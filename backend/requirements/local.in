@@ -1,0 +1,9 @@
+# Development and test dependencies (input file for pip-tools).
+# Runtime pins are taken from base.txt so local and production resolve identical versions.
+-c base.txt
+-r base.in
+django-extensions>=4.1,<5.0
+pytest>=8.3,<9.0
+pytest-django>=4.11,<5.0
+ruff>=0.11,<1.0
+pip-tools>=7.4,<8.0

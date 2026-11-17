@@ -1,0 +1,117 @@
+# Matermonial CI — G2 (repository governance).
+#
+# Scope: quality checks and backend tests only, using approved tooling
+# (CLAUDE.md CC-R08, CC-R11, CC-R58, CC-R60; TR-13 approved 2026-11-17).
+# - No deployment, no image build, no cloud access, no repository secrets.
+# - Dependencies install from the hashed pip-tools lockfiles (owner decision D4), which are
+#   compiled for Python 3.13, so CI uses Python 3.13.
+# - Tests run on PostgreSQL 16 and 18 (TR-13). The PostgreSQL credentials below belong to a
+#   throwaway CI service container and are not secrets.
+# - Known issue KI-11: the pre-baseline scaffold fails Ruff until G3 (owner decision D5),
+#   so the quality job is expected to fail on the Ruff steps until then.
+
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  PYTHON_VERSION: "3.13"
+
+jobs:
+  backend-quality:
+    name: Backend quality
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+          cache-dependency-path: backend/requirements/*.txt
+
+      - name: Install locked dependencies (hash-checked)
+        run: pip install -r requirements/local.txt
+
+      - name: Verify dependency consistency
+        run: pip check
+
+      - name: Verify lockfiles match their inputs
+        # Recompile from a copy of each committed lockfile (pip-compile keeps existing pins),
+        # so this fails only if a lockfile no longer satisfies its .in file, not on new upstream releases.
+        shell: bash
+        run: |
+          status=0
+          for r in base local production; do
+            cp "requirements/$r.txt" "/tmp/$r.txt"
+            pip-compile --quiet --generate-hashes --allow-unsafe --strip-extras \
+              --no-emit-index-url --output-file="/tmp/$r.txt" "requirements/$r.in"
+            if ! diff <(grep -v '^#' "requirements/$r.txt") <(grep -v '^#' "/tmp/$r.txt") > /dev/null; then
+              echo "requirements/$r.txt is out of date: regenerate it (backend/requirements/README.md)"
+              status=1
+            fi
+          done
+          exit $status
+
+      - name: Ruff lint
+        run: ruff check .
+
+      - name: Ruff format check
+        run: ruff format --check .
+
+  backend-tests:
+    name: Backend tests (PostgreSQL ${{ matrix.postgres }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        postgres: ["16", "18"]
+    services:
+      postgres:
+        image: postgres:${{ matrix.postgres }}
+        env:
+          POSTGRES_USER: matermonial_ci
+          POSTGRES_PASSWORD: matermonial_ci
+          POSTGRES_DB: matermonial_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U matermonial_ci"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql://matermonial_ci:matermonial_ci@localhost:5432/matermonial_ci
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+          cache-dependency-path: backend/requirements/*.txt
+
+      - name: Install locked dependencies (hash-checked)
+        run: pip install -r requirements/local.txt
+
+      - name: Run tests
+        run: pytest

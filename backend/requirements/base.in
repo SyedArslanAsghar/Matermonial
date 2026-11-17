@@ -1,0 +1,7 @@
+# Runtime dependencies (input file for pip-tools; owner decision D4, 2026-11-17).
+# Edit this file, then regenerate the lockfiles (see backend/requirements/README.md).
+Django>=5.2,<5.3
+djangorestframework>=3.16,<3.17
+django-environ>=0.12,<1.0
+psycopg[binary]>=3.2,<4.0
+drf-spectacular>=0.28,<0.29
