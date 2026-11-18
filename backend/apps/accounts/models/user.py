@@ -5,7 +5,7 @@ from django.db import models
 from django.db.models.functions import Lower
 from django.utils import timezone
 
-from .managers import E164_REGEX, UserManager, normalize_email
+from ..managers import E164_REGEX, UserManager, normalize_email
 
 
 class User(AbstractBaseUser, PermissionsMixin):
@@ -75,7 +75,7 @@ class User(AbstractBaseUser, PermissionsMixin):
 
     def save(self, *args, **kwargs):
         # Normalize/validate before persistence, including admin and service writes.
-        from .managers import normalize_phone_number
+        from ..managers import normalize_phone_number
 
         self.phone_number = normalize_phone_number(self.phone_number)
         self.email = normalize_email(self.email)

@@ -21,6 +21,10 @@ FK_LOCK_CLASSES: dict[str, str] = {
     # User.updated_by self-FK.
     "accounts.User.created_by": "B2",
     "accounts.User.updated_by": "B2",
+    # TR-01 lock order (doc 06 §22.1 amendment): login, refresh, logout and revocation take
+    # the account's User FOR SHARE first, and refresh locks AuthSession before AuthToken.
+    "accounts.AuthSession.user": "P",
+    "accounts.AuthToken.session": "P",
 }
 
 

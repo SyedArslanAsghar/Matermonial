@@ -85,4 +85,95 @@ class Migration(migrations.Migration):
             DROP FUNCTION IF EXISTS accounts_reject_permission_link();
             """,
         ),
+        migrations.CreateModel(
+            name='AuthSession',
+            fields=[
+                ('id', models.UUIDField(default=uuid.uuid4, editable=False, primary_key=True, serialize=False)),
+                ('client_type', models.CharField(choices=[('WEB', 'Web'), ('MOBILE', 'Mobile')], max_length=6)),
+                ('scope', models.CharField(choices=[('FULL', 'Full'), ('DELETION_RECOVERY', 'Deletion Recovery')], default='FULL', max_length=17)),
+                ('status', models.CharField(choices=[('ACTIVE', 'Active'), ('REVOKED', 'Revoked'), ('EXPIRED', 'Expired')], default='ACTIVE', max_length=7)),
+                ('created_at', models.DateTimeField(auto_now_add=True)),
+                ('last_seen_at', models.DateTimeField()),
+                ('idle_expires_at', models.DateTimeField()),
+                ('absolute_expires_at', models.DateTimeField()),
+                ('reauthenticated_at', models.DateTimeField(blank=True, null=True)),
+                ('revoked_at', models.DateTimeField(blank=True, null=True)),
+                ('revoked_reason', models.CharField(blank=True, choices=[('LOGOUT', 'Logout'), ('USER_REVOKED', 'User Revoked'), ('USER_REVOKED_ALL', 'User Revoked All'), ('PASSWORD_RESET', 'Password Reset'), ('PASSWORD_CHANGED', 'Password Changed'), ('DEACTIVATED', 'Deactivated'), ('DELETION_REQUESTED', 'Deletion Requested'), ('ADMIN', 'Admin'), ('REFRESH_REUSE', 'Refresh Reuse'), ('KEY_COMPROMISE', 'Key Compromise')], max_length=18, null=True)),
+                ('key_version_current', models.PositiveIntegerField(blank=True, null=True)),
+                ('device_name', models.CharField(blank=True, max_length=100)),
+                ('platform', models.CharField(blank=True, max_length=50)),
+                ('app_version', models.CharField(blank=True, max_length=50)),
+                ('user_agent', models.CharField(blank=True, max_length=512)),
+                ('login_ip', models.GenericIPAddressField(blank=True, null=True)),
+                ('last_ip', models.GenericIPAddressField(blank=True, null=True)),
+                ('approximate_location', models.CharField(blank=True, max_length=100)),
+                ('user', models.ForeignKey(on_delete=django.db.models.deletion.PROTECT, related_name='sessions', to=settings.AUTH_USER_MODEL)),
+            ],
+            options={
+                'db_table': 'accounts_auth_session',
+            },
+        ),
+        migrations.CreateModel(
+            name='AuthToken',
+            fields=[
+                ('id', models.UUIDField(default=uuid.uuid4, editable=False, primary_key=True, serialize=False)),
+                ('token_type', models.CharField(choices=[('ACCESS', 'Access'), ('REFRESH', 'Refresh')], max_length=7)),
+                ('token_hash', models.CharField(max_length=64, unique=True)),
+                ('generation', models.PositiveIntegerField()),
+                ('parent_id', models.UUIDField(blank=True, null=True)),
+                ('key_version', models.PositiveIntegerField()),
+                ('issued_at', models.DateTimeField()),
+                ('expires_at', models.DateTimeField()),
+                ('used_at', models.DateTimeField(blank=True, null=True)),
+                ('revoked_at', models.DateTimeField(blank=True, null=True)),
+                ('session', models.ForeignKey(on_delete=django.db.models.deletion.PROTECT, related_name='tokens', to='accounts.authsession')),
+            ],
+            options={
+                'db_table': 'accounts_auth_token',
+            },
+        ),
+        migrations.AddIndex(
+            model_name='authsession',
+            index=models.Index(fields=['user', 'status'], name='auth_session_user_status'),
+        ),
+        migrations.AddIndex(
+            model_name='authsession',
+            index=models.Index(fields=['key_version_current'], name='auth_session_key_version'),
+        ),
+        migrations.AddConstraint(
+            model_name='authsession',
+            constraint=models.CheckConstraint(condition=models.Q(('idle_expires_at__lte', models.F('absolute_expires_at'))), name='auth_session_idle_within_absolute'),
+        ),
+        migrations.AddConstraint(
+            model_name='authsession',
+            constraint=models.CheckConstraint(condition=models.Q(models.Q(('revoked_at__isnull', False), ('revoked_reason__isnull', False), ('status', 'REVOKED')), models.Q(models.Q(('status', 'REVOKED'), _negated=True), ('revoked_at__isnull', True), ('revoked_reason__isnull', True)), _connector='OR'), name='auth_session_revocation_consistent'),
+        ),
+        migrations.AddConstraint(
+            model_name='authsession',
+            constraint=models.CheckConstraint(condition=models.Q(('client_type', 'MOBILE'), ('key_version_current__isnull', True), _connector='OR'), name='auth_session_key_version_mobile_only'),
+        ),
+        migrations.AddIndex(
+            model_name='authtoken',
+            index=models.Index(fields=['session', 'token_type'], name='auth_token_session_type'),
+        ),
+        migrations.AddIndex(
+            model_name='authtoken',
+            index=models.Index(fields=['parent_id'], name='auth_token_parent'),
+        ),
+        migrations.AddConstraint(
+            model_name='authtoken',
+            constraint=models.CheckConstraint(condition=models.Q(('token_hash__regex', '^[0-9a-f]{64}$')), name='auth_token_hash_is_sha256_hex'),
+        ),
+        migrations.AddConstraint(
+            model_name='authtoken',
+            constraint=models.CheckConstraint(condition=models.Q(('expires_at__gt', models.F('issued_at'))), name='auth_token_expires_after_issue'),
+        ),
+        migrations.AddConstraint(
+            model_name='authtoken',
+            constraint=models.CheckConstraint(condition=models.Q(('token_type', 'REFRESH'), ('used_at__isnull', True), _connector='OR'), name='auth_token_only_refresh_is_used'),
+        ),
+        migrations.AddConstraint(
+            model_name='authtoken',
+            constraint=models.CheckConstraint(condition=models.Q(models.Q(('generation', 0), ('parent_id__isnull', True)), models.Q(('generation__gt', 0), ('parent_id__isnull', False)), _connector='OR'), name='auth_token_generation_parent_consistent'),
+        ),
     ]

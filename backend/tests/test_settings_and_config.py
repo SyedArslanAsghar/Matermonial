@@ -50,7 +50,7 @@ def test_api_foundation_settings():
 def test_custom_user_model_is_discoverable():
     user_model = get_user_model()
     assert settings.AUTH_USER_MODEL == "accounts.User"
-    assert user_model.__module__ == "apps.accounts.models"
+    assert user_model.__module__.startswith("apps.accounts.models")  # models/ package (G4)
     assert user_model._meta.app_label == "accounts"
     assert user_model._meta.db_table == "accounts_user"
     assert user_model.USERNAME_FIELD == "phone_number"
