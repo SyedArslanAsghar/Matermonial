@@ -40,6 +40,7 @@ INSTALLED_APPS = [
     # Project domain apps (backend/apps/, DR-2026-11-17-G3-3)
     "apps.accounts",
     "apps.audit",
+    "apps.platform_ops",
     # Shared kernel infrastructure (common/, DR-2026-11-18-G4-6)
     "common.events",
     "common.idempotency",
@@ -178,6 +179,8 @@ CELERY_BEAT_SCHEDULE = {
     "process-outbox": {"task": "events.process_outbox", "schedule": 10.0},
     "redact-and-purge-outbox": {"task": "events.redact_and_purge_outbox", "schedule": 3600.0},
     "purge-idempotency-records": {"task": "idempotency.purge_expired", "schedule": 3600.0},
+    "ensure-log-partitions": {"task": "platform_ops.ensure_log_partitions", "schedule": 86400.0},
+    "registry-checkpoint": {"task": "platform_ops.write_registry_checkpoint", "schedule": 86400.0},
 }
 
 # --- Celery and Redis (DR-2026-11-17-G3-4; CC-R53, CC-R54) ---

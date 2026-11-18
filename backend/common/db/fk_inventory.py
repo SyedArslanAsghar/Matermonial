@@ -31,6 +31,10 @@ FK_LOCK_CLASSES: dict[str, str] = {
     # The idempotent operation runs inside a service that has already locked the account
     # (doc 12 §5: account level 2 precedes inserts).
     "idempotency.IdempotencyRecord.account": "P",
+    # Maintenance lock domain (doc 09 §19.2): the operation row is locked first; the approver
+    # is a staff actor (class B2, bounded wait).
+    "platform_ops.MaintenanceApproval.operation": "P",
+    "platform_ops.MaintenanceApproval.approver": "B2",
 }
 
 

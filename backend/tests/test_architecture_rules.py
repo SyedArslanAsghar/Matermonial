@@ -96,11 +96,15 @@ def test_project_models_use_uuid_primary_keys():
     def pk_types(model):
         pk = model._meta.pk
         fields = getattr(pk, "fields", None)  # CompositePrimaryKey (link tables)
-        return [f.get_internal_type() for f in fields] if fields else [pk.get_internal_type()]
+        parts = fields or [pk]
+        # A key column that is a foreign key has the type of the column it references.
+        return [(f.target_field if f.is_relation else f).get_internal_type() for f in parts]
 
+    # Natural keys required by the specification (control rows, not domain entities).
+    spec_natural_keys = {"platform_ops.RegistryStreamHead"}  # doc 09 §19.2: (stream PK, ...)
     offenders = [
         f"{m._meta.label}: {pk_types(m)}"
         for m in project_models()
-        if any(t != "UUIDField" for t in pk_types(m))
+        if m._meta.label not in spec_natural_keys and any(t != "UUIDField" for t in pk_types(m))
     ]
     assert offenders == []
