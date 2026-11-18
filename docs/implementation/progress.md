@@ -251,3 +251,15 @@ G2 criterion "CI runs on the baseline": **OPEN**, pending the owner's decision o
 
 *Outcome (same day):* accepted by the owner as satisfying the criterion (Option A, DR-2026-11-18-G2C). `38f491d` did not run independently. The governance records are submitted on the branch `docs/ci-governance-acceptance` as a pull request to `main`, not merged (D2).
 
+## KI-19: GitHub Actions on Node.js 24 (2026-11-18, under DR-2026-11-18-CI)
+
+The owner approved `actions/checkout@v7` and `actions/setup-python@v7`.
+
+- **Change:** branch `fix/ki-19-actions-node24`. Only the 4 action references in `.github/workflows/ci.yml` changed (2 per action); otherwise the parsed workflow is identical. The matrices, test commands, the KI-14 deferred set, the PostgreSQL guard, the lockfile and Ruff checks and the permissions are unchanged.
+- **Compatibility checked:**
+  - both v7 releases run on Node.js 24, which needs runner 2.327.1 or newer (GitHub-hosted runners qualify);
+  - `setup-python@v7` keeps `python-version`, `cache` and `cache-dependency-path`;
+  - Python 3.12.16 and 3.13.18 are published for Linux x64 on Ubuntu 22.04, 24.04 and 26.04.
+- **Evidence:** run `44298922332`: success, 6/6 jobs, 0 Node.js 20 warnings, 4/4 test jobs with the KI-14 DEFERRED notice.
+- **Status:** KI-19 resolved on the branch; it reaches `main` when the PR is merged after owner review.
+
