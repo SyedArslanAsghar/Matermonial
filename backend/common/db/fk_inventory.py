@@ -35,6 +35,9 @@ FK_LOCK_CLASSES: dict[str, str] = {
     # is a staff actor (class B2, bounded wait).
     "platform_ops.MaintenanceApproval.operation": "P",
     "platform_ops.MaintenanceApproval.approver": "B2",
+    # OTP verify locks the account (level 2) before the verification row; send runs with no
+    # other business locks.
+    "verification.PhoneVerification.user": "P",
 }
 
 

@@ -19,8 +19,8 @@ DEV_LABEL = "matermonial-dev-only-not-secret"
 
 # Purposes (doc 16 §10.1): KEK wraps subject data keys; QUEUE encrypts outbox payloads;
 # DEDUPE keys the outbox dedupe HMAC; SUBJECT_HASH keys the unknown-phone HMAC;
-# REGISTRY signs compliance-registry entries.
-PURPOSES = ("KEK", "QUEUE", "DEDUPE", "SUBJECT_HASH", "REGISTRY")
+# REGISTRY signs compliance-registry entries; OTP keys the one-time-code hash (doc 06 §3).
+PURPOSES = ("KEK", "QUEUE", "DEDUPE", "SUBJECT_HASH", "REGISTRY", "OTP")
 
 
 class KeyConfigurationError(Exception):

@@ -41,6 +41,7 @@ INSTALLED_APPS = [
     "apps.accounts",
     "apps.audit",
     "apps.platform_ops",
+    "apps.verification",
     # Shared kernel infrastructure (common/, DR-2026-11-18-G4-6)
     "common.events",
     "common.idempotency",
@@ -161,7 +162,7 @@ PUSH_PROVIDER = env("PUSH_PROVIDER", default="disabled")
 # Each ring is "<version>:<base64 32-byte key>,..." plus its active version. The defaults are
 # DEV-ONLY keys derived from a public label (common.crypto.keys): fine for local development and
 # tests, never for real data. Staging and production refuse them (common.config).
-for _purpose in ("KEK", "QUEUE", "DEDUPE", "SUBJECT_HASH", "REGISTRY"):
+for _purpose in ("KEK", "QUEUE", "DEDUPE", "SUBJECT_HASH", "REGISTRY", "OTP"):
     globals()[f"{_purpose}_KEYS"] = env(f"{_purpose}_KEYS", default=dev_keyring(_purpose))
     globals()[f"{_purpose}_ACTIVE_VERSION"] = env.int(f"{_purpose}_ACTIVE_VERSION", default=1)
 # Compliance registry (TR-24): "local" writes hash-chained JSON files under
@@ -174,6 +175,11 @@ COMPLIANCE_REGISTRY_LOCATION = env(
 OUTBOX_LEASE_SECONDS = env.int("OUTBOX_LEASE_SECONDS", default=300)
 OUTBOX_REDACT_AFTER_DAYS = env.int("OUTBOX_REDACT_AFTER_DAYS", default=7)
 OUTBOX_PURGE_AFTER_DAYS = env.int("OUTBOX_PURGE_AFTER_DAYS", default=30)
+# One-time codes (doc 03 §2.5, doc 06 §3; configurable defaults).
+OTP_VALIDITY_SECONDS = env.int("OTP_VALIDITY_SECONDS", default=300)
+OTP_RESEND_COOLDOWN_SECONDS = env.int("OTP_RESEND_COOLDOWN_SECONDS", default=60)
+OTP_MAX_ATTEMPTS = env.int("OTP_MAX_ATTEMPTS", default=5)
+OTP_MAX_SENDS_PER_HOUR = env.int("OTP_MAX_SENDS_PER_HOUR", default=5)
 # Periodic kernel jobs (run by celery beat when a worker is used; doc 12 §6, CC-R53).
 CELERY_BEAT_SCHEDULE = {
     "process-outbox": {"task": "events.process_outbox", "schedule": 10.0},
