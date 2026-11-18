@@ -1,6 +1,6 @@
 # ADR-027: Administrative authorization from a single source
 
-**Status:** PROPOSED (TR-07). ADR decision and TR-07 approval are both due before G4 (baseline v4.6 approval-by-gate table).
+**Status:** APPROVED (DR-2026-11-18-G4, 2026-11-18; with TR-07). Implemented as decision D-4 Option A′: `PermissionsMixin` kept; Django groups and `user_permissions` link tables stay empty, enforced by trigger and test. *Previously:* PROPOSED (TR-07). ADR decision and TR-07 approval are both due before G4 (baseline v4.6 approval-by-gate table).
 **Date:** 2026-11-16 (G1)
 **Source:** approved baseline `docs/baseline/v4.6-F3/` (DR-2026-11-16-1). Approving the baseline didn't approve this ADR's technical content unless the status above says so.
 

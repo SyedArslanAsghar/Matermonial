@@ -23,14 +23,14 @@ One row per requirement, from the SRS (doc 01) to its domain, module, status and
 | FR-ACC-002 | FR-003 | Phone verification | D03 | M04, M01 | APPROVED | NOT_STARTED | — | T-AUTH |
 | FR-ACC-003 | — | Email | D01 | M01 | APPROVED | NOT_STARTED | — | T-AUTH |
 | FR-ACC-004 | FR-001 | Adult eligibility | D01 | M01 | APPROVED | NOT_STARTED | OD-04b (underage handling) (dependent behaviour BLOCKED) | T-AUTH |
-| FR-ACC-005 | FR-007 | Authentication | D02 | M01, M15 | APPROVED | NOT_STARTED | — | T-AUTH, T-SEC, T-CONC-001…004 |
+| FR-ACC-005 | FR-007 | Authentication | D02 | M01, M15 | APPROVED | IN_PROGRESS (G4: AuthSession/AuthToken schema; flows G5 Phase 2) | — | T-AUTH, T-SEC, T-CONC-001…004 |
 | FR-ACC-006 | FR-004 | Account/profile separation | D01 | M01 | APPROVED | NOT_STARTED | — | T-AUTH |
-| FR-ACC-007 | FR-005 | Account audit fields | D01 | M01 | APPROVED | NOT_STARTED | — | T-AUTH |
-| FR-ACC-008 | FR-002 | Phone normalization | D01 | M01 | APPROVED | NOT_STARTED | — | T-AUTH |
+| FR-ACC-007 | FR-005 | Account audit fields | D01 | M01 | APPROVED | IN_PROGRESS (G4: created_by/updated_by fields with PROTECT; set by services from G5) | — | T-AUTH |
+| FR-ACC-008 | FR-002 | Phone normalization | D01 | M01 | APPROVED | TESTED (G4, DR-2026-11-18-G4: E.164 normalisation, unique, DB CHECK; tests in apps/accounts/tests) | — | T-AUTH |
 | FR-ACC-009 | — | Limited browsing | D01 | M01 | APPROVED | BLOCKED | OD-02a/b (whole requirement) | T-AUTH |
 | FR-ACC-010 | FR-006 | Account deactivation (from FR-006) | D01 | M01 | APPROVED | NOT_STARTED | OD-02c (dependent behaviour BLOCKED) | T-AUTH |
 | FR-ADM-001 | — | Administrative capabilities | D22 | M15, M16 | APPROVED | NOT_STARTED | — | T-LOG, T-REG |
-| FR-ADM-002 | — | Least-privilege, audited administration | D22 | M15, M16 | APPROVED | NOT_STARTED | — | T-LOG, T-REG |
+| FR-ADM-002 | — | Least-privilege, audited administration | D22 | M15, M16 | APPROVED | IN_PROGRESS (G4: audit log, maintenance protocol, DB grant model; admin roles G5 Phase 2) | — | T-LOG, T-REG |
 | FR-CON-001 | — | Connection creation | D14 | M08 | APPROVED | NOT_STARTED | — | T-CON |
 | FR-CON-002 | — | Connection states | D14 | M08 | APPROVED | NOT_STARTED | OD-06h/i/l (dependent behaviour BLOCKED) | T-CON |
 | FR-CON-003 | — | Reopening | D14 | M08 | APPROVED | NOT_STARTED | OD-06n (dependent behaviour BLOCKED) | T-CON |
@@ -45,7 +45,7 @@ One row per requirement, from the SRS (doc 01) to its domain, module, status and
 | FR-DAT-006 | — | Account deletion | D21 | M14 | APPROVED | NOT_STARTED | OD-04c (dependent behaviour BLOCKED) | T-DEL, T-REG, T-SEC-013…020 |
 | FR-DAT-007 | — | Recovery period | D21 | M14 | APPROVED | NOT_STARTED | OD-02d (dependent behaviour BLOCKED) | T-DEL, T-REG, T-SEC-013…020 |
 | FR-DAT-008 | — | Deletion processing | D21 | M14 | APPROVED | NOT_STARTED | — | T-DEL, T-REG, T-SEC-013…020 |
-| FR-DAT-009 | — | Retention exceptions | D21 | M14 | APPROVED | NOT_STARTED | — | T-DEL, T-REG, T-SEC-013…020 |
+| FR-DAT-009 | — | Retention exceptions | D21 | M14 | APPROVED | IN_PROGRESS (G4: audit hold tables and release function; hold cases G5 Phase 15) | — | T-DEL, T-REG, T-SEC-013…020 |
 | FR-DAT-010 | — | Manager deletion | D21 | M14 | APPROVED | NOT_STARTED | — | T-DEL, T-REG, T-SEC-013…020 |
 | FR-FAM-001 | — | Authorization invitation | D08 | M05 | APPROVED | NOT_STARTED | — | T-ACT |
 | FR-FAM-002 | — | Acceptance | D08 | M05 | APPROVED | NOT_STARTED | — | T-ACT |
@@ -83,7 +83,7 @@ One row per requirement, from the SRS (doc 01) to its domain, module, status and
 | FR-NOT-002 | — | Notification preferences | D19 | M12 | APPROVED | NOT_STARTED | OD-02e (dependent behaviour BLOCKED) | T-NOT, T-OUT |
 | FR-NOT-003 | — | Security notifications can't be disabled | D19 | M12 | APPROVED | NOT_STARTED | — | T-NOT, T-OUT |
 | FR-NOT-004 | — | Generic SMS/push content | D19 | M12 | APPROVED | NOT_STARTED | — | T-NOT, T-OUT |
-| FR-NOT-005 | — | Transactional outbox and retryable delivery (approved core; ADR-014 core. Refinements are TR-11 / ADR-028, PROPOSED, not part of this row's approval) | D19 | M12 | APPROVED | NOT_STARTED | — | T-NOT, T-OUT |
+| FR-NOT-005 | — | Transactional outbox and retryable delivery (approved core; ADR-014 core. Refinements are TR-11 / ADR-028, PROPOSED, not part of this row's approval) | D19 | M12 | APPROVED | IN_PROGRESS (G4: outbox core and TR-11 processing tested; provider delivery G5 Phase 12) | — | T-NOT, T-OUT |
 | FR-NOT-006 | — | English and Urdu templates | D19 | M12 | APPROVED | NOT_STARTED | — | T-NOT, T-OUT |
 | FR-PREF-001 | FR-018 | Partner preference management (FR-018) | D07 | M03 | APPROVED | NOT_STARTED | — | — |
 | FR-PREF-002 | FR-019 | Nullable Boolean preferences (FR-019) | D07 | M03 | APPROVED | NOT_STARTED | — | — |

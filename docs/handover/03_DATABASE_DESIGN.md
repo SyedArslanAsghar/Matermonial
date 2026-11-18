@@ -35,7 +35,7 @@ Principal fields:
 
 - `id`: UUID.
 - `phone_number`: normalized E.164, unique.
-- `email`: nullable, unique when supplied.
+- `email`: nullable, unique when supplied, **case-insensitively**; stored trimmed and lower-cased (DR-2026-11-18-G4-9).
 - `password`: Django password hash.
 - `first_name`.
 - `last_name`.
@@ -43,8 +43,8 @@ Principal fields:
 - `is_active`.
 - `is_staff`.
 - `is_superuser`.
-- `phone_verified`.
-- `email_verified`.
+- `is_phone_verified` (name aligned with §22.1 row 5; DR-2026-11-18-G4-9).
+- `is_email_verified` (same naming convention; DR-2026-11-18-G4-9).
 - `deactivated`: Boolean, default false.
 - `deactivated_reason`: nullable text.
 - `created_at`.
@@ -2242,3 +2242,19 @@ Registry entry and local log row definition (DCR-95):
 | §18 duplicated "one wallet" item | Removed | DCR-13 |
 | `MatrimonialRequest.refund_outcome` (proposed in v4.1) | Never added; outcome derived | DCR-56 |
 | `Interest.closure_reason = SUPERSEDED_BY_REQUEST` | Never added | DCR-51 |
+
+### 22.17 G4 implementation record (2026-11-18, DR-2026-11-18-G4)
+
+Editorial record of how G4 implemented §22 (the TRs above were approved by DR-2026-11-18-G4-10). Where §22 left a detail open, the choice below was made under the clarification policy of DR-2026-11-18-G4 and is the current design.
+
+| Item | Implementation |
+|---|---|
+| App placement | `accounts`: User, AuthSession, AuthToken, AccountSecurityEvent, SubjectPseudonym, SubjectDataKey. `audit`: AuditLog, `audit_log_hold`, `audit_log_hold_link`, view `audit_log_all`. `common/events`: OutboxEvent. `common/idempotency`: IdempotencyRecord. `platform_ops`: TR-24 tables, `shredded_pseudonym`, `kek_rewrap_log` |
+| Migrations | One initial migration per app. Project-wide SQL functions (`uuid_v7`, `uuid_v7_lower`, `ensure_uuid7_partitions`, `reject_row_change`, `check_enc_parts`) live in `accounts.0001`, the root migration. Every RunSQL has reverse SQL; all migrations reverse to zero on PostgreSQL 16 and 18 |
+| **IdempotencyRecord** (columns fixed at G4) | `id`, `account` (FK, PROTECT), `key` (8–128 chars `[A-Za-z0-9_.:-]`), `scope` (operation code), `request_fingerprint` (SHA-256 of method, path and canonical body), `status` (COMPLETED), `response_status`, `response_body`, `created_at`, `expires_at` (default 24 h; purged). `UNIQUE (account, key)`. Written in the operation's own transaction; a different scope or body for the same key is a conflict, never a replay |
+| **AuditLog** columns | `actor_type` USER / MANAGER / ADMIN / SYSTEM; `actor_pseudonym`, `subject_pseudonym`, `represented_profile_pseudonym`; `action` and `resource_type` as dotted lowercase codes (CHECK); `result` SUCCESS / FAILURE / DENIED; `category` SYSTEM / FINANCIAL / ADMINISTRATIVE / STATE_CHANGE / SECURITY (retention per category); `request_id`; `safe_metadata` (allowlist: snake_case keys, scalar values, code-like strings only); `enc_parts`. Hold rows add `retain_until` and `moved_at` |
+| Hold tables | Held-event tables exist for `audit_log` only, as specified; security-event retention is partition-level |
+| OutboxEvent additions | `terminal_at` and `redacted_at` (needed to apply the 7/30-day rules); `obligation_resolution` is set to PENDING for FINANCIAL_OBLIGATION events at emit |
+| Partitions | Created 3 months (logs) / 1 year (maintenance log) ahead. The first partitions are created by the migrations, before the registry exists; every later partition change is a recorded PARTITION_CREATE / PARTITION_DROP operation |
+| `registry_stream_head` | Natural key `stream` (the only non-UUID primary key; a two-row control table) |
+| Database roles (D-11) | Append-only enforced by triggers for every role; the application-role GRANT model is `common/db/grants.py` (tested); applying it to deployed roles is deployment work |

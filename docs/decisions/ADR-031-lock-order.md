@@ -1,6 +1,6 @@
 # ADR-031: Global lock-order and anchor policy
 
-**Status:** PROPOSED (the ADR document). The TRs it records, TR-09 and TR-22, are **APPROVED** (DR-2026-11-17-G3-2, 2026-11-17). Approving the TRs didn't by itself approve this ADR document; ADR decision due before G4 (baseline v4.6 approval-by-gate table).
+**Status:** APPROVED (DR-2026-11-18-G4, 2026-11-18). The TRs it records, TR-09 and TR-22, were already APPROVED (DR-2026-11-17-G3-2). *Previously:* PROPOSED (the ADR document). The TRs it records, TR-09 and TR-22, are **APPROVED** (DR-2026-11-17-G3-2, 2026-11-17). Approving the TRs didn't by itself approve this ADR document; ADR decision due before G4 (baseline v4.6 approval-by-gate table).
 **Date:** 2026-11-16 (G1)
 **Source:** approved baseline `docs/baseline/v4.6-F3/` (DR-2026-11-16-1). Approving the baseline didn't approve this ADR's technical content unless the status above says so.
 

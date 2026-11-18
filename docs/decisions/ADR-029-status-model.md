@@ -1,6 +1,6 @@
 # ADR-029: Three independent status dimensions
 
-**Status:** PROPOSED (the ADR document; DR-2026-11-17-C6). ADR decision due before G4 (baseline v4.6 approval-by-gate table). The decision it records, TR-14 / DCR-12, is **APPROVED** by DR-2026-11-16-2 and is already binding through doc 00 §9.1 and `CLAUDE.md` CC-R69–CC-R70; approving TR-14 didn't by itself approve this ADR document.
+**Status:** APPROVED (DR-2026-11-18-G4, 2026-11-18). The decision it records, TR-14 / DCR-12, was already APPROVED by DR-2026-11-16-2. *Previously:* PROPOSED (the ADR document; DR-2026-11-17-C6). ADR decision due before G4 (baseline v4.6 approval-by-gate table). The decision it records, TR-14 / DCR-12, is **APPROVED** by DR-2026-11-16-2 and is already binding through doc 00 §9.1 and `CLAUDE.md` CC-R69–CC-R70; approving TR-14 didn't by itself approve this ADR document.
 **Date:** 2026-11-16 (G1)
 **Source:** approved baseline `docs/baseline/v4.6-F3/` (DR-2026-11-16-1). Approving the baseline didn't approve this ADR's technical content unless the status above says so.
 

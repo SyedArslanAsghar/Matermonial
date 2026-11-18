@@ -1,14 +1,16 @@
 """Fail-closed configuration validation for deployed environments (doc 16 §7, doc 10 G3).
 
 Staging and production refuse to start when required configuration is missing or unsafe.
-Only configuration that already exists in G3 is validated here; the compliance-registry,
-KEK and queue-key items of doc 16 §10 belong to TR-11/TR-23/TR-24 (PROPOSED) and are added
-when those are approved.
+G4 (DR-2026-11-18-G4) adds the key rings and compliance-registry items of doc 16 §10
+(TR-11, TR-23, TR-24): deployed environments must configure real keys and a non-local
+registry. Errors name settings, never values.
 """
 
 from collections.abc import Mapping
 
 from django.core.exceptions import ImproperlyConfigured
+
+from common.crypto.keys import PURPOSES, KeyConfigurationError, KeyRing, parse_keyring
 
 INSECURE_DEFAULT_SECRET_KEY = "unsafe-local-only-key-change-me"
 MIN_SECRET_KEY_LENGTH = 50
@@ -20,6 +22,30 @@ NON_PRODUCTION_EMAIL_BACKENDS = {
     "django.core.mail.backends.dummy.EmailBackend",
 }
 SUPPORTED_STORAGE_BACKENDS = {"local"}
+NON_PRODUCTION_REGISTRY_BACKENDS = {"local", "mock"}
+
+
+def key_ring_errors(settings: Mapping, environ: Mapping) -> list[str]:
+    """Key rings must be set explicitly, well formed, contain the active version and hold no
+    dev-only key (TR-23, TR-11, TR-24)."""
+    errors = []
+    for purpose in PURPOSES:
+        name = f"{purpose}_KEYS"
+        if not environ.get(name):
+            errors.append(f"{name} must be set explicitly (no default keys in deployment).")
+            continue
+        try:
+            ring = KeyRing(
+                purpose,
+                parse_keyring(settings.get(name, "")),
+                settings.get(f"{purpose}_ACTIVE_VERSION"),
+            )
+        except KeyConfigurationError as exc:
+            errors.append(f"{name}: {exc}")
+            continue
+        if ring.uses_dev_keys():
+            errors.append(f"{name} contains a dev-only key.")
+    return errors
 
 
 def deployed_settings_errors(settings: Mapping, environ: Mapping) -> list[str]:
@@ -53,6 +79,12 @@ def deployed_settings_errors(settings: Mapping, environ: Mapping) -> list[str]:
         errors.append(
             "STORAGE_BACKEND is not supported; object storage needs an approved dependency. "
             "Never fall back to public storage (doc 16 §7)."
+        )
+    errors.extend(key_ring_errors(settings, environ))
+    if settings.get("COMPLIANCE_REGISTRY_BACKEND") in NON_PRODUCTION_REGISTRY_BACKENDS:
+        errors.append(
+            "COMPLIANCE_REGISTRY_BACKEND must be the approved external registry when deployed "
+            "(TR-24; the storage resource needs owner approval before production)."
         )
     return errors
 

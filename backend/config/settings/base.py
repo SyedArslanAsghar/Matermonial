@@ -9,6 +9,7 @@ from pathlib import Path
 
 import environ
 
+from common.crypto.keys import dev_keyring
 from common.logs import build_logging_config
 
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
@@ -38,6 +39,11 @@ INSTALLED_APPS = [
     "drf_spectacular",
     # Project domain apps (backend/apps/, DR-2026-11-17-G3-3)
     "apps.accounts",
+    "apps.audit",
+    "apps.platform_ops",
+    # Shared kernel infrastructure (common/, DR-2026-11-18-G4-6)
+    "common.events",
+    "common.idempotency",
 ]
 
 MIDDLEWARE = [
@@ -150,6 +156,32 @@ CSRF_COOKIE_HTTPONLY = False
 EMAIL_BACKEND = env("EMAIL_BACKEND", default="django.core.mail.backends.console.EmailBackend")
 SMS_PROVIDER = env("SMS_PROVIDER", default="disabled")
 PUSH_PROVIDER = env("PUSH_PROVIDER", default="disabled")
+
+# --- Encryption, pseudonymisation and registry keys (TR-23, TR-11, TR-24; doc 16 §10) ---
+# Each ring is "<version>:<base64 32-byte key>,..." plus its active version. The defaults are
+# DEV-ONLY keys derived from a public label (common.crypto.keys): fine for local development and
+# tests, never for real data. Staging and production refuse them (common.config).
+for _purpose in ("KEK", "QUEUE", "DEDUPE", "SUBJECT_HASH", "REGISTRY"):
+    globals()[f"{_purpose}_KEYS"] = env(f"{_purpose}_KEYS", default=dev_keyring(_purpose))
+    globals()[f"{_purpose}_ACTIVE_VERSION"] = env.int(f"{_purpose}_ACTIVE_VERSION", default=1)
+# Compliance registry (TR-24): "local" writes hash-chained JSON files under
+# COMPLIANCE_REGISTRY_LOCATION; deployed environments need the approved external store.
+COMPLIANCE_REGISTRY_BACKEND = env("COMPLIANCE_REGISTRY_BACKEND", default="local")
+COMPLIANCE_REGISTRY_LOCATION = env(
+    "COMPLIANCE_REGISTRY_LOCATION", default=str(BASE_DIR / "var" / "compliance_registry")
+)
+# Outbox (TR-11; doc 16 §10.1).
+OUTBOX_LEASE_SECONDS = env.int("OUTBOX_LEASE_SECONDS", default=300)
+OUTBOX_REDACT_AFTER_DAYS = env.int("OUTBOX_REDACT_AFTER_DAYS", default=7)
+OUTBOX_PURGE_AFTER_DAYS = env.int("OUTBOX_PURGE_AFTER_DAYS", default=30)
+# Periodic kernel jobs (run by celery beat when a worker is used; doc 12 §6, CC-R53).
+CELERY_BEAT_SCHEDULE = {
+    "process-outbox": {"task": "events.process_outbox", "schedule": 10.0},
+    "redact-and-purge-outbox": {"task": "events.redact_and_purge_outbox", "schedule": 3600.0},
+    "purge-idempotency-records": {"task": "idempotency.purge_expired", "schedule": 3600.0},
+    "ensure-log-partitions": {"task": "platform_ops.ensure_log_partitions", "schedule": 86400.0},
+    "registry-checkpoint": {"task": "platform_ops.write_registry_checkpoint", "schedule": 86400.0},
+}
 
 # --- Celery and Redis (DR-2026-11-17-G3-4; CC-R53, CC-R54) ---
 REDIS_URL = env("REDIS_URL", default="redis://127.0.0.1:6379/0")

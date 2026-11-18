@@ -25,5 +25,4 @@ addopts = "-ra --strict-markers"
 testpaths = ["tests", "apps", "common"]
 markers = [
     "postgres: needs a disposable PostgreSQL database given by MATERMONIAL_TEST_POSTGRES_URL; skipped when it isn't set",
-    "deferred_g4_ki14: needs the initial accounts migration (G4, KI-14); reported as skipped with a DEFERRED reason, never as passed",
 ]

@@ -21,14 +21,28 @@ FK_LOCK_CLASSES: dict[str, str] = {
     # User.updated_by self-FK.
     "accounts.User.created_by": "B2",
     "accounts.User.updated_by": "B2",
+    # TR-01 lock order (doc 06 §22.1 amendment): login, refresh, logout and revocation take
+    # the account's User FOR SHARE first, and refresh locks AuthSession before AuthToken.
+    "accounts.AuthSession.user": "P",
+    "accounts.AuthToken.session": "P",
+    # TR-23: a data key is created in the same transaction as its pseudonym, and key
+    # destruction runs inside the deletion step that already locks the subject.
+    "accounts.SubjectDataKey.pseudonym": "P",
+    # The idempotent operation runs inside a service that has already locked the account
+    # (doc 12 §5: account level 2 precedes inserts).
+    "idempotency.IdempotencyRecord.account": "P",
+    # Maintenance lock domain (doc 09 §19.2): the operation row is locked first; the approver
+    # is a staff actor (class B2, bounded wait).
+    "platform_ops.MaintenanceApproval.operation": "P",
+    "platform_ops.MaintenanceApproval.approver": "B2",
 }
 
 
 def project_foreign_keys() -> list[str]:
-    """Every concrete FK/OneToOne declared by models in project apps (``apps.*``)."""
+    """Every concrete FK/OneToOne declared by models in project apps (``apps.*``, ``common.*``)."""
     found = []
     for model in apps.get_models():
-        if not model._meta.app_config.name.startswith("apps."):
+        if not model._meta.app_config.name.startswith(("apps.", "common.")):
             continue
         for field in model._meta.get_fields():
             if field.concrete and (field.many_to_one or field.one_to_one):

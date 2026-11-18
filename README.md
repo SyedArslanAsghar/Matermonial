@@ -6,9 +6,9 @@ A privacy-conscious matrimonial platform: a Django REST API backend, a React web
 
 ## Project status
 
-Work proceeds through owner-authorized gates (doc 10 §0): G1 documentation → **G2 repository governance** → G3 backend foundation → G4 first migration → G5 features. Current status: [`docs/implementation/progress.md`](docs/implementation/progress.md).
+Work proceeds through owner-authorized gates (doc 10 §0): G1 documentation → G2 repository governance → G3 backend foundation → **G4 first migration and backend kernel** → G5 features (G4 and G5 authorized, DR-2026-11-18-G4). Current status: [`docs/implementation/progress.md`](docs/implementation/progress.md).
 
-There are no product features yet. The backend foundation (G3) is in place: settings, the error envelope, logging, health checks, provider mocks, Celery wiring and lock foundations. **Don't run migrations**: the first migration belongs to G4 (see [`known_issues.md`](docs/implementation/known_issues.md)).
+There are no product features yet. The backend foundation (G3) and the G4 kernel are in place: the final `User` model and migrations, sessions and tokens, pseudonyms and envelope encryption, partitioned security-event and audit logs, the transactional outbox, idempotency records and the TR-24 maintenance protocol with a local compliance registry. Status and open items: [`progress.md`](docs/implementation/progress.md) and [`known_issues.md`](docs/implementation/known_issues.md).
 
 ## Repository structure
 
@@ -70,7 +70,7 @@ pytest                  # tests
 
 - Ruff and pytest settings are in `backend/pyproject.toml`.
 - Tests run on PostgreSQL (TR-13; `CLAUDE.md` CC-R58). Set `DATABASE_URL` in `backend/.env` to a local database role that may create databases; pytest-django creates and drops its own `test_…` database.
-- Tests that need the database carry `@pytest.mark.django_db`. Until the first migration exists (G4), pytest-django can't build the test database for them (KI-14). The only such tests today are the 3 User-model tests. They carry `@pytest.mark.deferred_g4_ki14`, so a plain `pytest` reports them as skipped with a "DEFERRED to G4" reason; they never count as passed. Any other database test fails until G4.
+- Tests that need the database carry `@pytest.mark.django_db`; pytest-django builds the test database from the migrations. Concurrency tests use `django_db(transaction=True)` with one connection per thread (doc 12 §8). Nothing is deferred: KI-14 was resolved in G4.
 - PostgreSQL foundation tests (`@pytest.mark.postgres`) cover readiness, advisory locks, `lock_timeout` and contention retry against a real server. They create no tables and run no migration. They only run when `MATERMONIAL_TEST_POSTGRES_URL` points to a **disposable** database, for example a throwaway container on a port other than 5432; otherwise they skip. They refuse port 5432 and local sockets, so they never touch a developer's own PostgreSQL server.
 - Testing standards: doc 08.
 
@@ -88,7 +88,17 @@ pytest                  # tests
   - readiness, which checks the database: `GET /api/v1/health/ready/`
   - OpenAPI schema and Swagger UI at `/api/schema/` and `/api/docs/`, only when `API_DOCS_ENABLED` (local by default)
 - `python manage.py check --database default` validates the configuration and database connection.
-- **`runserver` can't start before G4.** Django's development server builds the migration graph first, which fails until the custom User model has its first migration (KI-14). Don't work around this by creating migrations.
+- Set up a local database (never point at data you care about):
+
+  ```bash
+  python manage.py migrate                      # schema, functions, triggers, log partitions
+  python manage.py createsuperuser              # break-glass admin (TR-07: at most two)
+  python manage.py backfill_subject_pseudonyms  # only for accounts created outside the manager
+  python manage.py runserver
+  ```
+
+- Local settings use **dev-only** encryption, HMAC and registry keys derived from a public label (`common/crypto/keys.py`). They protect nothing and staging/production refuse them (doc 16 §11). The local compliance registry writes to `backend/var/compliance_registry/` (git-ignored).
+- Maintenance commands (TR-24 protocol, doc 09 §19): `ensure_log_partitions`, `drop_audit_partition`, `write_registry_checkpoint`; read-only: `verify_registry`, `print_db_grants <app_role>`.
 - Celery and Redis are optional locally. To run a worker against a local Redis:
 
   ```bash
@@ -97,7 +107,7 @@ pytest                  # tests
 
 ### Later setup steps
 
-These are documented as their gates are delivered: migrations, superuser creation and backend startup (G4); frontend and mobile startup (G5).
+Frontend and mobile startup are documented as G5 delivers them.
 
 ## Git workflow and contributions
 
@@ -116,7 +126,8 @@ These are documented as their gates are delivered: migrations, superuser creatio
     3. run the PostgreSQL foundation tests
     4. run every other test; the 3 KI-14 tests are reported as skipped, DEFERRED to G4
 - Any failure, error or collection error fails the job. There is no `continue-on-error`.
-- All steps pass locally. On GitHub, the first run (commit `c5fc346`) succeeded on all 6 jobs. The owner accepted it as satisfying the G2 criterion "CI runs on the baseline" (DR-2026-11-18-G2C). The baseline commit `38f491d` itself did not run independently.
+- **After G4 (owner action, KI-21):** step 2 checks for the 3 KI-14 tests marked deferred. G4 removed that marker because the tests now run and pass, so step 2 will fail until the workflow is updated: remove step 2 (and the KI-14 wording of step 4). CI/CD changes are made by the owner (DR-2026-11-18-G4).
+- Before G4, all steps passed locally. On GitHub, the first run (commit `c5fc346`) succeeded on all 6 jobs. The owner accepted it as satisfying the G2 criterion "CI runs on the baseline" (DR-2026-11-18-G2C). The baseline commit `38f491d` itself did not run independently.
 - The full pipeline, including builds, migration and schema checks, staging and production, is described in docs 08 and 09. It is delivered in later gates.
 
 ## Docker's role

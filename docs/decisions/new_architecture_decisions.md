@@ -1,7 +1,7 @@
 # New Architecture Decisions
 
 **Register status:** ACTIVE
-**Last updated:** 2026-11-18 (G2 CI criterion accepted, DR-2026-11-18-G2C)
+**Last updated:** 2026-11-18 (G4 and G5 authorized, DR-2026-11-18-G4)
 
 This register holds the project's approval decision records (DR-…) and the approved OD-01 domain catalogue. The decisions recorded here up to DR-2026-11-16-G1 have been applied to the handover documents during G1 (Documentation Reconciliation); where each was applied is recorded in `docs/handover/20_DOCUMENTATION_CORRECTION_REGISTER.md`. Owner decisions (OD) and technical recommendations (TR) and their statuses are tracked in `docs/handover/19_OPEN_DECISION_REGISTER.md`.
 
@@ -81,8 +81,8 @@ The legacy open decisions in `docs/handover/13_ASSUMPTIONS_RISKS_TRACEABILITY.md
 | G1 Documentation reconciliation | **COMPLETED. ACCEPTED by the project owner** (DR-2026-11-17-A, 2026-11-17). All 12 exit criteria met. |
 | G2 Repository governance | **ACCEPTED by the project owner with carried-forward items** (DR-2026-11-17-G2A). Baseline commit `38f491dea79fb9bb10fd2010b1c2cb8a68d545f9`. Exit criterion "CI runs on the baseline", carried forward OPEN under exception DR-2026-11-17-G2X: **satisfied by owner acceptance (DR-2026-11-18-G2C, 2026-11-18)** on the integrated run `44294474904` on commit `c5fc346` (success, 6/6 jobs). The baseline commit `38f491d` itself did not run independently. |
 | G3 Backend foundation | **ACCEPTED by the project owner** on 2026-11-18, with an accepted exception and a carried-forward item (DR-2026-11-18-G3A). Exit criterion "tests green on PostgreSQL" is not fully met: the foundation tests pass, but the 3 KI-14 User-model database tests are OPEN and carried forward to G4. |
-| G4 First migration | NOT STARTED. NOT AUTHORIZED. |
-| G5 Features | NOT STARTED. NOT AUTHORIZED. |
+| G4 First migration | AUTHORIZED (DR-2026-11-18-G4). **IMPLEMENTED; exit criteria met** (2026-11-18): migrations reviewed and validated from empty on PostgreSQL 16 and 18; kernel tests pass (220/220 on Python 3.12 and 3.13 × PostgreSQL 16 and 18; KI-14 resolved). **Owner acceptance pending** (only the owner sets ACCEPTED, CC-R70). G5 already authorized (DR-2026-11-18-G4). |
+| G5 Features | **AUTHORIZED** (DR-2026-11-18-G4), after G4 exit. |
 
 ### Baseline source
 
@@ -428,6 +428,35 @@ No speculative infrastructure tasks are added.
   - D6 (branch protection) and KI-15 (licence) stay deferred.
   - No other OD, TR, requirement or document status changes.
 - **Related authorization (D2):** commit the governance records on the short-lived branch `docs/ci-governance-acceptance`, push it, and open a pull request to `main`. Merging is **not** authorized and waits for owner review.
+
+---
+
+## Decision record DR-2026-11-18-G4: G4 and G5 authorized; G4 decision package adopted
+
+- **Decision ID:** DR-2026-11-18-G4
+- **Date:** 2026-11-18
+- **Decided by:** Project owner
+- **Decision status:** APPROVED
+- **Decision:** **G4 (First migration and complete backend kernel) and G5 (Features, per the roadmap) are AUTHORIZED** for development and validation. Not authorized: AWS and production deployment, production secrets and key management, CI/CD changes (the owner handles CI/CD separately), production release, public launch, live payment processing.
+- **Baseline:** the G4 owner decision package (2026-11-18) is the implementation baseline unless it conflicts with an approved requirement or reveals a material security, data-integrity or legal issue.
+
+| # | ID | Item | Decision |
+|---|---|---|---|
+| 1 | DR-2026-11-18-G4-1 | D-1 scope | Full G4 kernel (doc 10 §0.1), built in reviewable internal stages; every kernel component complete before G4 exit; one initial migration per app at G4 exit |
+| 2 | DR-2026-11-18-G4-2 | D-4 | Option A′: keep `PermissionsMixin`; `AdminRole` tables the only permission source; Django groups and `user_permissions` unused, enforced by database trigger and tests; `is_staff` a projection; `is_superuser` break-glass only |
+| 3 | DR-2026-11-18-G4-3 | D-5 | `django-otp` deferred to its G5 phase (Django 5.2 compatibility verified before use). `cryptography` and its transitive dependencies approved for G4; local development keys only |
+| 4 | DR-2026-11-18-G4-4 | D-7 | G3 no-migrations guard replaced by a migrations-in-sync guard |
+| 5 | DR-2026-11-18-G4-5 | D-8 | Disposable PostgreSQL 16 and 18 containers; the owner's server on port 5432 is never used |
+| 6 | DR-2026-11-18-G4-6 | D-9 | App placement: `apps/accounts` (User, AuthSession, AuthToken, AccountSecurityEvent, SubjectPseudonym, SubjectDataKey); `apps/audit` (AuditLog, hold tables); `common/events` (OutboxEvent); `common/idempotency` (IdempotencyRecord); `apps/platform_ops` (TR-24 tables); admin-authorization models in the accounts / admin-access domain |
+| 7 | DR-2026-11-18-G4-7 | D-10 | G4 kernel test list per the decision package (KI-14, UUIDv7, logs, audit and security events, outbox, registry, lock order, migrations) |
+| 8 | DR-2026-11-18-G4-8 | D-11 | Append-only enforced by database triggers in G4; GRANT model documented and tested; production role separation is deployment work |
+| 9 | DR-2026-11-18-G4-9 | User refinements | E.164 CHECK; deactivation consistency CHECK; nullable `deactivated_reason`; case-insensitive unique email with normalisation; UUID primary-key architecture test; doc 03 verification-field naming corrected |
+| 10 | DR-2026-11-18-G4-10 | TRs | **APPROVED:** TR-01, TR-07, TR-11, TR-17, TR-23; TR-21 schema portion only; TR-24 schema portion with a local/mock registry. TR-02 stays for Phase 4 |
+| 11 | DR-2026-11-18-G4-11 | ADRs | **APPROVED:** ADR-014 refinements, ADR-022, ADR-023, ADR-025, ADR-027, ADR-028, ADR-029, ADR-031, ADR-032. **Direction adopted:** ADR-026, ADR-030 (later-phase functionality not implemented early) |
+
+**Clarification policy:** ordinary implementation decisions use engineering judgment and are documented. The owner is asked only when an approved requirement would change, approved requirements conflict, business rules would materially change, a material security, privacy, data-loss or legal risk can't be resolved within the approved design, or work needs AWS, production deployment, production credentials or a financial commitment.
+
+**Unchanged:** OD-02…OD-10 stay OPEN; behaviour depending on them isn't implemented (CC-R25). AWS deployment stays deferred (DR-2026-11-18-CI).
 
 ---
 

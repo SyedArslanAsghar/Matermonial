@@ -2,15 +2,17 @@ import uuid
 
 from django.contrib.auth.models import AbstractBaseUser, PermissionsMixin
 from django.db import models
+from django.db.models.functions import Lower
 from django.utils import timezone
 
-from .managers import UserManager
+from ..managers import E164_REGEX, UserManager, normalize_email
 
 
 class User(AbstractBaseUser, PermissionsMixin):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    phone_number = models.CharField(max_length=16, unique=True, db_index=True)
-    email = models.EmailField(max_length=254, unique=True, null=True, blank=True)
+    phone_number = models.CharField(max_length=16, unique=True)
+    # Unique case-insensitively (constraint below); stored lower-cased by normalize_email.
+    email = models.EmailField(max_length=254, null=True, blank=True)
     first_name = models.CharField(max_length=100, blank=True)
     last_name = models.CharField(max_length=100, blank=True)
 
@@ -20,7 +22,7 @@ class User(AbstractBaseUser, PermissionsMixin):
     is_active = models.BooleanField(default=True)
     is_staff = models.BooleanField(default=False)
     deactivated = models.BooleanField(default=False)
-    deactivated_reason = models.TextField(blank=True)
+    deactivated_reason = models.TextField(null=True, blank=True)  # doc 03 §2.1: nullable
 
     date_joined = models.DateTimeField(default=timezone.now)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -55,15 +57,28 @@ class User(AbstractBaseUser, PermissionsMixin):
             models.Index(fields=["is_active", "deactivated"]),
             models.Index(fields=["created_at"]),
         ]
+        # Database constraints in addition to application validation (CC-R19, CC-R35).
+        constraints = [
+            models.CheckConstraint(
+                condition=models.Q(phone_number__regex=E164_REGEX),
+                name="accounts_user_phone_e164",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(deactivated=False) | models.Q(is_active=False),
+                name="accounts_user_deactivated_not_active",
+            ),
+            models.UniqueConstraint(Lower("email"), name="accounts_user_email_ci_unique"),
+        ]
 
     def __str__(self):
         return self.phone_number
 
     def save(self, *args, **kwargs):
         # Normalize/validate before persistence, including admin and service writes.
-        from .managers import normalize_phone_number
+        from ..managers import normalize_phone_number
 
         self.phone_number = normalize_phone_number(self.phone_number)
+        self.email = normalize_email(self.email)
         if self.deactivated:
             self.is_active = False
         super().save(*args, **kwargs)

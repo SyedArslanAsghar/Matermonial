@@ -1,6 +1,6 @@
 # ADR-030: Ledger as the permanent record; balances as projections
 
-**Status:** PROPOSED (TR-15). ADR decision due before G4 (baseline v4.6 approval-by-gate table); TR-15 approval due Phase 7 / 9 (doc 19).
+**Status:** DIRECTION ADOPTED (DR-2026-11-18-G4, 2026-11-18). TR-15 itself stays PROPOSED and is decided and implemented at G5 Phase 7 / 9. *Previously:* PROPOSED (TR-15). ADR decision due before G4 (baseline v4.6 approval-by-gate table); TR-15 approval due Phase 7 / 9 (doc 19).
 **Date:** 2026-11-16 (G1)
 **Source:** approved baseline `docs/baseline/v4.6-F3/` (DR-2026-11-16-1). Approving the baseline didn't approve this ADR's technical content unless the status above says so.
 

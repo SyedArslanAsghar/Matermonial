@@ -132,3 +132,23 @@ def pair_advisory_lock(
     function = "pg_advisory_xact_lock_shared" if shared else "pg_advisory_xact_lock"
     with connections[using].cursor() as cursor:
         cursor.execute(f"SELECT {function}(%s, %s)", [namespace, pair_key(first, second)])
+
+
+# --- Maintenance domain (TR-24; doc 09 §19.2) ---------------------------------------------
+# Maintenance tables are their own lock domain: no business transaction touches them, so these
+# locks are outside the business LOCK_PLAN order. A job holds a session-level advisory lock on
+# its stream for the whole job (it spans several short transactions).
+NS_MAINTENANCE = 0x4D54  # "MT"
+STREAM_LOCK_KEYS = {"R": 1, "M": 2}
+
+
+@contextmanager
+def maintenance_stream_lock(stream: str, using: str = "default") -> Iterator[None]:
+    key = STREAM_LOCK_KEYS[stream]
+    with connections[using].cursor() as cursor:
+        cursor.execute("SELECT pg_advisory_lock(%s, %s)", [NS_MAINTENANCE, key])
+    try:
+        yield
+    finally:
+        with connections[using].cursor() as cursor:
+            cursor.execute("SELECT pg_advisory_unlock(%s, %s)", [NS_MAINTENANCE, key])
