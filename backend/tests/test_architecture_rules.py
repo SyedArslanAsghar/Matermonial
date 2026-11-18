@@ -1,15 +1,19 @@
 """Repository rules enforced as tests.
 
-- No migration files before G4 (doc 10 §0.1 G3 exit: "No migration files").
+- Migrations are in sync with the models (G4 decision D-7; replaces the G3 "no migration files"
+  guard). The check writes nothing.
 - Lint rule (doc 12 §5.6, TR-22): no raw(), extra() or cursor.execute in service modules.
 - FK review rule (doc 12 §5.5, TR-22): every project FK has an implicit-lock class.
 - Project apps live in apps/ (DR-2026-11-17-G3-3).
 """
 
 import ast
+from io import StringIO
 from pathlib import Path
 
+import pytest
 from django.apps import apps
+from django.core.management import call_command
 
 from common.db.fk_inventory import (
     FK_LOCK_CLASSES,
@@ -32,11 +36,13 @@ def forbidden_calls(source: str) -> list[str]:
     return found
 
 
-def test_no_migration_files_exist_before_g4():
-    migrations = [
-        p for p in (BACKEND / "apps").glob("*/migrations/*.py") if p.name != "__init__.py"
-    ]
-    assert migrations == [], f"Migrations belong to G4: {migrations}"
+@pytest.mark.django_db
+def test_migrations_are_in_sync_with_models():
+    out = StringIO()
+    try:
+        call_command("makemigrations", "--check", "--dry-run", stdout=out, stderr=out)
+    except SystemExit as exc:  # --check exits non-zero when a migration is missing
+        raise AssertionError(f"Models and migrations differ:\n{out.getvalue()}") from exc
 
 
 def test_lint_rule_detects_raw_sql():
@@ -67,3 +73,20 @@ def test_project_apps_live_under_apps_package():
     project = [c for c in apps.get_app_configs() if is_project_app(c)]
     assert {c.name for c in project} == {"apps.accounts"}
     assert apps.get_app_config("accounts").name == "apps.accounts"
+
+
+def project_models():
+    """Concrete models declared in project apps (apps.* and common.*), excluding M2M links."""
+    return [
+        m for m in apps.get_models() if m._meta.app_config.name.startswith(("apps.", "common."))
+    ]
+
+
+def test_project_models_use_uuid_primary_keys():
+    """CC-R32: UUID primary keys for domain entities (G4 decision package)."""
+    offenders = [
+        f"{m._meta.label}.{m._meta.pk.name}: {m._meta.pk.get_internal_type()}"
+        for m in project_models()
+        if m._meta.pk.get_internal_type() != "UUIDField"
+    ]
+    assert offenders == []
