@@ -1,6 +1,6 @@
 # ADR-025: Authentication sessions and tokens
 
-**Status:** PROPOSED (TR-01). ADR decision and TR-01 approval are both due before G4 (baseline v4.6 approval-by-gate table).
+**Status:** APPROVED (DR-2026-11-18-G4, 2026-11-18; with TR-01). *Previously:* PROPOSED (TR-01). ADR decision and TR-01 approval are both due before G4 (baseline v4.6 approval-by-gate table).
 **Date:** 2026-11-16 (G1)
 **Source:** approved baseline `docs/baseline/v4.6-F3/` (DR-2026-11-16-1). Approving the baseline didn't approve this ADR's technical content unless the status above says so.
 

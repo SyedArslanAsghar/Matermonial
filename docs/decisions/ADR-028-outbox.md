@@ -1,6 +1,6 @@
 # ADR-028: Transactional outbox as a pseudonymous work queue
 
-**Status:** PROPOSED (TR-11). ADR decision and TR-11 approval are both due before G4 (baseline v4.6 approval-by-gate table). Refines ADR-014, whose **core** decision (outbox events written in the same transaction as the business operation and processed asynchronously with retryable, idempotent delivery) is APPROVED (FR-NOT-005; DR-2026-11-17-C2). Only the refinements described in this ADR are PROPOSED; the approved core doesn't make them approved.
+**Status:** APPROVED (DR-2026-11-18-G4, 2026-11-18; with TR-11). Refines ADR-014, whose core decision was already APPROVED (DR-2026-11-17-C2). *Previously:* PROPOSED (TR-11). ADR decision and TR-11 approval are both due before G4 (baseline v4.6 approval-by-gate table). Refines ADR-014, whose **core** decision (outbox events written in the same transaction as the business operation and processed asynchronously with retryable, idempotent delivery) is APPROVED (FR-NOT-005; DR-2026-11-17-C2). Only the refinements described in this ADR are PROPOSED; the approved core doesn't make them approved.
 **Date:** 2026-11-16 (G1)
 **Source:** approved baseline `docs/baseline/v4.6-F3/` (DR-2026-11-16-1). Approving the baseline didn't approve this ADR's technical content unless the status above says so.
 

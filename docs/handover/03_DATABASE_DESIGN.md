@@ -35,7 +35,7 @@ Principal fields:
 
 - `id`: UUID.
 - `phone_number`: normalized E.164, unique.
-- `email`: nullable, unique when supplied.
+- `email`: nullable, unique when supplied, **case-insensitively**; stored trimmed and lower-cased (DR-2026-11-18-G4-9).
 - `password`: Django password hash.
 - `first_name`.
 - `last_name`.
@@ -43,8 +43,8 @@ Principal fields:
 - `is_active`.
 - `is_staff`.
 - `is_superuser`.
-- `phone_verified`.
-- `email_verified`.
+- `is_phone_verified` (name aligned with §22.1 row 5; DR-2026-11-18-G4-9).
+- `is_email_verified` (same naming convention; DR-2026-11-18-G4-9).
 - `deactivated`: Boolean, default false.
 - `deactivated_reason`: nullable text.
 - `created_at`.

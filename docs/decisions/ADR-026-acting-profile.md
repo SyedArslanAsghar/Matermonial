@@ -1,6 +1,6 @@
 # ADR-026: Acting-profile authorization (ActorContext)
 
-**Status:** PROPOSED (TR-02). ADR decision due before G4 (baseline v4.6 approval-by-gate table); TR-02 approval due G4 / Phase 4 (doc 19).
+**Status:** DIRECTION ADOPTED (DR-2026-11-18-G4, 2026-11-18). TR-02 itself stays PROPOSED and is decided and implemented at G5 Phase 4. *Previously:* PROPOSED (TR-02). ADR decision due before G4 (baseline v4.6 approval-by-gate table); TR-02 approval due G4 / Phase 4 (doc 19).
 **Date:** 2026-11-16 (G1)
 **Source:** approved baseline `docs/baseline/v4.6-F3/` (DR-2026-11-16-1). Approving the baseline didn't approve this ADR's technical content unless the status above says so.
 

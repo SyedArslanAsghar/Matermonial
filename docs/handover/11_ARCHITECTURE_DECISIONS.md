@@ -199,7 +199,7 @@ An Architecture Decision Record captures a significant technical or structural d
 
 ## ADR-014: Use transactional outbox for notifications
 
-**Status:** APPROVED — **core decision only** (DR-2026-11-17-C2). Previously "Recommended implementation decision".
+**Status:** APPROVED — core decision (DR-2026-11-17-C2) **and refinements** (DR-2026-11-18-G4, 2026-11-18, via ADR-028 / TR-11). Previously "Recommended implementation decision".
 
 > **Scope of the approval.** The core decision below restates an already-approved requirement: SRS §15 / FR-NOT-005 (Notifications module, M12), `CLAUDE.md` CC-R30 ("Notifications use a transactional outbox"), and doc 02 §14. It is approved as such and doesn't await a further owner decision.
 >
@@ -315,7 +315,7 @@ An Architecture Decision Record captures a significant technical or structural d
 
 ## ADR-022: Preserve domain history and central audit separately
 
-**Status:** Recommended implementation decision
+**Status:** APPROVED (DR-2026-11-18-G4, 2026-11-18). Previously "Recommended implementation decision".
 
 > **G1 (DCR-28):** a formal decision is still pending; it is due before G4 (baseline v4.6, approval-by-gate table: "Decisions on ADR-014 / 022 / 023 and ADR-025…032"). Its refined form for security events and log pseudonymisation is ADR-032 (PROPOSED).
 
@@ -331,7 +331,7 @@ An Architecture Decision Record captures a significant technical or structural d
 
 ## ADR-023: Keep admin support and platform operations in a separate domain
 
-**Status:** Proposed implementation baseline
+**Status:** APPROVED (DR-2026-11-18-G4, 2026-11-18). Previously "Proposed implementation baseline".
 
 > **G1 (DCR-28):** a formal decision is still pending; it is due before G4 (baseline v4.6, approval-by-gate table). The approved domain catalogue (OD-01) places this under D22.
 

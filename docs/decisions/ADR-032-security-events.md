@@ -1,6 +1,6 @@
 # ADR-032: Security-event model and log pseudonymisation
 
-**Status:** PROPOSED (TR-17, TR-23). ADR decision and TR approvals are due before G4 (baseline v4.6 approval-by-gate table). Relates to ADR-022, whose status is still "Recommended" (decision due before G4).
+**Status:** APPROVED (DR-2026-11-18-G4, 2026-11-18; with TR-17 and TR-23). *Previously:* PROPOSED (TR-17, TR-23). ADR decision and TR approvals are due before G4 (baseline v4.6 approval-by-gate table). Relates to ADR-022, whose status is still "Recommended" (decision due before G4).
 **Date:** 2026-11-16 (G1)
 **Source:** approved baseline `docs/baseline/v4.6-F3/` (DR-2026-11-16-1). Approving the baseline didn't approve this ADR's technical content unless the status above says so.
 
