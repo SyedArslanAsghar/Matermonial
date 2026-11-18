@@ -1,6 +1,6 @@
 # Known Issues
 
-**Last updated:** 2026-11-18 (G3 finalization)
+**Last updated:** 2026-11-18 (KI-19)
 
 Issues in the existing repository scaffold, found during the specification assessment. None has been fixed; fixes belong to the gate shown.
 
@@ -34,4 +34,4 @@ Until then they carry `@pytest.mark.deferred_g4_ki14` and are reported as skippe
 | KI-16 | `apps/accounts/admin.py` still shows Django `groups` and `user_permissions`. TR-07 (single admin-authorization source, admin MFA with `django-otp`) replaces this at G4. | G4 (TR-07) |
 | KI-17 | Only local private file storage exists. A production object-storage backend needs a separately approved dependency (DR-2026-11-17-G3-4), and deployed settings refuse any other `STORAGE_BACKEND`. | Owner decision |
 | KI-18 | No payment-provider interface yet. Its contract depends on JazzCash decisions (doc 13 OD-001/003); it is added in G5 Phase 13. | G5 Phase 13 |
-| KI-19 | GitHub Actions warns that `actions/checkout@v4` and `actions/setup-python@v5` target the deprecated Node.js 20. The runner currently forces them onto Node.js 24 and the run succeeds (run `44294474904`). Fix: move to action releases that target a supported Node.js version, as a CI maintenance change under DR-2026-11-18-CI. Not urgent; it doesn't block CI. | CI/CD work |
+| KI-19 | **Resolved on branch `fix/ki-19-actions-node24` (2026-11-18); takes effect on `main` when its PR is merged.** The workflow now uses `actions/checkout@v7` and `actions/setup-python@v7`, both on Node.js 24 (owner-approved versions). Evidence: run `44298922332` succeeded on 6/6 jobs with **0** Node.js 20 warnings (previously 6), and each of the 4 test jobs still reports the 3 KI-14 tests as DEFERRED. *Original issue:* GitHub Actions warns that `actions/checkout@v4` and `actions/setup-python@v5` target the deprecated Node.js 20. The runner currently forces them onto Node.js 24 and the run succeeds (run `44294474904`). Fix: move to action releases that target a supported Node.js version, as a CI maintenance change under DR-2026-11-18-CI. Not urgent; it doesn't block CI. | CI/CD work |
