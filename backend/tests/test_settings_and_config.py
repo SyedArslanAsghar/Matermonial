@@ -22,6 +22,7 @@ KEY_SETTINGS = {
     **KEY_ENV,
     **{f"{purpose}_ACTIVE_VERSION": 1 for purpose in PURPOSES},
     "COMPLIANCE_REGISTRY_BACKEND": "external",
+    "CACHES": {"default": {"BACKEND": "django.core.cache.backends.redis.RedisCache"}},
 }
 
 GOOD_DEPLOYED = {
@@ -101,6 +102,11 @@ def test_valid_deployed_configuration_passes():
         ({"DEDUPE_KEYS": "1:not-base64!"}, GOOD_ENV, "DEDUPE_KEYS: Key version 1"),
         ({"SUBJECT_HASH_ACTIVE_VERSION": 2}, GOOD_ENV, "SUBJECT_HASH_KEYS: SUBJECT_HASH"),
         ({"COMPLIANCE_REGISTRY_BACKEND": "local"}, GOOD_ENV, "COMPLIANCE_REGISTRY_BACKEND"),
+        (
+            {"CACHES": {"default": {"BACKEND": "django.core.cache.backends.locmem.LocMemCache"}}},
+            GOOD_ENV,
+            "CACHE_URL must point to Redis",
+        ),
     ],
 )
 def test_deployed_configuration_fails_closed(override, env, fragment):
@@ -157,6 +163,7 @@ def _load_settings_in_subprocess(module: str, extra_env: dict) -> subprocess.Com
         "EMAIL_BACKEND": "django.core.mail.backends.smtp.EmailBackend",
         "DATABASE_URL": f"postgresql://app:{SECRET_LOOKING_PASSWORD}@db.example.test:5432/app",
         "COMPLIANCE_REGISTRY_BACKEND": "external",
+        "CACHE_URL": "redis://cache.example.test:6379/1",
         **KEY_ENV,
         **extra_env,
     }

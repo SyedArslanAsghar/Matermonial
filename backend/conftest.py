@@ -19,6 +19,16 @@ def api_client() -> APIClient:
 
 
 @pytest.fixture(autouse=True)
+def _clear_cache():
+    """Rate-limit and flood-control counters live in the cache; isolate tests."""
+    from django.core.cache import cache
+
+    cache.clear()
+    yield
+    cache.clear()
+
+
+@pytest.fixture(autouse=True)
 def _reset_mock_providers():
     MockSMSProvider.sent.clear()
     MockPushProvider.sent.clear()

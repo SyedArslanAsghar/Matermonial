@@ -81,6 +81,12 @@ def deployed_settings_errors(settings: Mapping, environ: Mapping) -> list[str]:
             "Never fall back to public storage (doc 16 §7)."
         )
     errors.extend(key_ring_errors(settings, environ))
+    cache_backend = (settings.get("CACHES") or {}).get("default", {}).get("BACKEND", "")
+    if "redis" not in cache_backend.lower():
+        errors.append(
+            "CACHE_URL must point to Redis when deployed: rate limits must be shared by all "
+            "workers (doc 06 §22.1)."
+        )
     if settings.get("COMPLIANCE_REGISTRY_BACKEND") in NON_PRODUCTION_REGISTRY_BACKENDS:
         errors.append(
             "COMPLIANCE_REGISTRY_BACKEND must be the approved external registry when deployed "

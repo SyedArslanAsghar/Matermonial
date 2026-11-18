@@ -190,6 +190,17 @@ AUTH_REFRESH_GRACE_SECONDS = env.int("AUTH_REFRESH_GRACE_SECONDS", default=15)
 AUTH_STEP_UP_WINDOW_SECONDS = env.int("AUTH_STEP_UP_WINDOW_SECONDS", default=300)  # TR-16 later
 AUTH_SEEN_WRITE_INTERVAL_SECONDS = 60  # idle extension written at most once a minute
 SESSION_COOKIE_AGE = AUTH_WEB_ABSOLUTE_SECONDS  # cookie Max-Age = absolute limit (doc 06 §22.2)
+# Authentication rate limits, "<count>/<seconds>" (doc 06 §22.1 §8.4; common/api/throttles.py).
+AUTH_RATE_LIMITS = {
+    "login_phone_ip": env("RATE_LOGIN_PHONE_IP", default="5/900"),
+    "login_ip": env("RATE_LOGIN_IP", default="20/900"),
+    "register_ip": env("RATE_REGISTER_IP", default="10/3600"),
+    "otp_ip": env("RATE_OTP_IP", default="10/3600"),
+    "password_ip": env("RATE_PASSWORD_IP", default="10/3600"),
+    "refresh_session": env("RATE_REFRESH_SESSION", default="30/3600"),
+}
+# Cache: rate limits and flood control. Local/test: in-process; deployed: Redis (validated).
+CACHES = {"default": env.cache("CACHE_URL", default="locmemcache://")}
 # One-time codes (doc 03 §2.5, doc 06 §3; configurable defaults).
 OTP_VALIDITY_SECONDS = env.int("OTP_VALIDITY_SECONDS", default=300)
 OTP_RESEND_COOLDOWN_SECONDS = env.int("OTP_RESEND_COOLDOWN_SECONDS", default=60)

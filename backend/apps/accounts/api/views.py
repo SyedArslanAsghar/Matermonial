@@ -23,6 +23,14 @@ from apps.accounts.services.refresh import refresh as refresh_tokens
 from apps.verification.services.otp import send_code, verify_code
 from common.api.auth_errors import AmbiguousCredentials, InvalidCode, InvalidPassword
 from common.api.pagination import StandardPagination
+from common.api.throttles import (
+    LoginIpThrottle,
+    LoginPhoneIpThrottle,
+    OtpIpThrottle,
+    PasswordIpThrottle,
+    RefreshSessionThrottle,
+    RegisterIpThrottle,
+)
 
 from .serializers import (
     AccountSerializer,
@@ -63,6 +71,7 @@ class CsrfView(APIView):
 class RegisterView(APIView):
     permission_classes = [AllowAny]
     authentication_classes = []
+    throttle_classes = [RegisterIpThrottle]
 
     def post(self, request):
         data = RegisterSerializer(data=request.data)
@@ -79,6 +88,7 @@ class OtpSendView(APIView):
 
     permission_classes = [AllowAny]
     authentication_classes = []
+    throttle_classes = [OtpIpThrottle]
 
     def post(self, request):
         data = PhoneSerializer(data=request.data)
@@ -92,6 +102,7 @@ class OtpSendView(APIView):
 class OtpVerifyView(APIView):
     permission_classes = [AllowAny]
     authentication_classes = []
+    throttle_classes = [OtpIpThrottle]
 
     def post(self, request):
         data = OtpVerifySerializer(data=request.data)
@@ -113,6 +124,7 @@ class OtpVerifyView(APIView):
 class LoginView(APIView):
     permission_classes = [AllowAny]
     authentication_classes = []
+    throttle_classes = [LoginPhoneIpThrottle, LoginIpThrottle]
 
     def post(self, request):
         if request.META.get("HTTP_AUTHORIZATION"):
@@ -183,6 +195,7 @@ class RefreshView(APIView):
 
     permission_classes = [AllowAny]
     authentication_classes = []
+    throttle_classes = [RefreshSessionThrottle]
 
     def post(self, request):
         token = request.data.get("refresh_token")
@@ -255,6 +268,7 @@ class PasswordForgotView(APIView):
 
     permission_classes = [AllowAny]
     authentication_classes = []
+    throttle_classes = [PasswordIpThrottle]
 
     def post(self, request):
         data = PhoneSerializer(data=request.data)
@@ -266,6 +280,7 @@ class PasswordForgotView(APIView):
 class PasswordResetView(APIView):
     permission_classes = [AllowAny]
     authentication_classes = []
+    throttle_classes = [PasswordIpThrottle]
 
     def post(self, request):
         data = PasswordResetSerializer(data=request.data)
