@@ -16,10 +16,12 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from apps.accounts.managers import normalize_phone_number
-from apps.accounts.models import User
+from apps.accounts.models import AuthSession, User
 from apps.accounts.services import auth as auth_service
+from apps.accounts.services.refresh import refresh as refresh_tokens
 from apps.verification.services.otp import send_code, verify_code
-from common.api.auth_errors import AmbiguousCredentials, InvalidCode
+from common.api.auth_errors import AmbiguousCredentials, InvalidCode, InvalidPassword
+from common.api.pagination import StandardPagination
 
 from .serializers import (
     AccountSerializer,
@@ -27,6 +29,7 @@ from .serializers import (
     OtpVerifySerializer,
     PhoneSerializer,
     RegisterSerializer,
+    SessionSerializer,
 )
 
 ACCEPTED = {"detail": "If the details can be used, a verification code has been sent."}
@@ -170,3 +173,75 @@ def _user_for_phone(phone_number: str) -> User | None:
     except DjangoValidationError:
         return None
     return User.objects.filter(phone_number=phone).first()
+
+
+class RefreshView(APIView):
+    """POST /auth/token/refresh/ (mobile): rotation with a 15 s idempotent grace."""
+
+    permission_classes = [AllowAny]
+    authentication_classes = []
+
+    def post(self, request):
+        token = request.data.get("refresh_token")
+        if not isinstance(token, str):
+            raise ValidationError({"refresh_token": ["This field is required."]})
+        result = refresh_tokens(token, request_id(request))
+        return Response(
+            {
+                "token_type": "Bearer",
+                "access_token": result.access_token,
+                "refresh_token": result.refresh_token,
+                "access_expires_at": result.access_expires_at,
+            }
+        )
+
+
+class SessionListView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        sessions = AuthSession.objects.filter(user=request.user).order_by("-created_at", "-id")
+        paginator = StandardPagination()
+        page = paginator.paginate_queryset(sessions, request, view=self)
+        data = SessionSerializer(page, many=True, context={"current_session": request.auth}).data
+        return paginator.get_paginated_response(data)
+
+
+class SessionDetailView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def delete(self, request, session_id):
+        if not auth_service.revoke_one(request.user, session_id, request_id(request)):
+            from rest_framework.exceptions import NotFound
+
+            raise NotFound()  # identical for missing and other people's sessions
+        if request.auth is not None and str(request.auth.pk) == str(session_id):
+            if request.auth.client_type == "WEB":
+                from django.contrib.auth import logout as django_logout
+
+                django_logout(request._request)
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class RevokeOthersView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        count = auth_service.revoke_others(request.user, request.auth, request_id(request))
+        return Response({"revoked": count})
+
+
+class ReauthenticateView(APIView):
+    """POST /auth/reauthenticate/: password step-up (OD-04c OPEN: no OTP yet)."""
+
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        password = request.data.get("password")
+        if not isinstance(password, str) or not password:
+            raise ValidationError({"password": ["This field is required."]})
+        if not auth_service.reauthenticate(
+            request.user, request.auth, password, request_id(request)
+        ):
+            raise InvalidPassword()
+        return Response({"reauthenticated": True})

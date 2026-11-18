@@ -285,3 +285,49 @@ def logout(request, session: AuthSession, request_id=None) -> None:
     )
     if session.client_type == "WEB":
         django_logout(request)
+
+
+# --- Step-up and session management -------------------------------------------------------
+# Step-up is password-only: OD-04c (password + OTP) is OPEN (DR-2026-11-18-G4A; CC-R25). The
+# per-action windows are TR-16 (Phase 4); until then AUTH_STEP_UP_WINDOW_SECONDS (default 5 min).
+
+
+def reauthenticate(user: User, session: AuthSession, password: str, request_id=None) -> bool:
+    ok = user.check_password(password)
+    record_security_event(
+        "STEP_UP_SUCCEEDED" if ok else "STEP_UP_FAILED",
+        "SUCCESS" if ok else "FAILURE",
+        actor_type="SELF",
+        subject_user_id=user.id,
+        request_id=request_id,
+        subject_linkable={"session_id": str(session.id)},
+    )
+    if ok:
+        AuthSession.objects.filter(pk=session.pk).update(reauthenticated_at=timezone.now())
+    return ok
+
+
+def require_recent_step_up(session: AuthSession, window_seconds: int | None = None) -> None:
+    from common.api.auth_errors import StepUpRequired
+
+    window = window_seconds or settings.AUTH_STEP_UP_WINDOW_SECONDS
+    current = AuthSession.objects.filter(pk=session.pk).values_list("reauthenticated_at", flat=True)
+    stamp = current.first()
+    if stamp is None or timezone.now() - stamp > timedelta(seconds=window):
+        raise StepUpRequired()
+
+
+def revoke_one(user: User, session_id, request_id=None) -> bool:
+    """Revoke one of the caller's sessions. False (-> identical 404) when it isn't theirs."""
+    session = AuthSession.objects.filter(pk=session_id, user=user).first()
+    if session is None:
+        return False
+    revoke_sessions(user, [session], AuthSession.RevokedReason.USER_REVOKED, request_id=request_id)
+    return True
+
+
+def revoke_others(user: User, current: AuthSession, request_id=None) -> int:
+    others = AuthSession.objects.filter(user=user, status="ACTIVE").exclude(pk=current.pk)
+    return revoke_sessions(
+        user, list(others), AuthSession.RevokedReason.USER_REVOKED, request_id=request_id
+    )

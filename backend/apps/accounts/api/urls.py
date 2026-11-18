@@ -12,4 +12,9 @@ urlpatterns = [
     path("login/", views.LoginView.as_view(), name="auth-login"),
     path("logout/", views.LogoutView.as_view(), name="auth-logout"),
     path("me/", views.MeView.as_view(), name="auth-me"),
+    path("token/refresh/", views.RefreshView.as_view(), name="auth-token-refresh"),
+    path("sessions/", views.SessionListView.as_view(), name="auth-sessions"),
+    path("sessions/revoke-others/", views.RevokeOthersView.as_view(), name="auth-revoke-others"),
+    path("sessions/<uuid:session_id>/", views.SessionDetailView.as_view(), name="auth-session"),
+    path("reauthenticate/", views.ReauthenticateView.as_view(), name="auth-reauthenticate"),
 ]

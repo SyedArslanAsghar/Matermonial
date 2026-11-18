@@ -187,6 +187,7 @@ AUTH_MOBILE_ACCESS_SECONDS = env.int("AUTH_MOBILE_ACCESS_SECONDS", default=15 * 
 AUTH_MOBILE_REFRESH_IDLE_SECONDS = env.int("AUTH_MOBILE_REFRESH_IDLE_SECONDS", default=30 * 86400)
 AUTH_MOBILE_ABSOLUTE_SECONDS = env.int("AUTH_MOBILE_ABSOLUTE_SECONDS", default=90 * 86400)
 AUTH_REFRESH_GRACE_SECONDS = env.int("AUTH_REFRESH_GRACE_SECONDS", default=15)
+AUTH_STEP_UP_WINDOW_SECONDS = env.int("AUTH_STEP_UP_WINDOW_SECONDS", default=300)  # TR-16 later
 AUTH_SEEN_WRITE_INTERVAL_SECONDS = 60  # idle extension written at most once a minute
 SESSION_COOKIE_AGE = AUTH_WEB_ABSOLUTE_SECONDS  # cookie Max-Age = absolute limit (doc 06 §22.2)
 # One-time codes (doc 03 §2.5, doc 06 §3; configurable defaults).

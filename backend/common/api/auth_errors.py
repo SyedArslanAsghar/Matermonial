@@ -53,3 +53,11 @@ class StepUpRequired(APIException):
     status_code = status.HTTP_403_FORBIDDEN
     default_code = "step_up_required"
     default_detail = "Please confirm your password to continue."
+
+
+class InvalidPassword(APIException):
+    """Step-up or password change with a wrong current password (the session stays valid)."""
+
+    status_code = status.HTTP_400_BAD_REQUEST
+    default_code = "invalid_password"
+    default_detail = "The password is incorrect."
