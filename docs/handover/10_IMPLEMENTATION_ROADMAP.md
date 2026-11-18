@@ -21,6 +21,8 @@ The project proceeds through five gates. **Each gate needs the project owner's e
 
 **G2 status (2026-11-17):** owner-accepted with carried-forward items (DR-2026-11-17-G2A); baseline commit `38f491dea79fb9bb10fd2010b1c2cb8a68d545f9`. The G2 exit criterion "CI runs on the baseline" is **OPEN**. G3 was entered under a narrow owner exception (DR-2026-11-17-G2X). This criterion **must be satisfied before G4 entry**. The criterion itself is unchanged.
 
+**G2 criterion update (2026-11-18):** the owner accepted the successful GitHub Actions run `44294474904` on commit `c5fc346` (the G2 baseline plus the approved G3 implementation; 6/6 jobs) as satisfying "CI runs on the baseline" (DR-2026-11-18-G2C). The exact baseline commit `38f491d` did not run through CI on its own. This meets the G4-entry precondition of DR-2026-11-17-G2X; it does not authorize G4.
+
 **G3 status (2026-11-18):** owner-accepted with an accepted exception and a carried-forward item (DR-2026-11-18-G3A). The G3 exit criterion "tests green on PostgreSQL" is not fully met. The PostgreSQL foundation tests pass; the 3 KI-14 User-model database tests are OPEN and must pass as part of G4. **G4 is NOT AUTHORIZED.**
 
 ### 0.2 G5 phase order
