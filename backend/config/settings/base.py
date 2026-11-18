@@ -40,6 +40,9 @@ INSTALLED_APPS = [
     # Project domain apps (backend/apps/, DR-2026-11-17-G3-3)
     "apps.accounts",
     "apps.audit",
+    # Shared kernel infrastructure (common/, DR-2026-11-18-G4-6)
+    "common.events",
+    "common.idempotency",
 ]
 
 MIDDLEWARE = [
@@ -170,6 +173,12 @@ COMPLIANCE_REGISTRY_LOCATION = env(
 OUTBOX_LEASE_SECONDS = env.int("OUTBOX_LEASE_SECONDS", default=300)
 OUTBOX_REDACT_AFTER_DAYS = env.int("OUTBOX_REDACT_AFTER_DAYS", default=7)
 OUTBOX_PURGE_AFTER_DAYS = env.int("OUTBOX_PURGE_AFTER_DAYS", default=30)
+# Periodic kernel jobs (run by celery beat when a worker is used; doc 12 §6, CC-R53).
+CELERY_BEAT_SCHEDULE = {
+    "process-outbox": {"task": "events.process_outbox", "schedule": 10.0},
+    "redact-and-purge-outbox": {"task": "events.redact_and_purge_outbox", "schedule": 3600.0},
+    "purge-idempotency-records": {"task": "idempotency.purge_expired", "schedule": 3600.0},
+}
 
 # --- Celery and Redis (DR-2026-11-17-G3-4; CC-R53, CC-R54) ---
 REDIS_URL = env("REDIS_URL", default="redis://127.0.0.1:6379/0")

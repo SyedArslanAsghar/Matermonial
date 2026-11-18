@@ -4,7 +4,7 @@
   guard). The check writes nothing.
 - Lint rule (doc 12 §5.6, TR-22): no raw(), extra() or cursor.execute in service modules.
 - FK review rule (doc 12 §5.5, TR-22): every project FK has an implicit-lock class.
-- Project apps live in apps/ (DR-2026-11-17-G3-3).
+- Domain apps live in apps/, shared infrastructure apps in common/ (DR-2026-11-17-G3-3).
 """
 
 import ast
@@ -71,7 +71,15 @@ def test_project_apps_live_under_apps_package():
         return path.is_relative_to(BACKEND) and path.relative_to(BACKEND).parts[0] != ".venv"
 
     project = [c for c in apps.get_app_configs() if is_project_app(c)]
-    assert {c.name for c in project} == {"apps.accounts", "apps.audit"}
+    # Domain apps live in apps/, shared kernel infrastructure in common/
+    # (DR-2026-11-17-G3-3; placement DR-2026-11-18-G4-6).
+    assert all(c.name.startswith(("apps.", "common.")) for c in project)
+    assert {c.name for c in project} >= {
+        "apps.accounts",
+        "apps.audit",
+        "common.events",
+        "common.idempotency",
+    }
     assert apps.get_app_config("accounts").name == "apps.accounts"
 
 
