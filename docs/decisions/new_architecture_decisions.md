@@ -1,7 +1,7 @@
 # New Architecture Decisions
 
 **Register status:** ACTIVE
-**Last updated:** 2026-11-18 (G3 owner acceptance, DR-2026-11-18-G3A)
+**Last updated:** 2026-11-18 (G2 CI criterion accepted, DR-2026-11-18-G2C)
 
 This register holds the project's approval decision records (DR-…) and the approved OD-01 domain catalogue. The decisions recorded here up to DR-2026-11-16-G1 have been applied to the handover documents during G1 (Documentation Reconciliation); where each was applied is recorded in `docs/handover/20_DOCUMENTATION_CORRECTION_REGISTER.md`. Owner decisions (OD) and technical recommendations (TR) and their statuses are tracked in `docs/handover/19_OPEN_DECISION_REGISTER.md`.
 
@@ -79,7 +79,7 @@ The legacy open decisions in `docs/handover/13_ASSUMPTIONS_RISKS_TRACEABILITY.md
 | Gate | Status |
 |---|---|
 | G1 Documentation reconciliation | **COMPLETED. ACCEPTED by the project owner** (DR-2026-11-17-A, 2026-11-17). All 12 exit criteria met. |
-| G2 Repository governance | **ACCEPTED by the project owner with carried-forward items** (DR-2026-11-17-G2A). Baseline commit `38f491dea79fb9bb10fd2010b1c2cb8a68d545f9`. Exit criterion "CI runs on the baseline" **OPEN**: must be met before G4 (exception DR-2026-11-17-G2X). |
+| G2 Repository governance | **ACCEPTED by the project owner with carried-forward items** (DR-2026-11-17-G2A). Baseline commit `38f491dea79fb9bb10fd2010b1c2cb8a68d545f9`. Exit criterion "CI runs on the baseline", carried forward OPEN under exception DR-2026-11-17-G2X: **satisfied by owner acceptance (DR-2026-11-18-G2C, 2026-11-18)** on the integrated run `44294474904` on commit `c5fc346` (success, 6/6 jobs). The baseline commit `38f491d` itself did not run independently. |
 | G3 Backend foundation | **ACCEPTED by the project owner** on 2026-11-18, with an accepted exception and a carried-forward item (DR-2026-11-18-G3A). Exit criterion "tests green on PostgreSQL" is not fully met: the foundation tests pass, but the 3 KI-14 User-model database tests are OPEN and carried forward to G4. |
 | G4 First migration | NOT STARTED. NOT AUTHORIZED. |
 | G5 Features | NOT STARTED. NOT AUTHORIZED. |
@@ -326,6 +326,108 @@ The approvals required before G3 (baseline v4.6 approval-by-gate table, "Before 
 - KI-14 (3 User-model database tests): OPEN, G4.
 
 **Boundaries:** no prior decision changes meaning. No OD, TR, requirement or document status changes. The baseline commit `38f491dea79fb9bb10fd2010b1c2cb8a68d545f9` is unchanged, and the G3 changes remain uncommitted.
+
+---
+
+## Decision record DR-2026-11-18-CI: Current delivery scope — CI/CD implementation and validation; AWS deployment deferred
+
+- **Decision ID:** DR-2026-11-18-CI
+- **Date:** 2026-11-18
+- **Decided by:** Project owner
+- **Decision status:** APPROVED (scope clarification)
+- **Decision:** the current objective is to **implement and validate CI/CD** for Matermonial. **AWS deployment and production infrastructure are not part of the current scope.**
+
+**In current scope:**
+1. Repository governance and Git workflow.
+2. GitHub remote configuration, once explicitly authorized.
+3. GitHub Actions CI implementation and validation.
+4. Automated backend testing.
+5. Lint and format checks.
+6. Dependency and lockfile integrity checks.
+7. Build and integration validation.
+8. CD workflow design and implementation.
+9. Pipeline documentation.
+10. Validation of the complete CI/CD workflow.
+
+**Deferred (out of current scope; each needs separate authorization when deployment is actually required):**
+- AWS EC2 provisioning and AWS infrastructure configuration
+- production deployment
+- production Docker/Compose infrastructure
+- production PostgreSQL and Redis provisioning
+- domain and DNS; SSL certificates
+- production monitoring and backup infrastructure
+- AWS-specific deployment automation
+
+No speculative infrastructure tasks are added.
+
+**CD boundary:**
+- The CD workflow structure may be designed and implemented. Deployment execution stays disabled, manual or protected until a deployment target and an authorization exist.
+- No AWS deployment is executed, no AWS resource is provisioned, and no AWS credential or secret is introduced.
+- Documentation says which parts are implemented and which are deferred. CI/CD work is never presented as a completed production deployment.
+
+**Bug handling:** a bug found during CI/CD work is investigated. It is fixed if that is needed to complete or validate the CI/CD scope; otherwise it is recorded in `docs/implementation/known_issues.md`. No unrelated refactoring and no scope expansion.
+
+**Boundaries:**
+- This clarification sequences work; it changes no approved decision or requirement. The approved production stack (`CLAUDE.md` CC-R11, CC-R22) and the target pipeline in doc 09 §12–§13 remain the approved targets. Their deployment parts are deferred, not removed.
+- It does **not** authorize a GitHub remote, a push, a commit, G4, or any deployment. Each still needs explicit owner authorization.
+- Unchanged: G3 ACCEPTED (DR-2026-11-18-G3A); KI-14 OPEN (G4); the G2 criterion "CI runs on the baseline" OPEN (DR-2026-11-17-G2X); G4 NOT AUTHORIZED.
+
+---
+
+## Decision record DR-2026-11-18-GH: Owner-performed GitHub remote, commit and push; first CI evidence
+
+- **Decision ID:** DR-2026-11-18-GH
+- **Date:** 2026-11-18
+- **Recorded from:** the project owner's confirmation (2026-11-18)
+- **Nature:** a record of actions the **project owner performed manually**. They happened after DR-2026-11-18-G3A-5 (which said Claude Code was not authorized to create a remote or push) and are recorded as of the date they occurred. Earlier records are unchanged and are not reinterpreted as prior authorization.
+
+| Owner action (2026-11-18) | Detail |
+|---|---|
+| Commit | `c5fc346cb8b6f871c4056a0938f7bd2bc603212f`, "added first commit", parent `38f491dea79fb9bb10fd2010b1c2cb8a68d545f9` (baseline, unchanged). It contains the G2-to-G3 working-tree changes: 69 files, including the G3 foundation, the G3 correction, the CI pre-G4 preparation and the related documentation. A content check found no `.env` (only `.env.example`), no caches, no virtual environment, no key files and no migrations. |
+| Remote | `origin` = `https://github.com/SyedArslanAsghar/Matermonial.git`. The repository is **public** (GitHub API, 2026-11-18). |
+| Push | `main` pushed; `origin/main` = `c5fc346`. |
+
+**First GitHub Actions evidence (read-only review via the public GitHub API, 2026-11-18):**
+- Workflow "CI", run `44294474904`, event `push`, branch `main`, commit `c5fc346`: **completed, conclusion success**.
+- 6 of 6 jobs succeeded: Backend quality on Python 3.12 and 3.13; Backend tests on Python 3.12 and 3.13 × PostgreSQL 16 and 18.
+- Every step succeeded. The lockfile consistency step was skipped on 3.13 by design, because it runs on 3.12 only.
+- Each test job carries the notice "3 tests DEFERRED to G4 (KI-14) … not run and not passed".
+- Warnings: actions `checkout@v4` and `setup-python@v5` target the deprecated Node.js 20; the `ubuntu-latest` label is migrating to a newer Ubuntu release.
+- Not reviewable without authentication: the job logs, so per-test counts on GitHub weren't read.
+- No workflow run exists for the baseline commit `38f491d` itself; only the head commit of the push triggered CI.
+
+**G2 criterion "CI runs on the baseline" (doc 10 §0.1; DR-2026-11-17-G2X):** **still OPEN**. CI evidence now exists for `c5fc346`, which builds on the baseline `38f491d`. Whether that satisfies the criterion is the **owner's decision**; it isn't recorded as complete here.
+
+**Boundaries:**
+- Claude Code still performs no commit, push, remote or branch-protection operation without explicit authorization.
+- G4 NOT AUTHORIZED. AWS deployment deferred (DR-2026-11-18-CI).
+- KI-15 (no LICENSE) is unchanged, but its trigger "before public distribution" is now relevant, because the repository is public.
+
+---
+
+## Decision record DR-2026-11-18-G2C: G2 criterion "CI runs on the baseline" — accepted on the integrated run (Option A)
+
+- **Decision ID:** DR-2026-11-18-G2C
+- **Date:** 2026-11-18
+- **Decided by:** Project owner
+- **Decision status:** APPROVED (a gate-criterion decision)
+- **Original criterion:** doc 10 §0.1 G2 exit criterion "CI runs on the baseline". It was carried forward OPEN by DR-2026-11-17-G2A, under the G3-entry exception DR-2026-11-17-G2X, which required it to be satisfied before G4 entry.
+- **Evidence:** GitHub Actions workflow "CI", run `44294474904` (push to `main`), on commit `c5fc346cb8b6f871c4056a0938f7bd2bc603212f`: **success**, 6/6 jobs (DR-2026-11-18-GH).
+  - Backend quality passed on Python 3.12 and 3.13.
+  - Backend tests passed on Python 3.12 and 3.13 × PostgreSQL 16 and 18.
+  - The 3 KI-14 tests were explicitly reported as DEFERRED, not as passed.
+- **Decision (D1, Option A):** the owner **accepts the successful integrated run on `c5fc346` as satisfying the criterion**. `c5fc346` contains the G2 baseline together with the approved G3 implementation.
+- **Qualification:** the exact G2 baseline commit `38f491dea79fb9bb10fd2010b1c2cb8a68d545f9` **did not run** through GitHub Actions on its own. The criterion is satisfied by owner acceptance of the integrated run, not by a test of `38f491d` itself.
+- **Effect:**
+  - The G2 carried-forward item "CI runs on the baseline" is **closed**.
+  - The G4-entry precondition in DR-2026-11-17-G2X is met.
+  - G4 itself is **NOT AUTHORIZED** (D3) and needs its own owner authorization.
+- **Unchanged:**
+  - KI-14: the 3 User-model database tests stay **OPEN**, carried forward to G4 (DR-2026-11-18-G3A-2).
+  - AWS deployment stays **DEFERRED** (D4; DR-2026-11-18-CI).
+  - D6 (branch protection) and KI-15 (licence) stay deferred.
+  - No other OD, TR, requirement or document status changes.
+- **Related authorization (D2):** commit the governance records on the short-lived branch `docs/ci-governance-acceptance`, push it, and open a pull request to `main`. Merging is **not** authorized and waits for owner review.
 
 ---
 
