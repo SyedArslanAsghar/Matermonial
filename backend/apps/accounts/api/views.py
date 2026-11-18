@@ -18,6 +18,7 @@ from rest_framework.views import APIView
 from apps.accounts.managers import normalize_phone_number
 from apps.accounts.models import AuthSession, User
 from apps.accounts.services import auth as auth_service
+from apps.accounts.services import passwords
 from apps.accounts.services.refresh import refresh as refresh_tokens
 from apps.verification.services.otp import send_code, verify_code
 from common.api.auth_errors import AmbiguousCredentials, InvalidCode, InvalidPassword
@@ -27,6 +28,8 @@ from .serializers import (
     AccountSerializer,
     LoginSerializer,
     OtpVerifySerializer,
+    PasswordChangeSerializer,
+    PasswordResetSerializer,
     PhoneSerializer,
     RegisterSerializer,
     SessionSerializer,
@@ -245,3 +248,57 @@ class ReauthenticateView(APIView):
         ):
             raise InvalidPassword()
         return Response({"reauthenticated": True})
+
+
+class PasswordForgotView(APIView):
+    """POST /auth/password/forgot/: always 202 (no account enumeration)."""
+
+    permission_classes = [AllowAny]
+    authentication_classes = []
+
+    def post(self, request):
+        data = PhoneSerializer(data=request.data)
+        data.is_valid(raise_exception=True)
+        passwords.forgot(data.validated_data["phone_number"], request_id(request))
+        return Response(ACCEPTED, status=status.HTTP_202_ACCEPTED)
+
+
+class PasswordResetView(APIView):
+    permission_classes = [AllowAny]
+    authentication_classes = []
+
+    def post(self, request):
+        data = PasswordResetSerializer(data=request.data)
+        data.is_valid(raise_exception=True)
+        values = data.validated_data
+        try:
+            ok = passwords.reset(
+                values["phone_number"], values["code"], values["new_password"], request_id(request)
+            )
+        except DjangoValidationError as exc:
+            raise ValidationError({"new_password": exc.messages}) from None
+        if not ok:
+            raise InvalidCode()
+        return Response({"password_reset": True})
+
+
+class PasswordChangeView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        data = PasswordChangeSerializer(data=request.data)
+        data.is_valid(raise_exception=True)
+        try:
+            ok = passwords.change(
+                request._request,
+                request.user,
+                request.auth,
+                data.validated_data["current_password"],
+                data.validated_data["new_password"],
+                request_id(request),
+            )
+        except DjangoValidationError as exc:
+            raise ValidationError({"new_password": exc.messages}) from None
+        if not ok:
+            raise InvalidPassword()
+        return Response({"password_changed": True})

@@ -27,6 +27,15 @@ class OtpVerifySerializer(PhoneSerializer):
     code = serializers.RegexField(r"^[0-9]{6}$")
 
 
+class PasswordResetSerializer(OtpVerifySerializer):
+    new_password = serializers.CharField(max_length=128, write_only=True, trim_whitespace=False)
+
+
+class PasswordChangeSerializer(serializers.Serializer):
+    current_password = serializers.CharField(max_length=128, write_only=True, trim_whitespace=False)
+    new_password = serializers.CharField(max_length=128, write_only=True, trim_whitespace=False)
+
+
 class LoginSerializer(serializers.Serializer):
     phone_number = serializers.CharField(max_length=20)
     password = serializers.CharField(max_length=128, write_only=True, trim_whitespace=False)

@@ -17,4 +17,7 @@ urlpatterns = [
     path("sessions/revoke-others/", views.RevokeOthersView.as_view(), name="auth-revoke-others"),
     path("sessions/<uuid:session_id>/", views.SessionDetailView.as_view(), name="auth-session"),
     path("reauthenticate/", views.ReauthenticateView.as_view(), name="auth-reauthenticate"),
+    path("password/forgot/", views.PasswordForgotView.as_view(), name="auth-password-forgot"),
+    path("password/reset/", views.PasswordResetView.as_view(), name="auth-password-reset"),
+    path("password/change/", views.PasswordChangeView.as_view(), name="auth-password-change"),
 ]
