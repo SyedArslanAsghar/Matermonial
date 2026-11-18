@@ -2,7 +2,7 @@
 
 **Version:** 1.0 (G1 revision 2026-11-16)  
 **Date:** 11 November 2026  
-**Document status:** APPROVED_WITH_OPEN_ITEMS (project owner, 2026-11-17, DR-2026-11-17-A; record in doc 20 §5). **Open items:** PROPOSED TRs: TR-22. Listed items keep their own status (doc 19); this document status doesn't approve them. TR-13 approved 2026-11-17 (DR-2026-11-17-G2D-2).  
+**Document status:** APPROVED (project owner, 2026-11-17, DR-2026-11-17-G3C-4; record in doc 20 §5). Previously APPROVED_WITH_OPEN_ITEMS (DR-2026-11-17-A); its open items (TR-13, TR-22) have all been approved.  
 **Applied corrections:** DCR-10, DCR-66, DCR-80, DCR-88 (doc 20). Test catalogue and harness rules: **§14**.
 
 ## 1. Testing objectives
@@ -362,7 +362,7 @@ Claude Code must never claim that a test was run or passed unless the command ac
 - **T-HARNESS-001:** a deliberately uncommitted write must not be visible to the checking connection, which proves real separation.
 - **CI runs the PostgreSQL suites on PostgreSQL 16 and 18** (DCR-88), covering both UUIDv7 code paths. SQLite is not used for these suites.
 
-### 14.2 What the lock tracker can't prove (DCR-66) [TR-22]
+### 14.2 What the lock tracker can't prove (DCR-66) [TR-22, APPROVED 2026-11-17]
 
 The `LOCK_PLAN` tracker sees only explicit locks taken through the project's lock helpers. It can't detect implicit foreign-key checks, row locks from plain UPDATE/DELETE outside the helpers, unique-index insertion waits, trigger locks or raw SQL. Those are covered by design (doc 12 §5.5), by a lint rule on raw SQL in service modules, by the T-CONC suite, and in production by `log_lock_waits=on`, a deadlock alert and a retry-rate metric.
 

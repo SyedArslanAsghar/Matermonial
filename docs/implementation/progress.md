@@ -1,6 +1,6 @@
 # Progress
 
-**Last updated:** 2026-11-17 (G2)
+**Last updated:** 2026-11-18 (G3 finalization and integrity verification)
 
 ## Governance status
 
@@ -8,16 +8,16 @@
 |---|---|
 | Documentation baseline (v4–v4.6-F3) | APPROVED (see `docs/decisions/new_architecture_decisions.md`, DR-2026-11-16) |
 | G1 Documentation reconciliation | **COMPLETED. ACCEPTED by the project owner** (DR-2026-11-17-A, 2026-11-17). Final document statuses assigned (doc 20 §5). |
-| G2 Repository governance | IN PROGRESS. AUTHORIZED (2026-11-17). Decisions recorded (DR-2026-11-17-G2D); finalization applied; baseline commit waiting for the author identity. **Not owner-accepted.** |
-| G3 Backend foundation | NOT STARTED. NOT AUTHORIZED. |
-| G4 First migration | NOT STARTED. NOT AUTHORIZED. |
+| G2 Repository governance | **ACCEPTED** by the project owner with carried-forward items (DR-2026-11-17-G2A). Baseline commit `38f491dea79fb9bb10fd2010b1c2cb8a68d545f9`. Exit criterion "CI runs on the baseline" **OPEN**; must be met before G4 (DR-2026-11-17-G2X). |
+| G3 Backend foundation | **ACCEPTED** by the project owner on 2026-11-18, with an accepted exception and a carried-forward item (DR-2026-11-18-G3A). Exit criterion "tests green on PostgreSQL" is **not fully met**: the PostgreSQL foundation tests pass, but the 3 KI-14 User-model database tests are **OPEN** and must pass as part of G4. Changes uncommitted. |
+| G4 First migration | NOT STARTED. **NOT AUTHORIZED.** Before G4 entry: the G2 criterion "CI runs on the baseline" (DR-2026-11-17-G2X). GitHub remote and push are NOT AUTHORIZED (DR-2026-11-18-G3A-5). |
 | G5 Features | NOT STARTED. NOT AUTHORIZED. |
 
 ## Implementation status
 
 No implementation work has been authorized or started. Doc 18 lists 126 requirements: 124 NOT_STARTED and 2 BLOCKED (FR-ACC-009 by OD-02a/b, FR-PRO-005 by OD-04a). Nothing is PLANNED or beyond.
 
-The existing `backend/` scaffold (settings, a custom `User` model, 3 unit tests) predates the baseline. It has never been executed or verified in this environment, and has no migrations.
+The `backend/` scaffold predates the baseline. G3 rebuilt it into the backend foundation, which has been **executed and verified**: system checks, `check --deploy`, WSGI/ASGI loading, and the test suite on Python 3.12 and 3.13. The PostgreSQL foundation tests pass on PostgreSQL 16 and 18. It has no migrations, so the 3 KI-14 User-model database tests stay deferred to G4. GitHub Actions has never run (no GitHub remote), and the G2 prerequisite "CI runs on the baseline" stays **OPEN** (DR-2026-11-17-G2X).
 
 ## G1 progress (2026-11-16 to 2026-11-17)
 
@@ -62,7 +62,7 @@ Authorized by the project owner on 2026-11-17 (G2 only; G3–G5 not authorized).
 | `git init -b main` | Done; no commit, no remote, no Git config changed | doc 10 §0.1; doc 07 §8 |
 | `.gitignore` | Extended (nested `.env*` except `.env.example`, keys, Node/Expo/build output, local DBs, local tool settings) | doc 10 §0.1; doc 07 §11, §14; doc 16 §8 |
 | Virtual environment | Stale root `.venv` removed; `backend/.venv` created; `requirements/local.txt` installed; `pip check` clean | doc 10 §0.1; CC-R21 |
-| CI | `.github/workflows/ci.yml`: install, `pip check`, Ruff lint and format, pytest collection; Python 3.12/3.13; read-only permissions; no secrets, no deploy | CC-R11, CC-R60; doc 08 §11; doc 09 §13 |
+| CI | `.github/workflows/ci.yml`: install, `pip check`, Ruff lint and format, pytest collection (G2 state; superseded by the G3 correction: Python 3.12 and 3.13, DR-2026-11-17-G3C-2) | CC-R11, CC-R60; doc 08 §11; doc 09 §13 |
 | PR template | `.github/pull_request_template.md` | doc 07 §10 |
 | README | Rewritten as entry point | DR-2026-11-16-P3; doc 07 §12 |
 
@@ -90,7 +90,7 @@ Authorized by the project owner on 2026-11-17 (G2 only; G3–G5 not authorized).
 
 | ID | Decision | Outcome |
 |---|---|---|
-| D1 | Local baseline commit | APPROVED with conditions; **waiting for the owner's Git author identity** (the authorization contained placeholders) |
+| D1 | Local baseline commit | APPROVED; **done**: commit `38f491dea79fb9bb10fd2010b1c2cb8a68d545f9`, 113 files, author Syed Arslan Asghar |
 | D2 | TR-13 | **APPROVED.** PostgreSQL CI jobs added; SQLite test override removed |
 | D3 | Branch model | APPROVED: `main` plus short-lived `feature/`, `fix/` and `hotfix/` branches; no `develop` |
 | D4 | Dependency locking | APPROVED: pip-tools with hashed lockfiles |
@@ -103,13 +103,13 @@ Authorized by the project owner on 2026-11-17 (G2 only; G3–G5 not authorized).
 | Item | Result |
 |---|---|
 | `backend/requirements/{base,local,production}.in` | Created; existing version ranges kept; `pip-tools` added to `local.in` |
-| `backend/requirements/{base,local,production}.txt` | Regenerated as hashed lockfiles (`pip-compile --generate-hashes`, Python 3.13). Pins equal the versions already installed; nothing upgraded |
+| `backend/requirements/{base,local,production}.txt` | Regenerated as hashed lockfiles (`pip-compile --generate-hashes`, Python 3.13). Pins equal the versions already installed; nothing upgraded (G2 state; recompiled with Python 3.12 in the G3 correction, with no version or hash changed, DR-2026-11-17-G3C-2) |
 | `backend/requirements/README.md` | Install and update procedure |
 | `backend/config/settings/test.py` | SQLite override removed; tests use PostgreSQL through `DATABASE_URL` (TR-13) |
-| `.github/workflows/ci.yml` | Python 3.13; quality job with hash-checked install, `pip check`, lockfile consistency check and Ruff; test job on PostgreSQL 16 and 18 |
+| `.github/workflows/ci.yml` | Python 3.13; quality job with hash-checked install, `pip check`, lockfile consistency check and Ruff; test job on PostgreSQL 16 and 18 (G2 state; G3 correction: Python 3.12 and 3.13, DR-2026-11-17-G3C-2) |
 | Docs | TR-13 APPROVED (doc 19, decision register, docs 08, 12, 13 and 20); D3 and D4 recorded in doc 07 §8 and §13; README updated |
 
-**Assumption (CC-R67):** the supported and locked Python version is **3.13**. Hash-checked lockfiles are specific to one Python version: on Python < 3.13, `psycopg` and `referencing` need `typing-extensions`, which isn't locked. Earlier material said "3.12+".
+**Superseded (2026-11-17, DR-2026-11-17-G3C-2):** the project supports **Python 3.12 and 3.13** (`requires-python = ">=3.12,<3.14"`). The lockfiles are compiled with Python 3.12, so `typing-extensions` (needed by `psycopg` and `referencing` on Python < 3.13) is locked, and the same hashed lockfiles install on both versions. *Original G2 text, kept for history:* "Assumption (CC-R67): the supported and locked Python version is 3.13. Hash-checked lockfiles are specific to one Python version: on Python < 3.13, `psycopg` and `referencing` need `typing-extensions`, which isn't locked. Earlier material said '3.12+'."
 
 ### G2 exit checklist
 
@@ -117,7 +117,7 @@ Authorized by the project owner on 2026-11-17 (G2 only; G3–G5 not authorized).
 |---|---|---|
 | 1 | Repository inventory documented | Done |
 | 2 | Approved repository structure established | Done (G2 scope) |
-| 3 | Git governance established | Done except the baseline commit, which waits for the author identity (D1) |
+| 3 | Git governance established | Done (baseline commit `38f491dea79fb9bb10fd2010b1c2cb8a68d545f9`) |
 | 4 | Development standards documented | Done |
 | 5 | Local development setup documented | Done |
 | 6 | Dependency-management conventions established | Done (pip-tools) |
@@ -129,7 +129,98 @@ Authorized by the project owner on 2026-11-17 (G2 only; G3–G5 not authorized).
 | 12 | Project owner accepts G2 | **Pending** |
 
 **doc 10 §0.1 G2 exit criterion "CI runs on the baseline":** not yet met. Exact blockers:
-1. the baseline commit, which needs the author identity (D1)
-2. a GitHub remote and push, which are deferred (D6)
+1. ~~the baseline commit~~: done, `38f491dea79fb9bb10fd2010b1c2cb8a68d545f9`
+2. a GitHub remote and push, which are deferred (D6). This is the **only** remaining blocker
 
 Even once CI runs, it will report the known failures KI-11 (G3) and KI-14 (G4). The criterion says "runs", not "passes".
+
+## G3 backend foundation (2026-11-17)
+
+Authorized by DR-2026-11-17-G3 and entered under exception DR-2026-11-17-G2X. Approvals recorded before G3: TR-12; TR-09/TR-22; the `apps/` layout; the dependency list (Celery and Redis only).
+
+| Milestone | Result |
+|---|---|
+| G3.1 Assessment | The scaffold's User model already matched doc 03 §2.1/§22, with a UUID primary key |
+| G3.2 Settings | `base`, `local`, `test`, new `staging`, `production`. Environment variables; fail-closed validation (`common/config.py`); secure cookie and header defaults |
+| G3.3 Custom User | Moved to `apps/accounts` with the app label kept as `accounts`. `created_by` / `updated_by` changed to `PROTECT` (doc 12 F4, TR-09). No field added, **no migration** |
+| G3.4 PostgreSQL and API | PostgreSQL 16/18 connectivity verified. DRF foundation, `/api/v1/` routing, error envelope (doc 02 §8), pagination (doc 04 §16), liveness and readiness endpoints, OpenAPI where enabled |
+| G3.5 Shared infrastructure | `common/`: request IDs, JSON logging, SMS and push provider mocks (disabled by default), Django email backends and storage settings |
+| G3.6 Authentication | Session authentication with CSRF for the same-origin web client (TR-12). Mobile tokens, `__Host-` cookies, lifetimes (TR-01), ActorContext (TR-02) and admin MFA (TR-07) **not implemented**: PROPOSED, due G4 or later |
+| G3.7 Celery and Redis | Celery app, `BaseTask` conventions (bounded retries, acks_late, failure logging without arguments). A worker was verified against Redis |
+| G3.8 Quality and tests | Ruff clean (KI-11 resolved); lockfiles regenerated with Celery/Redis only; 56 tests pass. 3 database tests not run (KI-14, G4) |
+| G3.9 Documentation | README, doc 16 §11, `.env.example`, known issues and decision records |
+
+Lock foundations (TR-09/TR-22): `common/db/locking.py` (LockLevel order, `lock_plan` tracker, FOR UPDATE / FOR SHARE / pair advisory helpers), `common/db/retry.py` (`@retry_on_contention`), `common/db/fk_inventory.py` with its review test, and the no-raw-SQL-in-services lint test. These are not used in any business workflow.
+
+### G3 exit (doc 10 §0.1: "Lint and tests green on PostgreSQL. No migration files.")
+
+Final verification: 2026-11-18. Python 3.12.16 and 3.13.18 × PostgreSQL 16.16 and 18.7, in throwaway containers.
+
+| Part | Status |
+|---|---|
+| Lint green | **Met.** Ruff lint and format pass on Python 3.12 and 3.13 (45 files) |
+| Tests green on PostgreSQL | **Not fully met.** (a) **Foundation tests: green.** All 77 tests that don't need Django's test database pass in all four Python × PostgreSQL combinations; these include the 9 automated PostgreSQL foundation tests (DR-2026-11-17-G3C-3). (b) **The 3 User-model database tests: not green.** They are not run successfully and are not counted as passing: their setup fails with `ValueError: Dependency on app with no migrations: accounts` because there is no first migration (KI-14). Resolving that is G4 work. **Owner decision (DR-2026-11-18-G3A):** G3 accepted with this criterion not fully met (accepted exception). (b) is carried forward to G4 as an OPEN item (KI-14) |
+| No migration files | **Met.** No migration file exists, and a test enforces this. No migration was applied; no `django_migrations` table or application table exists in any test database |
+
+## G3 controlled correction (2026-11-17, DR-2026-11-17-G3C)
+
+| Item | Result |
+|---|---|
+| D-1 Celery broker | Staging and production require `CELERY_BROKER_URL` or `REDIS_URL` (`common/config.py`). Errors name variables, never values. Local development unchanged. 10 new tests |
+| D-2 Python 3.12 + 3.13 | `requires-python = ">=3.12,<3.14"`; Ruff target `py312`; lockfiles compiled with Python 3.12 (no version or hash changed; `typing-extensions` now locked via `psycopg` and `referencing`). Hash-checked development and production installs verified on 3.12.16 and 3.13.18. CI matrix covers both |
+| G-3 PostgreSQL tests | `tests/test_postgres_foundation.py`, 9 tests: readiness, advisory locks, `lock_timeout`, contention retry. Disposable database only (`MATERMONIAL_TEST_POSTGRES_URL`; port 5432 and local sockets refused). No migration, no table |
+| Document statuses | `CLAUDE.md`, doc 07, doc 08 → APPROVED (DR-2026-11-17-G3C-4; doc 20 §5) |
+
+Test totals: 80 collected. 77 pass on PostgreSQL 16.16 and 18.7, under Python 3.12 and 3.13. The 3 User-model database tests were not run (G4, KI-14).
+
+## G3 finalization and integrity verification (2026-11-18)
+
+Fresh results. Python ran in throwaway `python:3.12-slim` / `python:3.13-slim` containers and PostgreSQL in throwaway `postgres:16` / `postgres:18` containers on host port 55432. The source was mounted read-only. The owner's PostgreSQL server (port 5432) and `.env` were not used.
+
+| Check | Python 3.12.16 | Python 3.13.18 |
+|---|---|---|
+| Development lockfile, hash-checked install + `pip check` | Pass | Pass |
+| Production lockfile, hash-checked install + `pip check` | Pass | Pass |
+| Lockfile consistency (pip-compile from the committed lockfiles) | Pass | Not applicable: lockfiles are compiled on 3.12, and CI checks on 3.12 only. On 3.13 only `# via` comments differ |
+| Ruff lint / format | Pass / Pass | Pass / Pass |
+
+| Tests (each Python × PostgreSQL 16.16 and 18.7) | Result |
+|---|---|
+| Collected | 80 |
+| Foundation step (`pytest -m "not django_db"`) | 77 passed, 0 failed, 0 skipped |
+| PostgreSQL foundation tests (`-m postgres`, part of the 77) | 9 passed |
+| User-model database tests (`-m django_db`) | 3 errors at setup (KI-14): **not passing, deferred to G4** |
+
+After each PostgreSQL run: 0 application tables, no `django_migrations` table, 0 advisory locks, and no remaining client sessions or open transactions. The database step's setup created only an empty `test_matermonial_ci` database inside the throwaway container. The containers were then removed.
+
+CI workflow: the YAML parses, with no duplicate keys; matrices are Python 3.12/3.13 × PostgreSQL 16/18; PostgreSQL is published only on host port 55432. No workflow change was needed. The workflow has not run on GitHub (KI-12, D6).
+
+## G3 owner acceptance and CI pre-G4 preparation (2026-11-18, DR-2026-11-18-G3A)
+
+**G3 ACCEPTED** by the project owner, with an accepted exception: "tests green on PostgreSQL" is not fully met. KI-14 is carried forward to G4 as OPEN. G4, GitHub remote and push: NOT AUTHORIZED.
+
+CI test job before this change:
+1. `pytest -m "not django_db"`. The PostgreSQL tests would silently skip if `MATERMONIAL_TEST_POSTGRES_URL` were missing.
+2. `pytest -m django_db`, which always failed with 3 KI-14 setup errors, so every test job was red.
+
+CI test job after this change:
+1. A guard fails the job if `MATERMONIAL_TEST_POSTGRES_URL` is missing or empty.
+2. A check that exactly the 3 known KI-14 node IDs are marked deferred.
+3. `pytest -m postgres`.
+4. `pytest -m "not postgres"`. The 3 KI-14 tests carry `deferred_g4_ki14` and are reported as `SKIPPED … DEFERRED to G4 (KI-14 …)`, never as passed.
+
+Any other failure, error or collection error fails the job, and there is no `continue-on-error`. If the initial `accounts` migration exists, the run stops with an error until the marker is removed (`backend/conftest.py`).
+
+Local verification: the workflow's own `run:` steps, parsed from `ci.yml`, were run in `bash -eo pipefail` in throwaway containers (Python 3.12.16 and 3.13.18 × PostgreSQL 16.16 and 18.7). The changes do not affect the quality job; it was re-run and passed on both Python versions (on 3.13 the lockfile check differs only in `# via` comments; CI runs that check on 3.12 only).
+
+| Scenario | Result |
+|---|---|
+| Unmodified tree (all 4 combinations) | Job succeeds: 9 PostgreSQL passed; 68 passed, 3 skipped (DEFERRED) |
+| `MATERMONIAL_TEST_POSTGRES_URL` empty / unset | Job fails at the guard |
+| Unrelated failing test | Job fails (1 failed) |
+| Non-deferred `django_db` test (unrelated database error) | Job fails (1 error) |
+| Collection error | Job fails |
+| A 4th test marked deferred | Job fails at the deferred-set check |
+| Failing PostgreSQL foundation test | Job fails (1 failed, 8 passed) |
+
+Not run on GitHub: no remote exists, and none is authorized.

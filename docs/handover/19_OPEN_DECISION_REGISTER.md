@@ -1,6 +1,6 @@
 # Matermonial — Open Decision Register
 
-**Document status:** APPROVED_WITH_OPEN_ITEMS (project owner, 2026-11-17, DR-2026-11-17-A; record in doc 20 §5). **Open items:** OPEN ODs: OD-02, OD-03, OD-04, OD-05, OD-06, OD-07, OD-08, OD-09, OD-10; OPEN legacy ODs (doc 13 series): OD-001, OD-002, OD-003, OD-004, OD-005, OD-006, OD-007; PROPOSED TRs: TR-01, TR-02, TR-03, TR-04, TR-06, TR-07, TR-08, TR-09, TR-10, TR-11, TR-12, TR-15, TR-16, TR-17, TR-18, TR-19, TR-20, TR-21, TR-22, TR-23, TR-24. Listed items keep their own status (doc 19); this document status doesn't approve them. TR-13 approved 2026-11-17 (DR-2026-11-17-G2D-2).
+**Document status:** APPROVED_WITH_OPEN_ITEMS (project owner, 2026-11-17, DR-2026-11-17-A; record in doc 20 §5). **Open items:** OPEN ODs: OD-02, OD-03, OD-04, OD-05, OD-06, OD-07, OD-08, OD-09, OD-10; OPEN legacy ODs (doc 13 series): OD-001, OD-002, OD-003, OD-004, OD-005, OD-006, OD-007; PROPOSED TRs: TR-01, TR-02, TR-03, TR-04, TR-06, TR-07, TR-08, TR-10, TR-11, TR-15, TR-16, TR-17, TR-18, TR-19, TR-20, TR-21, TR-23, TR-24. Listed items keep their own status (doc 19); this document status doesn't approve them. TR-09, TR-12, TR-22 approved 2026-11-17 (DR-2026-11-17-G3). TR-13 approved 2026-11-17 (DR-2026-11-17-G2D-2).
 **Created:** 2026-11-16, G1 step 2 (DCR-34)
 **Source:** approved baseline `docs/baseline/v4.6-F3/` and decision records in `docs/decisions/new_architecture_decisions.md`
 
@@ -112,10 +112,10 @@ Doc 13 §4 lists **OD-001…OD-007** (commercial structure, credit packages, Jaz
 | TR-06 | Locked-field correction requests | PROPOSED | Phase 5 | A4 §3 |
 | TR-07 | Admin authorization from a single source | PROPOSED | G4 | v4 §16 |
 | TR-08 | View billing mechanics | PROPOSED | Phase 8 | A4 §10; v4 §8 |
-| TR-09 | Constraints, global lock order, anchors | PROPOSED | G3 / per phase | v4.2; v4.3 §3; v4.5 §6 |
+| TR-09 | Constraints, global lock order, anchors | **APPROVED** (DR-2026-11-17-G3-2, 2026-11-17) | — | v4.2; v4.3 §3; v4.5 §6 |
 | TR-10 | Upload pipeline | PROPOSED | Phase 3 | A4 §3 |
 | TR-11 | Audit and outbox refinements (two-phase processing, queue key, redaction, event classes). The core transactional outbox itself is an approved requirement (FR-NOT-005; ADR-014 core, DR-2026-11-17-C2) and is not part of this TR. | PROPOSED | G4 | v4.5 §1; v4.6 §1; F1 Corr. 4 |
-| TR-12 | Same-origin deployment | PROPOSED | G3 | A4 §3 |
+| TR-12 | Same-origin deployment | **APPROVED** (DR-2026-11-17-G3-1, 2026-11-17; architectural direction only, no deployment) | — | A4 §3 |
 | TR-13 | PostgreSQL tests and concurrency harness (CI on PostgreSQL 16 and 18) | **APPROVED** (DR-2026-11-17-G2D-2, 2026-11-17) | — | v4.5 §6; v4.6 §4 |
 | TR-14 | Status model | **APPROVED** (DR-2026-11-16-2) | — | v4 §6 |
 | TR-15 | Ledger projections, refund integrity, wallet closure, financial events | PROPOSED | Phase 7 / 9 | v4.4; v4.5; F1; F2; F3 |
@@ -125,7 +125,7 @@ Doc 13 §4 lists **OD-001…OD-007** (commercial structure, credit packages, Jaz
 | TR-19 | Profile-detail revalidation, GET snapshot and deadline | PROPOSED | Phase 8 | v4 §8; v4.4 §5 |
 | TR-20 | Connection / progress separation | PROPOSED | Phase 10 | v4 §7 B |
 | TR-21 | Recovery-scoped session | PROPOSED | Phase 2 | v4 §10.6 |
-| TR-22 | LOCK_PLAN tracker and implicit-FK inventory | PROPOSED | G3 | v4.3 §6; v4.5 §6.1 |
+| TR-22 | LOCK_PLAN tracker and implicit-FK inventory | **APPROVED** (DR-2026-11-17-G3-2, 2026-11-17) | — | v4.3 §6; v4.5 §6.1 |
 | TR-23 | Log pseudonymisation, envelopes, UUIDv7 partitioning | PROPOSED | G4 | v4.5 §2, §5; v4.6 §4 |
 | TR-24 | Compliance registry and maintenance protocol | PROPOSED | G4 (schema); before production (storage resource) | v4.6 §2–3; F; F1; F2; F3 |
 

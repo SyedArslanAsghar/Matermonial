@@ -1,6 +1,6 @@
 # Matermonial — Claude Code Detailed Instructions (Companion to CLAUDE.md)
 
-**Document status:** APPROVED_WITH_OPEN_ITEMS (project owner, 2026-11-17, DR-2026-11-17-A; record in doc 20 §5). **Open items:** OPEN ODs: OD-07; PROPOSED TRs: TR-01, TR-02, TR-09, TR-11, TR-17, TR-19, TR-22, TR-23, TR-24. Listed items keep their own status (doc 19); this document status doesn't approve them. TR-13 approved 2026-11-17 (DR-2026-11-17-G2D-2). Its role as the detailed companion is approved (DR-2026-11-16-3).
+**Document status:** APPROVED_WITH_OPEN_ITEMS (project owner, 2026-11-17, DR-2026-11-17-A; record in doc 20 §5). **Open items:** OPEN ODs: OD-07; PROPOSED TRs: TR-01, TR-02, TR-11, TR-17, TR-19, TR-23, TR-24. Listed items keep their own status (doc 19); this document status doesn't approve them. TR-09, TR-22 approved 2026-11-17 (DR-2026-11-17-G3). TR-13 approved 2026-11-17 (DR-2026-11-17-G2D-2). Its role as the detailed companion is approved (DR-2026-11-16-3).
 **Matches:** root `CLAUDE.md` G1 revision (rule IDs CC-R01…CC-R79)
 **Applied corrections:** DCR-45, DCR-12, DCR-42, DCR-50, DCR-53, DCR-58, DCR-63, DCR-66, DCR-72, DCR-73, DCR-80, DCR-81, DCR-82, DCR-87, DCR-91, DCR-94, DCR-95, DCR-97, DCR-99 (doc 20); G1 correction pass 2026-11-17 (DR-2026-11-17-C)
 **Verbatim extracts:** each starts with a "*Verbatim from …*" (or "*Adapted from …*") line and ends with "*— End of verbatim extract —*". Text outside those markers is editorial.
@@ -48,9 +48,9 @@ The three status dimensions are defined in doc 00 §9. In practice:
 - **Conflict handling:** inside a transaction, use `INSERT … ON CONFLICT` rather than catching `IntegrityError`, which would abort the PostgreSQL transaction.
 - **No external calls inside a transaction.** Use the outbox (§6).
 
-## 5. Transactions and locking [TR-09, TR-22]
+## 5. Transactions and locking [TR-09, TR-22, APPROVED]
 
-**Status:** this section is a PROPOSED technical recommendation (TR-09, TR-22; approval due before G3). Follow it as the intended design, but don't describe it as approved until doc 19 records its approval (`CLAUDE.md` CC-R20, CC-R26).
+**Status:** TR-09 and TR-22 are **APPROVED** (2026-11-17, DR-2026-11-17-G3-2; `CLAUDE.md` CC-R20). G3 builds the shared foundations (lock helpers, LOCK_PLAN tracker, lint rule, FK-inventory review). Their use in feature services starts with each G5 phase.
 
 ### 5.1 Account and profile locks
 
@@ -434,7 +434,7 @@ The protocol is specified in doc 09. Procedure rules for Claude Code:
 
 ## 11. Review checklist
 
-- [ ] Every service has a `LOCK_PLAN` that follows §5.3 and matches §5.4 [TR-09/TR-22, PROPOSED until approved in doc 19].
+- [ ] Every service has a `LOCK_PLAN` that follows §5.3 and matches §5.4 [TR-09/TR-22, APPROVED].
 - [ ] No raw user, profile, session, authorization or resource ID is written in plaintext to `AuditLog`, `AccountSecurityEvent` or `OutboxEvent` rows (§5.5 amendment; doc 03 §22.2, §22.12).
 - [ ] Every new foreign key is assigned an implicit-lock class (§5.5). Unclassified foreign keys fail review.
 - [ ] No external call inside a transaction; side effects go through the outbox.

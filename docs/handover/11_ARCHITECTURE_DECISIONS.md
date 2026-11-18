@@ -2,7 +2,7 @@
 
 **Version:** 1.0 (G1 revision 2026-11-16)  
 **Date:** 11 November 2026  
-**Document status:** APPROVED_WITH_OPEN_ITEMS (project owner, 2026-11-17, DR-2026-11-17-A; record in doc 20 §5). **Open items:** PROPOSED TRs: TR-01, TR-02, TR-07, TR-09, TR-11, TR-15, TR-17, TR-22, TR-23; ADR decisions pending: ADR-022, ADR-023 (RECOMMENDED / PROPOSED), ADR-025…ADR-032 (PROPOSED). Listed items keep their own status (doc 19); this document status doesn't approve them.  
+**Document status:** APPROVED_WITH_OPEN_ITEMS (project owner, 2026-11-17, DR-2026-11-17-A; record in doc 20 §5). **Open items:** PROPOSED TRs: TR-01, TR-02, TR-07, TR-11, TR-15, TR-17, TR-23; ADR decisions pending: ADR-022, ADR-023 (RECOMMENDED / PROPOSED), ADR-025…ADR-032 (PROPOSED). Listed items keep their own status (doc 19); this document status doesn't approve them. TR-09, TR-22 approved 2026-11-17 (DR-2026-11-17-G3).  
 **Applied corrections:** DCR-10, DCR-28 (doc 20); G1 correction pass 2026-11-17 (DR-2026-11-17-C). New ADRs from ADR-025 onwards are kept as files in `docs/decisions/` and indexed in §25.
 
 An Architecture Decision Record captures a significant technical or structural decision, its context, consequences, and current status.
@@ -371,7 +371,7 @@ All ADR decisions below are due **before G4** (baseline v4.6, approval-by-gate t
 | ADR-028 | Transactional outbox as a pseudonymous work queue | PROPOSED (TR-11). Refines the approved ADR-014 core. | `docs/decisions/ADR-028-outbox.md` |
 | ADR-029 | Three independent status dimensions | PROPOSED (the ADR document; DR-2026-11-17-C6). The status-model decision it records, TR-14, is APPROVED (DR-2026-11-16-2). | `docs/decisions/ADR-029-status-model.md` |
 | ADR-030 | Ledger as the permanent record; balances as projections | PROPOSED (TR-15) | `docs/decisions/ADR-030-ledger-projections.md` |
-| ADR-031 | Global lock-order and anchor policy | PROPOSED (TR-09, TR-22) | `docs/decisions/ADR-031-lock-order.md` |
+| ADR-031 | Global lock-order and anchor policy | PROPOSED (the ADR document). The TRs it records, TR-09 and TR-22, are APPROVED (DR-2026-11-17-G3-2). | `docs/decisions/ADR-031-lock-order.md` |
 | ADR-032 | Security-event model and log pseudonymisation | PROPOSED (TR-17, TR-23) | `docs/decisions/ADR-032-security-events.md` |
 
 Pending decisions on existing ADRs: ADR-022 and ADR-023 (see the notes under each). ADR-014 is APPROVED for its core decision only (DR-2026-11-17-C2).

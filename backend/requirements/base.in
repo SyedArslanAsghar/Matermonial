@@ -5,3 +5,5 @@ djangorestframework>=3.16,<3.17
 django-environ>=0.12,<1.0
 psycopg[binary]>=3.2,<4.0
 drf-spectacular>=0.28,<0.29
+# Approved dependency list for G3 (DR-2026-11-17-G3-4): Celery with its Redis transport.
+celery[redis]>=5.5,<6.0

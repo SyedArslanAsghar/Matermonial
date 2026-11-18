@@ -202,3 +202,47 @@ Never silently fall back from private production storage to public storage.
 - **Local and test environments:** use a local or mock registry and locally generated development keys. Development keys are never reused in any other environment, and real user data is never used locally (§6).
 - **`.env.example`** lists the item names with empty placeholders only.
 - **Logging:** values of every secret item are redacted from logs and error reports (§8).
+
+## 11. Configuration implemented in G3 (2026-11-17)
+
+Implementation record (`CLAUDE.md` CC-R63). The names are in `backend/.env.example` with safe placeholders only, and the code is in `backend/config/settings/`. This section adds no requirement; §1–§10 still govern.
+
+| Variable | Purpose | Default (local) | Deployed environments |
+|---|---|---|---|
+| `DJANGO_SETTINGS_MODULE` | `config.settings.{local,test,staging,production}` | local (`manage.py`) | Set explicitly. WSGI, ASGI and Celery default to production. |
+| `DJANGO_ENVIRONMENT` | Environment name | `local` | `staging` / `production` |
+| `DJANGO_SECRET_KEY` | Django secret | Insecure local default | **Required**, ≥ 50 characters; the default is refused |
+| `DJANGO_DEBUG` | Debug mode | on (local) | Always off |
+| `DJANGO_ALLOWED_HOSTS` / `DJANGO_CSRF_TRUSTED_ORIGINS` | Host and origin allowlists (same origin, TR-12) | localhost | **Hosts required** |
+| `DATABASE_URL`, `DATABASE_CONN_MAX_AGE` | PostgreSQL connection | Local default URL | **Explicit URL required** |
+| `DB_LOCK_TIMEOUT_MS` | `lock_timeout` set by `@retry_on_contention` (doc 12 §5.3) | 5000 | 5000 |
+| `LOCK_TRACKER_ENABLED` | LOCK_PLAN tracker (doc 12 §5.6) | on (local, test) | off |
+| `API_PAGE_SIZE`, `API_MAX_PAGE_SIZE` | Pagination defaults (doc 04 §16) | 20 / 100 | 20 / 100 |
+| `API_DOCS_ENABLED` | Serve the OpenAPI schema and Swagger UI | on (local) | off unless explicitly enabled |
+| `EMAIL_BACKEND` | Django email backend | console | Console, locmem, file and dummy backends are refused |
+| `SMS_PROVIDER`, `PUSH_PROVIDER` | `mock` or `disabled` | mock (local, test) | `disabled` until real providers exist; `mock` is refused |
+| `STORAGE_BACKEND`, `MEDIA_ROOT` | Private file storage; not served by Django (CC-R46) | `local`, `backend/media` | Only `local` exists. Object storage needs an approved dependency; there is never a fallback to public storage. |
+| `REDIS_URL`, `CELERY_BROKER_URL`, `CELERY_RESULT_BACKEND` | Celery broker and results | Redis on localhost; no results | **`CELERY_BROKER_URL` or `REDIS_URL` must be set explicitly**; no silent fallback to localhost Redis. The startup error names the variables, never their values or credentials. Local development is unchanged (DR-2026-11-17-G3C-1; retained by DR-2026-11-18-G3A-3) |
+| `CELERY_TASK_ALWAYS_EAGER`, `CELERY_TASK_TIME_LIMIT`, `CELERY_TASK_SOFT_TIME_LIMIT` | Inline tasks locally; time limits | eager; 300 / 270 s | Not eager |
+| `DJANGO_LOG_LEVEL`, `DJANGO_LOG_FORMAT` | Log level; `json` or `text` | INFO, text | INFO, json |
+| `MATERMONIAL_TEST_POSTGRES_URL` | Disposable PostgreSQL database for the PostgreSQL foundation tests (tests only; see §11.1) | unset: those tests skip | Never set. Tests and CI only |
+
+Startup validation (`backend/common/config.py`) applies to staging and production. The compliance-registry, KEK, queue-key and dedupe-key items in §10 belong to TR-11, TR-23 and TR-24 (PROPOSED) and aren't implemented yet.
+
+### 11.1 `MATERMONIAL_TEST_POSTGRES_URL` (test-only)
+
+Added by the G3 correction (DR-2026-11-17-G3C-3). Test code reads it (`backend/tests/test_postgres_foundation.py`, marker `postgres`). Django settings never read it, so it has no effect on any running environment.
+
+- **Purpose:** points the 9 PostgreSQL foundation tests at a real PostgreSQL server: readiness, advisory-lock acquisition and release, `lock_timeout`, and the `@retry_on_contention` behaviour (doc 12 §5.3).
+- **Format:** a PostgreSQL URL, `postgresql://<user>:<password>@<host>:<port>/<database>`. Use throwaway values only. Never put real credentials in this variable, in `.env.example` or in documentation.
+- **When unset:** the tests skip with a reason, and the rest of the suite runs normally.
+- **Expected usage:**
+  - **CI:** set in `.github/workflows/ci.yml` to the job's throwaway PostgreSQL service container (PostgreSQL 16 and 18), published on host port 55432.
+  - **Locally (optional):** start a throwaway container on a port other than 5432, e.g. `docker run --rm -d -p 127.0.0.1:55432:5432 -e POSTGRES_USER=<user> -e POSTGRES_PASSWORD=<password> -e POSTGRES_DB=<db> postgres:16`. Set the variable for that test run only, then remove the container. Docker here is a test convenience; it is not required for local development (CC-R21).
+- **Safety restrictions, enforced by the tests:**
+  - Only a PostgreSQL URL is accepted.
+  - Port 5432, an empty host and local Unix sockets are refused, so a developer's own PostgreSQL server can't be reached by accident. Point it only at a database you can throw away.
+  - The tests use temporary connection aliases. They don't create pytest-django's test database, run no migration, create no table and touch no application data. They only run `SELECT` and advisory-lock functions.
+  - Teardown fails the test if a table was created or an advisory lock is left behind, and closes every connection it opened.
+- **Not covered:** tests that need application tables, including the 3 User-model database tests, need the first migration and belong to G4 (KI-14).
+

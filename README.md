@@ -8,12 +8,12 @@ A privacy-conscious matrimonial platform: a Django REST API backend, a React web
 
 Work proceeds through owner-authorized gates (doc 10 §0): G1 documentation → **G2 repository governance** → G3 backend foundation → G4 first migration → G5 features. Current status: [`docs/implementation/progress.md`](docs/implementation/progress.md).
 
-There are no product features yet. The code under `backend/` is an early scaffold that predates the approved baseline; it is reworked in G3 (see [`known_issues.md`](docs/implementation/known_issues.md)). **Don't run migrations**: the first migration belongs to G4.
+There are no product features yet. The backend foundation (G3) is in place: settings, the error envelope, logging, health checks, provider mocks, Celery wiring and lock foundations. **Don't run migrations**: the first migration belongs to G4 (see [`known_issues.md`](docs/implementation/known_issues.md)).
 
 ## Repository structure
 
 ```text
-backend/          Django + DRF API (scaffold; reorganized into apps/ and common/ in G3)
+backend/          Django + DRF API: config/ (settings, URLs, Celery), apps/ (domain apps), common/ (shared infrastructure), tests/
 frontend/         React + Vite + TypeScript web app (placeholder until G5 Phase 17)
 mobile/           React Native + Expo app (placeholder until G5 Phase 18)
 infrastructure/   Production deployment files (placeholder; AWS EC2 + Docker)
@@ -33,7 +33,7 @@ Approved stack (`CLAUDE.md` §3): Python, Django, Django REST Framework, Postgre
 
 ## Local development (native, no Docker required)
 
-Prerequisites: **Python 3.13** (the dependency lockfiles are compiled for it, and CI uses it), Git, and PostgreSQL 15 or later. Tests run on PostgreSQL (CI checks 16 and 18). Docker is **not** needed for local development (`CLAUDE.md` CC-R21).
+Prerequisites: **Python 3.12 or 3.13** (both supported and tested; `requires-python` in `backend/pyproject.toml`), Git, and PostgreSQL 15 or later. Tests run on PostgreSQL (CI checks 16 and 18). Docker is **not** needed for local development (`CLAUDE.md` CC-R21).
 
 ### Backend environment
 
@@ -70,18 +70,34 @@ pytest                  # tests
 
 - Ruff and pytest settings are in `backend/pyproject.toml`.
 - Tests run on PostgreSQL (TR-13; `CLAUDE.md` CC-R58). Set `DATABASE_URL` in `backend/.env` to a local database role that may create databases; pytest-django creates and drops its own `test_…` database.
-- Known limitations ([`known_issues.md`](docs/implementation/known_issues.md)):
-  - the existing scaffold fails Ruff until G3 (KI-11)
-  - its tests can't run until the first migration exists in G4 (KI-14)
+- Tests that need the database carry `@pytest.mark.django_db`. Until the first migration exists (G4), pytest-django can't build the test database for them (KI-14). The only such tests today are the 3 User-model tests. They carry `@pytest.mark.deferred_g4_ki14`, so a plain `pytest` reports them as skipped with a "DEFERRED to G4" reason; they never count as passed. Any other database test fails until G4.
+- PostgreSQL foundation tests (`@pytest.mark.postgres`) cover readiness, advisory locks, `lock_timeout` and contention retry against a real server. They create no tables and run no migration. They only run when `MATERMONIAL_TEST_POSTGRES_URL` points to a **disposable** database, for example a throwaway container on a port other than 5432; otherwise they skip. They refuse port 5432 and local sockets, so they never touch a developer's own PostgreSQL server.
 - Testing standards: doc 08.
+
+### Settings and running the backend
+
+| Settings module | Use |
+|---|---|
+| `config.settings.local` | Native development: `DEBUG` on, mock SMS and push, console email, API docs, Celery tasks run inline |
+| `config.settings.test` | pytest, on PostgreSQL |
+| `config.settings.staging`, `config.settings.production` | Deployed environments. They **fail closed**: they refuse to start with an insecure key, no allowed hosts, no `DATABASE_URL`, mock providers or a console email backend (doc 16 §7) |
+
+- `manage.py` defaults to local settings. The WSGI, ASGI and Celery entry points default to production settings.
+- Endpoints:
+  - liveness: `GET /api/v1/health/`
+  - readiness, which checks the database: `GET /api/v1/health/ready/`
+  - OpenAPI schema and Swagger UI at `/api/schema/` and `/api/docs/`, only when `API_DOCS_ENABLED` (local by default)
+- `python manage.py check --database default` validates the configuration and database connection.
+- **`runserver` can't start before G4.** Django's development server builds the migration graph first, which fails until the custom User model has its first migration (KI-14). Don't work around this by creating migrations.
+- Celery and Redis are optional locally. To run a worker against a local Redis:
+
+  ```bash
+  DJANGO_SETTINGS_MODULE=config.settings.local CELERY_TASK_ALWAYS_EAGER=false celery -A config worker -l info
+  ```
 
 ### Later setup steps
 
-These are documented as their gates are delivered:
-- PostgreSQL configuration and backend startup (G3)
-- migrations and superuser creation (G4)
-- local media and mock providers, optional Redis/Celery, and API docs (G3 onwards)
-- frontend and mobile startup (G5)
+These are documented as their gates are delivered: migrations, superuser creation and backend startup (G4); frontend and mobile startup (G5).
 
 ## Git workflow and contributions
 
@@ -92,10 +108,15 @@ These are documented as their gates are delivered:
 
 ## CI/CD
 
-- [`.github/workflows/ci.yml`](.github/workflows/ci.yml) runs on every push and pull request, on Python 3.13. It uses no repository secrets and doesn't deploy. It has two jobs:
-  - **quality**: hash-checked install, `pip check`, a lockfile consistency check, and Ruff lint and format
-  - **tests**: `pytest` on PostgreSQL 16 and 18 (TR-13)
-- Both jobs are expected to fail until the known issues KI-11 (G3) and KI-14 (G4) are resolved.
+- [`.github/workflows/ci.yml`](.github/workflows/ci.yml) runs on every push and pull request, on Python 3.12 and 3.13. It uses no repository secrets and doesn't deploy. It has two jobs:
+  - **quality**: hash-checked installs of the development and production lockfiles, `pip check`, a lockfile consistency check (on 3.12, the version the lockfiles are compiled with), and Ruff lint and format
+  - **tests**, on each Python version × PostgreSQL 16 and 18 (TR-13), in this order:
+    1. fail if `MATERMONIAL_TEST_POSTGRES_URL` is missing or empty, so the PostgreSQL tests can't silently skip
+    2. check that exactly the 3 KI-14 tests are marked deferred
+    3. run the PostgreSQL foundation tests
+    4. run every other test; the 3 KI-14 tests are reported as skipped, DEFERRED to G4
+- Any failure, error or collection error fails the job. There is no `continue-on-error`.
+- All steps pass when run locally with the same commands. CI has not yet run on GitHub: no remote is configured (D6).
 - The full pipeline, including builds, migration and schema checks, staging and production, is described in docs 08 and 09. It is delivered in later gates.
 
 ## Docker's role

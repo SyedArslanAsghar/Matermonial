@@ -40,6 +40,9 @@ This register records every documentation correction (DCR), where it was applied
 | 2026-11-17 | DR-2026-11-17-C | G1 final reconciliation audit reviewed; G1 correction pass authorized and applied (§8). Owner decisions C1–C8 recorded in `docs/decisions/new_architecture_decisions.md`. Final document statuses are still to be set by the owner. |
 | 2026-11-17 | DR-2026-11-17-A | **G1 final owner acceptance.** G1 result accepted; final document statuses assigned (§5). G1 COMPLETED. G2–G5 not authorized. All OPEN ODs, PROPOSED TRs, REC-BIZ items and DCR-20 (BLOCKED) keep their status. |
 | 2026-11-17 | DR-2026-11-17-G2, DR-2026-11-17-G2D | G2 authorized. G2 decisions: TR-13 **APPROVED** (TR-13 removed from the open-item headers of docs 08, 12, 13 and 19, and its labels updated in docs 08, 12, 13 and 19); branch model and pip-tools recorded in doc 07 §8 and §13; D5–D7 deferred. No document status changed. |
+| 2026-11-17 | DR-2026-11-17-G2A, -G2X, -G3 | G2 accepted with carried-forward items; baseline commit `38f491dea79f`; G3-entry exception. TR-09, TR-12, TR-22 **APPROVED**: labels updated in `CLAUDE.md` CC-R20 and docs 02, 07, 08, 11, 12 and 19, and removed from open-item headers. `apps/` layout recorded in doc 07 §1. No document status changed. |
+| 2026-11-17 | DR-2026-11-17-G3C | G3 correction pass. Document status changes: `CLAUDE.md`, doc 07, doc 08 → **APPROVED** (§5). No other status changed. |
+| 2026-11-18 | DR-2026-11-18-G3A | **G3 accepted by the project owner**, with an accepted exception: the exit criterion "tests green on PostgreSQL" is not fully met. The foundation tests pass; the 3 KI-14 User-model database tests are OPEN and carried forward to G4. The doc 16 §11 Redis/Celery row correction is retained. A G3 status note was added to doc 10 §0.1, and the gate status was updated in `docs/decisions/new_architecture_decisions.md` and `docs/implementation/` (`progress.md`, `known_issues.md`, `pending_features.md`). G4 NOT AUTHORIZED; GitHub remote and push NOT AUTHORIZED; the G2 criterion "CI runs on the baseline" stays OPEN before G4 (DR-2026-11-17-G2X). Following the acceptance, the CI pre-G4 preparation changed the test job in two ways: a guard against a missing `MATERMONIAL_TEST_POSTGRES_URL`, and exactly the 3 KI-14 tests reported as DEFERRED. The README "Formatting, linting and tests" and "CI/CD" sections and `progress.md` were updated to match. No document status changed. |
 
 ## 3. DCR register
 
@@ -265,6 +268,14 @@ All contradictions below are **resolved in the baseline**. "Docs aligned" is YES
 | 20 Correction register | REFERENCE | Historical record of corrections, contradictions and approvals; informative, not a requirements or instruction source |
 
 No document is SUPERSEDED.
+
+**Status changes after G1 acceptance**
+
+| Document | From | To | Decision | Reason |
+|---|---|---|---|---|
+| `CLAUDE.md` | APPROVED_WITH_OPEN_ITEMS | APPROVED | DR-2026-11-17-G3C-4 | Its open items (TR-09, TR-22) were approved; the open-item list was verified empty |
+| 07 Repository standards | APPROVED_WITH_OPEN_ITEMS | APPROVED | DR-2026-11-17-G3C-4 | Its open items (TR-09, TR-22) were approved; verified empty |
+| 08 Testing and QA | APPROVED_WITH_OPEN_ITEMS | APPROVED | DR-2026-11-17-G3C-4 | Its open items (TR-13, TR-22) were approved; verified empty |
 
 ## 6. G1 alignment notes (interpretations and deviations for owner review)
 

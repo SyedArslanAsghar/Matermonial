@@ -1,7 +1,7 @@
 # New Architecture Decisions
 
 **Register status:** ACTIVE
-**Last updated:** 2026-11-17 (G1 final owner acceptance)
+**Last updated:** 2026-11-18 (G3 owner acceptance, DR-2026-11-18-G3A)
 
 This register holds the project's approval decision records (DR-…) and the approved OD-01 domain catalogue. The decisions recorded here up to DR-2026-11-16-G1 have been applied to the handover documents during G1 (Documentation Reconciliation); where each was applied is recorded in `docs/handover/20_DOCUMENTATION_CORRECTION_REGISTER.md`. Owner decisions (OD) and technical recommendations (TR) and their statuses are tracked in `docs/handover/19_OPEN_DECISION_REGISTER.md`.
 
@@ -44,8 +44,8 @@ The decision records below are historical: each describes the situation **at the
 
 | Status | Items |
 |---|---|
-| APPROVED | TR-05, TR-14, TR-13 (DR-2026-11-17-G2D-2) |
-| PROPOSED | TR-01, TR-02, TR-03, TR-04, TR-06, TR-07, TR-08, TR-09, TR-10, TR-11, TR-12, TR-15, TR-16, TR-17, TR-18, TR-19, TR-20, TR-21, TR-22, TR-23, TR-24 |
+| APPROVED | TR-05, TR-14, TR-13 (DR-2026-11-17-G2D-2), TR-09, TR-12, TR-22 (DR-2026-11-17-G3) |
+| PROPOSED | TR-01, TR-02, TR-03, TR-04, TR-06, TR-07, TR-08, TR-10, TR-11, TR-15, TR-16, TR-17, TR-18, TR-19, TR-20, TR-21, TR-23, TR-24 |
 
 ### Owner decisions (OD)
 
@@ -79,8 +79,8 @@ The legacy open decisions in `docs/handover/13_ASSUMPTIONS_RISKS_TRACEABILITY.md
 | Gate | Status |
 |---|---|
 | G1 Documentation reconciliation | **COMPLETED. ACCEPTED by the project owner** (DR-2026-11-17-A, 2026-11-17). All 12 exit criteria met. |
-| G2 Repository governance | IN PROGRESS. AUTHORIZED (DR-2026-11-17-G2). Owner decisions recorded (DR-2026-11-17-G2D). Finalization applied; baseline commit awaiting the owner's author identity. Not owner-accepted. |
-| G3 Backend foundation | NOT STARTED. NOT AUTHORIZED. |
+| G2 Repository governance | **ACCEPTED by the project owner with carried-forward items** (DR-2026-11-17-G2A). Baseline commit `38f491dea79fb9bb10fd2010b1c2cb8a68d545f9`. Exit criterion "CI runs on the baseline" **OPEN**: must be met before G4 (exception DR-2026-11-17-G2X). |
+| G3 Backend foundation | **ACCEPTED by the project owner** on 2026-11-18, with an accepted exception and a carried-forward item (DR-2026-11-18-G3A). Exit criterion "tests green on PostgreSQL" is not fully met: the foundation tests pass, but the 3 KI-14 User-model database tests are OPEN and carried forward to G4. |
 | G4 First migration | NOT STARTED. NOT AUTHORIZED. |
 | G5 Features | NOT STARTED. NOT AUTHORIZED. |
 
@@ -221,6 +221,111 @@ The full assignment, with reasons, is recorded in doc 20 §5. `CLAUDE.md` remain
 | 7 | DR-2026-11-17-G2D-7 | D7 LICENSE | DEFERRED. The owner chooses a licence before public distribution or when otherwise required; no file is created. |
 
 **Boundaries:** no OD is resolved, and no TR other than TR-13 changes status. No approved business requirement changes.
+
+---
+
+## Decision record DR-2026-11-17-G2A: G2 Repository Governance — Owner Acceptance with Carried-Forward Items
+
+- **Decision ID:** DR-2026-11-17-G2A
+- **Date:** 2026-11-17
+- **Decided by:** Project owner
+- **Decision status:** APPROVED (a gate decision; the document-status value APPROVED_WITH_OPEN_ITEMS isn't used for gates)
+- **Scope:** G2 only
+- **Decision:** G2 is accepted, with the items below explicitly carried forward. Baseline commit: `38f491dea79fb9bb10fd2010b1c2cb8a68d545f9` (author Syed Arslan Asghar; 113 files; no remote, no push).
+
+| Carried-forward item | Status / destination |
+|---|---|
+| doc 10 §0.1 G2 exit criterion "CI runs on the baseline" (CI execution on GitHub) | **OPEN.** Must be satisfied before G4 entry (DR-2026-11-17-G2X) |
+| GitHub remote and push | Deferred; needs separate authorization (D6) |
+| D6 Remote and branch protection | Deferred |
+| KI-11 Existing Ruff failures | G3 |
+| KI-14 Tests need the custom User model migration | G4 |
+| KI-15 / D7 LICENSE | Deferred; owner decision |
+
+Every other OPEN OD and PROPOSED TR keeps its status.
+
+## Decision record DR-2026-11-17-G2X: Narrow G3-entry exception to the G2 exit criterion
+
+- **Date:** 2026-11-17
+- **Decided by:** Project owner
+- **Decision status:** APPROVED
+- **Exception:** G3 may begin before the doc 10 §0.1 G2 exit criterion "CI runs on the baseline" is satisfied.
+- **Conditions:**
+  - The criterion stays OPEN and **unchanged**; it isn't completed or permanently waived.
+  - The exception covers **G3 entry only**.
+  - The criterion **must be satisfied before G4 entry**.
+  - No GitHub remote or push is authorized under this exception.
+  - The known CI failures keep their assignments: KI-11 to G3, KI-14 to G4.
+
+## Decision record DR-2026-11-17-G3: G3 authorization and the approvals due before G3
+
+- **Date:** 2026-11-17
+- **Decided by:** Project owner
+- **G3 Backend Foundation:** AUTHORIZED, entered under DR-2026-11-17-G2X. **G4 and G5 are NOT AUTHORIZED.**
+- **Not authorized within G3:**
+  - generating or applying migrations, or running `migrate`
+  - business feature workflows, frontend, mobile
+  - deployment, AWS
+  - GitHub remote, push or commits without separate authorization
+
+The approvals required before G3 (baseline v4.6 approval-by-gate table, "Before G3"):
+
+| # | Decision ID | Item | Decision |
+|---|---|---|---|
+| 1 | DR-2026-11-17-G3-1 | TR-12 Same-origin deployment | **APPROVED** as the architectural direction for web/API origin, CORS and cookie/CSRF configuration. It doesn't authorize deployment or infrastructure changes. |
+| 2 | DR-2026-11-17-G3-2 | TR-09 / TR-22 Lock policy, LOCK_PLAN tracker, lint rule, FK-inventory review rule | **APPROVED.** G3 builds the shared technical foundations only; no business workflows, and no premature use across feature domains. |
+| 3 | DR-2026-11-17-G3-3 | `apps/` layout (doc 07 §1–§3) | **APPROVED:** domain apps in `backend/apps/`, shared infrastructure in `backend/common/`, `accounts` moved to `backend/apps/accounts`, existing behaviour preserved. |
+| 4 | DR-2026-11-17-G3-4 | Dependency list | **APPROVED with restrictions:** Celery and Redis only. `django-otp` is **not** added in G3 (deferred to TR-07 at G4). Any other package needs separate approval, with its purpose, necessity, maintenance status and alternatives. |
+
+**Boundaries:** no other OD or TR changes status. ADR-031 stays PROPOSED as a document. The headers of `CLAUDE.md`, doc 07 and doc 08 now have no open items left; changing their document status from APPROVED_WITH_OPEN_ITEMS is a separate owner decision.
+
+---
+
+## Decision record DR-2026-11-17-G3C: G3 controlled correction
+
+- **Date:** 2026-11-17
+- **Decided by:** Project owner
+- **Scope:** G3 correction only. G3 is NOT accepted. G4 is NOT AUTHORIZED.
+
+| # | Decision ID | Item | Decision |
+|---|---|---|---|
+| 1 | DR-2026-11-17-G3C-1 | D-1 Celery broker | APPROVED: staging and production require `CELERY_BROKER_URL` or `REDIS_URL` to be set explicitly; no localhost fallback |
+| 2 | DR-2026-11-17-G3C-2 | D-2 Python policy | APPROVED: Python 3.12 and 3.13 supported (`requires-python >=3.12,<3.14`); Ruff targets 3.12; lockfiles compiled with 3.12; CI tests both |
+| 3 | DR-2026-11-17-G3C-3 | G-3 PostgreSQL foundation tests | APPROVED: automated tests on disposable PostgreSQL only; no migrations, no tables; the 3 User tests stay in G4 |
+| 4 | DR-2026-11-17-G3C-4 | Document statuses | `CLAUDE.md`, doc 07 and doc 08 changed from APPROVED_WITH_OPEN_ITEMS to **APPROVED** after their open-item lists were verified empty |
+
+---
+
+## Decision record DR-2026-11-18-G3A: G3 Backend Foundation — Owner Acceptance with an Accepted Exception and Carried-Forward Item
+
+- **Decision ID:** DR-2026-11-18-G3A
+- **Date:** 2026-11-18
+- **Decided by:** Project owner
+- **Decision status:** APPROVED (a gate decision)
+- **Scope:** G3 only
+- **Decision:** **G3 is ACCEPTED** by the project owner on 2026-11-18, on the evidence of the G3 final verification (2026-11-18; `docs/implementation/progress.md`).
+
+**G3 exit criteria (doc 10 §0.1: "Lint and tests green on PostgreSQL. No migration files.") as accepted:**
+
+| Criterion | Result at acceptance |
+|---|---|
+| Lint green | Met |
+| No migration files | Met |
+| Tests green on PostgreSQL | **Not fully met. Accepted by the owner as an exception, with a carry-forward.** The PostgreSQL foundation tests are verified and pass: 77 tests that don't need Django's test database, including the 9 automated PostgreSQL foundation tests, on Python 3.12 and 3.13 × PostgreSQL 16 and 18. The 3 KI-14 User-model database tests **do not pass yet**: the initial User-model migration doesn't exist, so their test-database setup fails. This criterion is **not** recorded as fully met. |
+
+| Owner decision | Detail |
+|---|---|
+| DR-2026-11-18-G3A-1 | G3 ACCEPTED (2026-11-18). |
+| DR-2026-11-18-G3A-2 | **KI-14 carried forward to G4 as an OPEN item.** The 3 migration-dependent User-model database tests must be completed (passing) as part of G4. |
+| DR-2026-11-18-G3A-3 | The doc 16 §11 Redis/Celery row correction made during G3 finalization is **retained** (it documents DR-2026-11-17-G3C-1). |
+| DR-2026-11-18-G3A-4 | **G4 is NOT AUTHORIZED.** G3 acceptance does not authorize G4 or any part of it. |
+| DR-2026-11-18-G3A-5 | Creating or configuring a GitHub remote is **NOT AUTHORIZED**. Pushing any branch or commit is **NOT AUTHORIZED**. |
+
+**Carried forward and still open:**
+- The doc 10 §0.1 G2 exit criterion "CI runs on the baseline" stays **OPEN, unchanged**, and must be satisfied before G4 entry (DR-2026-11-17-G2X). Satisfying it needs a remote and a push, which DR-2026-11-18-G3A-5 does not authorize.
+- KI-14 (3 User-model database tests): OPEN, G4.
+
+**Boundaries:** no prior decision changes meaning. No OD, TR, requirement or document status changes. The baseline commit `38f491dea79fb9bb10fd2010b1c2cb8a68d545f9` is unchanged, and the G3 changes remain uncommitted.
 
 ---
 

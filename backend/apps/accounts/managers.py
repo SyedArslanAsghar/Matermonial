@@ -3,7 +3,6 @@ import re
 from django.contrib.auth.base_user import BaseUserManager
 from django.core.exceptions import ValidationError
 
-
 E164_PATTERN = re.compile(r"^\+[1-9]\d{7,14}$")
 
 

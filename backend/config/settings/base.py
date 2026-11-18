@@ -1,16 +1,31 @@
+"""Settings shared by every environment (doc 07 §2, doc 16).
+
+Environment-specific modules (local, test, staging, production) override only what differs.
+Values come from environment variables; a developer's backend/.env (never committed) is read
+for local convenience. No secret value is stored in source code.
+"""
+
 from pathlib import Path
+
 import environ
+
+from common.logs import build_logging_config
 
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
 env = environ.Env(
     DJANGO_DEBUG=(bool, False),
     DJANGO_ALLOWED_HOSTS=(list, []),
+    DJANGO_CSRF_TRUSTED_ORIGINS=(list, []),
 )
 environ.Env.read_env(BASE_DIR / ".env")
 
+ENVIRONMENT = env("DJANGO_ENVIRONMENT", default="local")
+
+# The insecure default only works locally; staging/production refuse it (common/config.py).
 SECRET_KEY = env("DJANGO_SECRET_KEY", default="unsafe-local-only-key-change-me")
 DEBUG = env("DJANGO_DEBUG")
 ALLOWED_HOSTS = env("DJANGO_ALLOWED_HOSTS")
+CSRF_TRUSTED_ORIGINS = env("DJANGO_CSRF_TRUSTED_ORIGINS")
 
 INSTALLED_APPS = [
     "django.contrib.admin",
@@ -21,10 +36,12 @@ INSTALLED_APPS = [
     "django.contrib.staticfiles",
     "rest_framework",
     "drf_spectacular",
-    "accounts",
+    # Project domain apps (backend/apps/, DR-2026-11-17-G3-3)
+    "apps.accounts",
 ]
 
 MIDDLEWARE = [
+    "common.middleware.RequestIDMiddleware",
     "django.middleware.security.SecurityMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
@@ -53,13 +70,18 @@ TEMPLATES = [
     },
 ]
 
+# --- Database: one authoritative PostgreSQL database (CC-R14) ---
 DATABASES = {
     "default": env.db(
         "DATABASE_URL",
         default="postgresql://matrimonial_app:password@127.0.0.1:5432/matrimonial_db",
     )
 }
-DATABASES["default"]["CONN_MAX_AGE"] = 60
+DATABASES["default"]["CONN_MAX_AGE"] = env.int("DATABASE_CONN_MAX_AGE", default=60)
+# lock_timeout per transaction for @retry_on_contention (doc 12 §5.3, TR-09)
+DB_LOCK_TIMEOUT_MS = env.int("DB_LOCK_TIMEOUT_MS", default=5000)
+# LOCK_PLAN tracker (doc 12 §5.6, TR-22): enabled in local and test settings only
+LOCK_TRACKER_ENABLED = env.bool("LOCK_TRACKER_ENABLED", default=False)
 
 AUTH_USER_MODEL = "accounts.User"
 AUTH_PASSWORD_VALIDATORS = [
@@ -72,40 +94,78 @@ AUTH_PASSWORD_VALIDATORS = [
 LANGUAGE_CODE = "en-us"
 TIME_ZONE = env("TIME_ZONE", default="Asia/Karachi")
 USE_I18N = True
-USE_TZ = True
+USE_TZ = True  # timestamps are stored in UTC (CC-R34)
 
+# --- Static and media (private media is never served by Django; CC-R46) ---
 STATIC_URL = "static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
 MEDIA_URL = "media/"
-MEDIA_ROOT = BASE_DIR / "media"
+MEDIA_ROOT = Path(env("MEDIA_ROOT", default=str(BASE_DIR / "media")))
+STORAGE_BACKEND = env("STORAGE_BACKEND", default="local")
+STORAGES = {
+    "default": {
+        "BACKEND": "django.core.files.storage.FileSystemStorage",
+        "OPTIONS": {"location": MEDIA_ROOT},
+    },
+    "staticfiles": {"BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage"},
+}
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
+# --- API (CC-R51; doc 02 §8; doc 04 §16) ---
+# Authentication: Django sessions with CSRF for the same-origin web client (TR-12).
+# Mobile token authentication is TR-01 (PROPOSED, due before G4) and isn't configured here.
+# Per-endpoint rate limits are added with their features (CC-R49; doc 06).
 REST_FRAMEWORK = {
     "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
-    "DEFAULT_PAGINATION_CLASS": "rest_framework.pagination.PageNumberPagination",
-    "PAGE_SIZE": 20,
+    "DEFAULT_PAGINATION_CLASS": "common.api.pagination.StandardPagination",
+    "PAGE_SIZE": env.int("API_PAGE_SIZE", default=20),
     "DEFAULT_RENDERER_CLASSES": ["rest_framework.renderers.JSONRenderer"],
-    "DEFAULT_AUTHENTICATION_CLASSES": [
-        "rest_framework.authentication.SessionAuthentication",
-    ],
-    "DEFAULT_PERMISSION_CLASSES": [
-        "rest_framework.permissions.IsAuthenticated",
-    ],
-    "DEFAULT_THROTTLE_RATES": {
-        "anon": "60/hour",
-        "user": "1000/hour",
-    },
+    "DEFAULT_AUTHENTICATION_CLASSES": ["rest_framework.authentication.SessionAuthentication"],
+    "DEFAULT_PERMISSION_CLASSES": ["rest_framework.permissions.IsAuthenticated"],
+    "EXCEPTION_HANDLER": "common.api.exceptions.exception_handler",
 }
+API_MAX_PAGE_SIZE = env.int("API_MAX_PAGE_SIZE", default=100)
+# OpenAPI schema and Swagger UI are served only where enabled (local by default; KI-7)
+API_DOCS_ENABLED = env.bool("API_DOCS_ENABLED", default=False)
 
 SPECTACULAR_SETTINGS = {
-    "TITLE": "Matrimonial Platform API",
-    "DESCRIPTION": "Versioned API for the matrimonial platform.",
+    "TITLE": "Matermonial API",
+    "DESCRIPTION": "Versioned API for the Matermonial platform.",
     "VERSION": "1.0.0",
     "SERVE_INCLUDE_SCHEMA": False,
 }
 
+# --- Security headers and cookies ---
 SECURE_CONTENT_TYPE_NOSNIFF = True
-SESSION_COOKIE_HTTPONLY = True
-CSRF_COOKIE_HTTPONLY = True
 X_FRAME_OPTIONS = "DENY"
+SESSION_COOKIE_HTTPONLY = True
+SESSION_COOKIE_SAMESITE = "Lax"
+CSRF_COOKIE_SAMESITE = "Lax"
+# The same-origin web client (TR-12) must read the CSRF token from its cookie, so the CSRF
+# cookie isn't HttpOnly. The session cookie stays HttpOnly (KI-5; baseline v4 §18).
+CSRF_COOKIE_HTTPONLY = False
+
+# --- Providers (CC-R55, CC-R56; doc 16 §5) ---
+EMAIL_BACKEND = env("EMAIL_BACKEND", default="django.core.mail.backends.console.EmailBackend")
+SMS_PROVIDER = env("SMS_PROVIDER", default="disabled")
+PUSH_PROVIDER = env("PUSH_PROVIDER", default="disabled")
+
+# --- Celery and Redis (DR-2026-11-17-G3-4; CC-R53, CC-R54) ---
+REDIS_URL = env("REDIS_URL", default="redis://127.0.0.1:6379/0")
+CELERY_BROKER_URL = env("CELERY_BROKER_URL", default=REDIS_URL)
+CELERY_RESULT_BACKEND = env("CELERY_RESULT_BACKEND", default=None)
+CELERY_TASK_ALWAYS_EAGER = env.bool("CELERY_TASK_ALWAYS_EAGER", default=False)
+CELERY_TASK_EAGER_PROPAGATES = True
+CELERY_TASK_ACKS_LATE = True
+CELERY_TASK_REJECT_ON_WORKER_LOST = True
+CELERY_WORKER_PREFETCH_MULTIPLIER = 1
+CELERY_TASK_TIME_LIMIT = env.int("CELERY_TASK_TIME_LIMIT", default=300)
+CELERY_TASK_SOFT_TIME_LIMIT = env.int("CELERY_TASK_SOFT_TIME_LIMIT", default=270)
+CELERY_TIMEZONE = "UTC"
+
+# --- Logging (doc 07 §17) ---
+LOGGING = build_logging_config(
+    level=env("DJANGO_LOG_LEVEL", default="INFO"),
+    fmt=env("DJANGO_LOG_FORMAT", default="json"),
+)

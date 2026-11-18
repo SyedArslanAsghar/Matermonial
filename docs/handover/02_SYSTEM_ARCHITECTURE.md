@@ -3,7 +3,7 @@
 **Version:** 1.0  
 **Date:** 11 November 2026  
 **Origin (pre-G1 label, not a status):** Architecture Baseline  
-**Document status:** APPROVED_WITH_OPEN_ITEMS (project owner, 2026-11-17, DR-2026-11-17-A; record in doc 20 §5). **Open items:** PROPOSED TRs: TR-02, TR-07, TR-09, TR-11, TR-23. Listed items keep their own status (doc 19); this document status doesn't approve them.  
+**Document status:** APPROVED_WITH_OPEN_ITEMS (project owner, 2026-11-17, DR-2026-11-17-A; record in doc 20 §5). **Open items:** PROPOSED TRs: TR-02, TR-07, TR-11, TR-23. Listed items keep their own status (doc 19); this document status doesn't approve them. TR-09 approved 2026-11-17 (DR-2026-11-17-G3).  
 **Applied corrections:** DCR-03, DCR-10, DCR-22, DCR-42, DCR-44, DCR-53, DCR-68, DCR-73 (doc 20)
 
 ## 1. Architecture objectives
@@ -515,7 +515,7 @@ The worker must safely handle retries and duplicate delivery attempts.
 > - Events are either NOTIFICATION or FINANCIAL_OBLIGATION. A financial event is only a wake-up signal; the obligation is always re-derivable from domain records (doc 05 §25.6).
 > - Processing is two-phase: a short claim transaction assigns a lease and commits; the handler transaction then takes its business locks in the global order and marks its own event DONE as the very last lock (doc 12 §6).
 
-## 14a. Concurrency and lock-order policy (G1, DCR-42, DCR-53) [TR-09]
+## 14a. Concurrency and lock-order policy (G1, DCR-42, DCR-53) [TR-09, APPROVED 2026-11-17]
 
 All multi-step operations follow one global lock order (authorization → account → profile → pair advisory locks → wallet → allowances → domain rows → inserts → own outbox row), with at most one exclusive state anchor per transaction, whole-transaction retry on deadlock or serialization failure, and no external calls inside a transaction. The full policy, the per-service compliance matrix and the implicit foreign-key lock inventory are in doc 12 §5.
 

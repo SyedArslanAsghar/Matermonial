@@ -1,6 +1,6 @@
 # CLAUDE.md — Matermonial Project Instructions
 
-**Document status:** APPROVED_WITH_OPEN_ITEMS (project owner, 2026-11-17, DR-2026-11-17-A; record in doc 20 §5). **Open items:** PROPOSED TRs: TR-09, TR-22. Listed items keep their own status (doc 19); this document status doesn't approve them. Its role as the authoritative entry point is approved (DR-2026-11-16-3).
+**Document status:** APPROVED (project owner, 2026-11-17, DR-2026-11-17-G3C-4; record in doc 20 §5). Previously APPROVED_WITH_OPEN_ITEMS (DR-2026-11-17-A); its open items (TR-09, TR-22) have all been approved. Its role as the authoritative entry point is approved (DR-2026-11-16-3).
 **Role:** This file is the **authoritative entry point** for Claude Code. `docs/handover/12_CLAUDE_CODE_INSTRUCTIONS.md` is its detailed companion. Doc 12 explains *how* to follow these rules and refers to them by ID (`CC-R…`). **If doc 12 and this file disagree, this file wins** and doc 12 must be corrected.
 
 ## 1. Project identity
@@ -39,7 +39,7 @@
 - **CC-R17** Use explicit cross-module interfaces. Avoid uncontrolled circular imports.
 - **CC-R18** Avoid placing complex business workflows in signals.
 - **CC-R19** Use database constraints in addition to application validation.
-- **CC-R20** Use transactions for multi-step business operations. The global lock-order policy in doc 12 §5 is a PROPOSED technical recommendation (TR-09, TR-22; approval due before G3). It is the intended design, but it isn't a binding rule until its approval is recorded in doc 19 (CC-R26). The approved locking rules are CC-R38 and CC-R39.
+- **CC-R20** Use transactions for multi-step business operations, and follow the global lock-order policy, LOCK_PLAN tracker and foreign-key review rule in doc 12 §5 (TR-09, TR-22, approved 2026-11-17, DR-2026-11-17-G3-2). The approved locking rules also include CC-R38 and CC-R39.
 
 ## 5. Local development rule
 

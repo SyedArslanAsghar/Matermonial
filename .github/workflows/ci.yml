@@ -1,14 +1,16 @@
-# Matermonial CI — G2 (repository governance).
+# Matermonial CI — quality checks and backend tests.
 #
-# Scope: quality checks and backend tests only, using approved tooling
-# (CLAUDE.md CC-R08, CC-R11, CC-R58, CC-R60; TR-13 approved 2026-11-17).
+# Scope: approved tooling only (CLAUDE.md CC-R08, CC-R11, CC-R58, CC-R60; TR-13 approved).
 # - No deployment, no image build, no cloud access, no repository secrets.
-# - Dependencies install from the hashed pip-tools lockfiles (owner decision D4), which are
-#   compiled for Python 3.13, so CI uses Python 3.13.
-# - Tests run on PostgreSQL 16 and 18 (TR-13). The PostgreSQL credentials below belong to a
-#   throwaway CI service container and are not secrets.
-# - Known issue KI-11: the pre-baseline scaffold fails Ruff until G3 (owner decision D5),
-#   so the quality job is expected to fail on the Ruff steps until then.
+# - Supported Python versions: 3.12 and 3.13 (DR-2026-11-17-G3C-2). Both are tested.
+# - Dependencies install from the hashed pip-tools lockfiles (D4). The lockfiles are compiled
+#   with Python 3.12, the minimum supported version, so the consistency check runs on 3.12.
+# - Tests run on PostgreSQL 16 and 18 (TR-13), in throwaway CI service containers. Their
+#   credentials are not secrets. The service is published on port 55432, never 5432.
+# - Known issue KI-14 (carried forward to G4, DR-2026-11-18-G3A): exactly 3 User-model database
+#   tests need the initial accounts migration. They carry the `deferred_g4_ki14` marker and are
+#   reported as skipped with a DEFERRED reason, never as passed. Every other test runs, and any
+#   failure, error or collection error fails the job. There is no continue-on-error.
 
 name: CI
 
@@ -23,13 +25,14 @@ concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
 
-env:
-  PYTHON_VERSION: "3.13"
-
 jobs:
   backend-quality:
-    name: Backend quality
+    name: Backend quality (Python ${{ matrix.python-version }})
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.12", "3.13"]
     defaults:
       run:
         working-directory: backend
@@ -40,7 +43,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: ${{ env.PYTHON_VERSION }}
+          python-version: ${{ matrix.python-version }}
           cache: pip
           cache-dependency-path: backend/requirements/*.txt
 
@@ -50,7 +53,14 @@ jobs:
       - name: Verify dependency consistency
         run: pip check
 
-      - name: Verify lockfiles match their inputs
+      - name: Verify the production lockfile installs (hash-checked)
+        run: |
+          python -m venv /tmp/prod
+          /tmp/prod/bin/pip install -r requirements/production.txt
+          /tmp/prod/bin/pip check
+
+      - name: Verify lockfiles match their inputs (compiled with Python 3.12)
+        if: matrix.python-version == '3.12'
         # Recompile from a copy of each committed lockfile (pip-compile keeps existing pins),
         # so this fails only if a lockfile no longer satisfies its .in file, not on new upstream releases.
         shell: bash
@@ -74,11 +84,12 @@ jobs:
         run: ruff format --check .
 
   backend-tests:
-    name: Backend tests (PostgreSQL ${{ matrix.postgres }})
+    name: Backend tests (Python ${{ matrix.python-version }}, PostgreSQL ${{ matrix.postgres }})
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
+        python-version: ["3.12", "3.13"]
         postgres: ["16", "18"]
     services:
       postgres:
@@ -88,14 +99,15 @@ jobs:
           POSTGRES_PASSWORD: matermonial_ci
           POSTGRES_DB: matermonial_ci
         ports:
-          - 5432:5432
+          - 55432:5432
         options: >-
           --health-cmd "pg_isready -U matermonial_ci"
           --health-interval 5s
           --health-timeout 5s
           --health-retries 10
     env:
-      DATABASE_URL: postgresql://matermonial_ci:matermonial_ci@localhost:5432/matermonial_ci
+      DATABASE_URL: postgresql://matermonial_ci:matermonial_ci@127.0.0.1:55432/matermonial_ci
+      MATERMONIAL_TEST_POSTGRES_URL: postgresql://matermonial_ci:matermonial_ci@127.0.0.1:55432/matermonial_ci
     defaults:
       run:
         working-directory: backend
@@ -106,12 +118,40 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: ${{ env.PYTHON_VERSION }}
+          python-version: ${{ matrix.python-version }}
           cache: pip
           cache-dependency-path: backend/requirements/*.txt
 
       - name: Install locked dependencies (hash-checked)
         run: pip install -r requirements/local.txt
 
-      - name: Run tests
-        run: pytest
+      - name: Require the disposable PostgreSQL test database
+        # Without this URL the PostgreSQL foundation tests would skip, and the job could go green.
+        shell: bash
+        run: |
+          if [ -z "${MATERMONIAL_TEST_POSTGRES_URL:-}" ]; then
+            echo "::error::MATERMONIAL_TEST_POSTGRES_URL is missing or empty; the PostgreSQL foundation tests cannot run."
+            exit 1
+          fi
+          echo "MATERMONIAL_TEST_POSTGRES_URL is set (value not printed)."
+
+      - name: Verify that exactly the 3 KI-14 tests are deferred to G4
+        shell: bash
+        run: |
+          expected="apps/accounts/tests/test_user_model.py::test_create_user_stores_e164_phone_and_hashed_password
+          apps/accounts/tests/test_user_model.py::test_create_user_without_password_gets_unusable_password
+          apps/accounts/tests/test_user_model.py::test_invalid_phone_format_is_rejected"
+          collected=$(pytest --collect-only -q -m deferred_g4_ki14) || { echo "$collected"; exit 1; }
+          actual=$(grep '::' <<< "$collected" | sort)
+          if ! diff <(sed 's/^ *//' <<< "$expected" | sort) <(echo "$actual"); then
+            echo "::error::The deferred_g4_ki14 set is not exactly the 3 known KI-14 tests."
+            exit 1
+          fi
+          echo "::notice::3 tests DEFERRED to G4 (KI-14): they need the initial accounts migration. They are not run and not passed."
+          echo "$actual"
+
+      - name: PostgreSQL foundation tests
+        run: pytest -m postgres
+
+      - name: All other pre-G4 tests (the 3 KI-14 tests are reported as skipped, DEFERRED)
+        run: pytest -m "not postgres"

@@ -1,16 +1,10 @@
+"""Routes under /api/v1/ (CLAUDE.md CC-R51; ADR-010). Domain apps add their URLs here."""
+
 from django.urls import path
-from rest_framework.response import Response
-from rest_framework.views import APIView
 
-
-class HealthCheckView(APIView):
-    authentication_classes = []
-    permission_classes = []
-
-    def get(self, request):
-        return Response({"status": "ok", "service": "matrimonial-api", "api_version": "v1"})
-
+from common.api.health import LivenessView, ReadinessView
 
 urlpatterns = [
-    path("health/", HealthCheckView.as_view(), name="api-health"),
+    path("health/", LivenessView.as_view(), name="api-health"),
+    path("health/ready/", ReadinessView.as_view(), name="api-health-ready"),
 ]

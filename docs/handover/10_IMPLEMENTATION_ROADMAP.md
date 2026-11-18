@@ -19,6 +19,10 @@ The project proceeds through five gates. **Each gate needs the project owner's e
 | **G4 First migration** | `User` (final), `AuthSession` (including `scope` and `key_version_current`), `AuthToken`, `AuditLog`, `AccountSecurityEvent` (extended, append-only), `OutboxEvent`, `IdempotencyRecord`, plus the G4 schema parts of TR-17, TR-21, TR-23 and TR-24 → migration `0001`, tested from an empty database | G3 exit + owner authorization + approval of the G4 TRs (doc 19) | Migration reviewed. Kernel tests pass. | Feature models |
 | **G5 Features** | Phases 2–19 (§0.2) | G4 exit + per-phase scope approval | Per-phase definition of done | Behaviour that depends on an unanswered OD sub-item. Frontend work without an approved API contract. |
 
+**G2 status (2026-11-17):** owner-accepted with carried-forward items (DR-2026-11-17-G2A); baseline commit `38f491dea79fb9bb10fd2010b1c2cb8a68d545f9`. The G2 exit criterion "CI runs on the baseline" is **OPEN**. G3 was entered under a narrow owner exception (DR-2026-11-17-G2X). This criterion **must be satisfied before G4 entry**. The criterion itself is unchanged.
+
+**G3 status (2026-11-18):** owner-accepted with an accepted exception and a carried-forward item (DR-2026-11-18-G3A). The G3 exit criterion "tests green on PostgreSQL" is not fully met. The PostgreSQL foundation tests pass; the 3 KI-14 User-model database tests are OPEN and must pass as part of G4. **G4 is NOT AUTHORIZED.**
+
 ### 0.2 G5 phase order
 
 | Phase | Scope |

@@ -2,7 +2,7 @@
 
 **Version:** 1.0 (G1 revision 2026-11-16)  
 **Date:** 11 November 2026  
-**Document status:** APPROVED_WITH_OPEN_ITEMS (project owner, 2026-11-17, DR-2026-11-17-A; record in doc 20 §5). **Open items:** PROPOSED TRs: TR-09, TR-22. Listed items keep their own status (doc 19); this document status doesn't approve them.  
+**Document status:** APPROVED (project owner, 2026-11-17, DR-2026-11-17-G3C-4; record in doc 20 §5). Previously APPROVED_WITH_OPEN_ITEMS (DR-2026-11-17-A); its open items (TR-09, TR-22) have all been approved.  
 **Applied corrections:** DCR-10, DCR-18, DCR-42 (doc 20)
 
 ## 1. Repository strategy
@@ -110,6 +110,8 @@ matermonial/
 ```
 
 This is the target structure, not a requirement to create every empty directory immediately.
+
+**Approved layout (owner decision DR-2026-11-17-G3-3, 2026-11-17):** domain applications under `backend/apps/`, shared infrastructure under `backend/common/`; the existing `accounts` app moves to `backend/apps/accounts` (its app label stays `accounts`).
 
 ## 2. Backend Django settings
 

@@ -1,3 +1,11 @@
+# Project metadata: the supported Python range (owner decision DR-2026-11-17-G3C-2).
+# The backend is a Django project, not a distributed package; dependencies are managed with
+# pip-tools in requirements/ (see requirements/README.md), not here.
+[project]
+name = "matermonial-backend"
+version = "0.0.0"
+requires-python = ">=3.12,<3.14"
+
 [tool.ruff]
 line-length = 100
 target-version = "py312"
@@ -7,8 +15,15 @@ exclude = ["*/migrations/*", ".venv"]
 select = ["E", "F", "I", "B", "UP"]
 ignore = ["E501"]
 
+[tool.ruff.lint.isort]
+known-first-party = ["apps", "common", "config"]
+
 [tool.pytest.ini_options]
 DJANGO_SETTINGS_MODULE = "config.settings.test"
 python_files = ["test_*.py", "*_test.py", "tests.py"]
 addopts = "-ra --strict-markers"
-testpaths = ["."]
+testpaths = ["tests", "apps", "common"]
+markers = [
+    "postgres: needs a disposable PostgreSQL database given by MATERMONIAL_TEST_POSTGRES_URL; skipped when it isn't set",
+    "deferred_g4_ki14: needs the initial accounts migration (G4, KI-14); reported as skipped with a DEFERRED reason, never as passed",
+]

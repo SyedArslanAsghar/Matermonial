@@ -24,11 +24,14 @@ class User(AbstractBaseUser, PermissionsMixin):
 
     date_joined = models.DateTimeField(default=timezone.now)
     created_at = models.DateTimeField(auto_now_add=True)
+    # Audit FKs use PROTECT: doc 12 §5.5 rule F4 (TR-09, approved) forbids cascading or
+    # SET NULL deletes on hot referenced rows; accounts are anonymised, never hard-deleted
+    # during business transactions. Implicit-lock class B2 (common/db/fk_inventory.py).
     created_by = models.ForeignKey(
         "self",
         null=True,
         blank=True,
-        on_delete=models.SET_NULL,
+        on_delete=models.PROTECT,
         related_name="users_created",
     )
     updated_at = models.DateTimeField(auto_now=True)
@@ -36,7 +39,7 @@ class User(AbstractBaseUser, PermissionsMixin):
         "self",
         null=True,
         blank=True,
-        on_delete=models.SET_NULL,
+        on_delete=models.PROTECT,
         related_name="users_updated",
     )
 
