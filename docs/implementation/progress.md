@@ -10,8 +10,8 @@
 | G1 Documentation reconciliation | **COMPLETED. ACCEPTED by the project owner** (DR-2026-11-17-A, 2026-11-17). Final document statuses assigned (doc 20 §5). |
 | G2 Repository governance | **ACCEPTED** by the project owner with carried-forward items (DR-2026-11-17-G2A). Baseline commit `38f491dea79fb9bb10fd2010b1c2cb8a68d545f9`. Exit criterion "CI runs on the baseline" (carried forward under DR-2026-11-17-G2X): **satisfied by owner acceptance** (DR-2026-11-18-G2C, 2026-11-18) on the integrated run `44294474904` on commit `c5fc346` (success, 6/6 jobs). The baseline commit `38f491d` itself did not run independently. |
 | G3 Backend foundation | **ACCEPTED** by the project owner on 2026-11-18, with an accepted exception and a carried-forward item (DR-2026-11-18-G3A). Exit criterion "tests green on PostgreSQL" is **not fully met**: the PostgreSQL foundation tests pass, but the 3 KI-14 User-model database tests are **OPEN** and must pass as part of G4. The G3 changes were committed and pushed by the owner as `c5fc346` (DR-2026-11-18-GH). |
-| G4 First migration | AUTHORIZED (DR-2026-11-18-G4). **IMPLEMENTED; exit criteria met** (2026-11-18): migrations reviewed and validated from empty on PostgreSQL 16 and 18; kernel tests pass (220/220 on Python 3.12 and 3.13 × PostgreSQL 16 and 18; KI-14 resolved). **Owner acceptance pending** (only the owner sets ACCEPTED, CC-R70). G5 already authorized (DR-2026-11-18-G4). |
-| G5 Features | **AUTHORIZED** (DR-2026-11-18-G4). Starts after G4. |
+| G4 First migration | **ACCEPTED by the project owner** (DR-2026-11-18-G4A, 2026-11-18). |
+| G5 Features | **IN PROGRESS** (authorized DR-2026-11-18-G4): Phase 2 authentication on `feature/g5-phase2-auth`. |
 | Current delivery scope | **CI/CD implementation and validation** (DR-2026-11-18-CI, 2026-11-18). AWS deployment and production infrastructure are **deferred** and out of current scope. CD execution stays disabled until a target and an authorization exist. This doesn't authorize a remote, a push, a commit, G4 or a deployment. |
 
 ## Implementation status

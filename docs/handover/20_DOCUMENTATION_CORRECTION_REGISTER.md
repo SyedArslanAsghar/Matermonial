@@ -50,6 +50,7 @@ This register records every documentation correction (DCR), where it was applied
 | 2026-11-18 | DR-2026-11-18-G4 | **G4 and G5 authorized**; G4 decision package adopted. TR-01, TR-07, TR-11, TR-17, TR-23 → APPROVED; TR-21 and TR-24 → APPROVED (schema portions); TR-02 stays for Phase 4 (doc 19 §4). ADR-014 refinements, 022, 023 (doc 11) and ADR-025, 027, 028, 029, 031, 032 → APPROVED; ADR-026 and 030 → direction adopted. No document status changed. |
 | 2026-11-18 | DR-2026-11-18-G4-9 | Doc 03 §2.1: `phone_verified` / `email_verified` renamed `is_phone_verified` / `is_email_verified` to match §22.1 and the model; email uniqueness stated as case-insensitive. |
 | 2026-11-18 | DR-2026-11-18-G4 (G4 completion) | G4 implementation recorded: doc 03 §22.17 (implementation record, IdempotencyRecord columns fixed), doc 16 §11 (key rings, registry, outbox settings), doc 10 §0.1 G4 status note, doc 18 (FR-ACC-008 → TESTED; FR-ACC-005, FR-ACC-007, FR-NOT-005, FR-ADM-002, FR-DAT-009 → IN_PROGRESS), README, `.env.example`, `progress.md`, `known_issues.md` (KI-9, KI-14 resolved; KI-16 G4 part resolved; KI-20…KI-24 added), decision-register gate status. No document status changed. |
+| 2026-11-18 | DR-2026-11-18-G4A | **G4 accepted by the owner.** Gate status updated in the decision register, doc 10 §0.1 and `progress.md`. KI-21 (CI step) is the owner's. No document status changed. |
 
 ## 3. DCR register
 

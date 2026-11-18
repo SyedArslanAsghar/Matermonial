@@ -1,7 +1,7 @@
 # New Architecture Decisions
 
 **Register status:** ACTIVE
-**Last updated:** 2026-11-18 (G4 and G5 authorized, DR-2026-11-18-G4)
+**Last updated:** 2026-11-18 (G4 accepted, DR-2026-11-18-G4A)
 
 This register holds the project's approval decision records (DR-…) and the approved OD-01 domain catalogue. The decisions recorded here up to DR-2026-11-16-G1 have been applied to the handover documents during G1 (Documentation Reconciliation); where each was applied is recorded in `docs/handover/20_DOCUMENTATION_CORRECTION_REGISTER.md`. Owner decisions (OD) and technical recommendations (TR) and their statuses are tracked in `docs/handover/19_OPEN_DECISION_REGISTER.md`.
 
@@ -81,8 +81,8 @@ The legacy open decisions in `docs/handover/13_ASSUMPTIONS_RISKS_TRACEABILITY.md
 | G1 Documentation reconciliation | **COMPLETED. ACCEPTED by the project owner** (DR-2026-11-17-A, 2026-11-17). All 12 exit criteria met. |
 | G2 Repository governance | **ACCEPTED by the project owner with carried-forward items** (DR-2026-11-17-G2A). Baseline commit `38f491dea79fb9bb10fd2010b1c2cb8a68d545f9`. Exit criterion "CI runs on the baseline", carried forward OPEN under exception DR-2026-11-17-G2X: **satisfied by owner acceptance (DR-2026-11-18-G2C, 2026-11-18)** on the integrated run `44294474904` on commit `c5fc346` (success, 6/6 jobs). The baseline commit `38f491d` itself did not run independently. |
 | G3 Backend foundation | **ACCEPTED by the project owner** on 2026-11-18, with an accepted exception and a carried-forward item (DR-2026-11-18-G3A). Exit criterion "tests green on PostgreSQL" is not fully met: the foundation tests pass, but the 3 KI-14 User-model database tests are OPEN and carried forward to G4. |
-| G4 First migration | AUTHORIZED (DR-2026-11-18-G4). **IMPLEMENTED; exit criteria met** (2026-11-18): migrations reviewed and validated from empty on PostgreSQL 16 and 18; kernel tests pass (220/220 on Python 3.12 and 3.13 × PostgreSQL 16 and 18; KI-14 resolved). **Owner acceptance pending** (only the owner sets ACCEPTED, CC-R70). G5 already authorized (DR-2026-11-18-G4). |
-| G5 Features | **AUTHORIZED** (DR-2026-11-18-G4), after G4 exit. |
+| G4 First migration | **ACCEPTED by the project owner** (DR-2026-11-18-G4A, 2026-11-18). |
+| G5 Features | **AUTHORIZED and IN PROGRESS** (DR-2026-11-18-G4): Phase 2 (authentication). |
 
 ### Baseline source
 
@@ -457,6 +457,18 @@ No speculative infrastructure tasks are added.
 **Clarification policy:** ordinary implementation decisions use engineering judgment and are documented. The owner is asked only when an approved requirement would change, approved requirements conflict, business rules would materially change, a material security, privacy, data-loss or legal risk can't be resolved within the approved design, or work needs AWS, production deployment, production credentials or a financial commitment.
 
 **Unchanged:** OD-02…OD-10 stay OPEN; behaviour depending on them isn't implemented (CC-R25). AWS deployment stays deferred (DR-2026-11-18-CI).
+
+---
+
+## Decision record DR-2026-11-18-G4A: G4 accepted by the owner
+
+- **Decision ID:** DR-2026-11-18-G4A
+- **Date:** 2026-11-18
+- **Decided by:** Project owner
+- **Decision status:** APPROVED (gate decision)
+- **Decision:** **G4 (First migration and backend kernel) is ACCEPTED**, on the evidence recorded in `docs/implementation/progress.md` (G4 section): 220/220 tests on Python 3.12/3.13 × PostgreSQL 16/18, five initial migrations validated from empty and reversible, KI-14 resolved. Branch `feature/g4-kernel` (9 commits) is pushed; the PR is opened by the owner.
+- **Owner responsibilities:** KI-21 (remove the obsolete KI-14 CI step) is the owner's; CI/CD stays with the owner.
+- **Unchanged:** G5 authorized (DR-2026-11-18-G4); OD-04c OPEN, so step-up re-authentication is password-only; AWS deferred.
 
 ---
 
