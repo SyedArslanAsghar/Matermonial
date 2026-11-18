@@ -71,7 +71,7 @@ def test_project_apps_live_under_apps_package():
         return path.is_relative_to(BACKEND) and path.relative_to(BACKEND).parts[0] != ".venv"
 
     project = [c for c in apps.get_app_configs() if is_project_app(c)]
-    assert {c.name for c in project} == {"apps.accounts"}
+    assert {c.name for c in project} == {"apps.accounts", "apps.audit"}
     assert apps.get_app_config("accounts").name == "apps.accounts"
 
 
@@ -84,9 +84,15 @@ def project_models():
 
 def test_project_models_use_uuid_primary_keys():
     """CC-R32: UUID primary keys for domain entities (G4 decision package)."""
+
+    def pk_types(model):
+        pk = model._meta.pk
+        fields = getattr(pk, "fields", None)  # CompositePrimaryKey (link tables)
+        return [f.get_internal_type() for f in fields] if fields else [pk.get_internal_type()]
+
     offenders = [
-        f"{m._meta.label}.{m._meta.pk.name}: {m._meta.pk.get_internal_type()}"
+        f"{m._meta.label}: {pk_types(m)}"
         for m in project_models()
-        if m._meta.pk.get_internal_type() != "UUIDField"
+        if any(t != "UUIDField" for t in pk_types(m))
     ]
     assert offenders == []

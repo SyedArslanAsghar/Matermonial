@@ -10,6 +10,7 @@ import django.db.models.functions.text
 import django.utils.timezone
 import uuid
 from django.conf import settings
+import common.db.uuid7
 from django.db import migrations, models
 
 
@@ -27,6 +28,12 @@ class Migration(migrations.Migration):
         migrations.RunSQL(
             sql="\nDO $outer$\nBEGIN\n  IF current_setting('server_version_num')::int >= 180000 THEN\n    -- PostgreSQL 18: wrap the built-in generator (baseline v4.6 §4.1).\n    EXECUTE $f$\n      CREATE OR REPLACE FUNCTION uuid_v7() RETURNS uuid\n      LANGUAGE sql VOLATILE PARALLEL SAFE AS 'SELECT uuidv7()'\n    $f$;\n  ELSE\n    -- PostgreSQL 15/16: RFC 9562 layout; gen_random_uuid() is built in from 13.\n    EXECUTE $f$\n      CREATE OR REPLACE FUNCTION uuid_v7() RETURNS uuid\n      LANGUAGE plpgsql VOLATILE PARALLEL SAFE AS $body$\n      DECLARE\n        ts_ms bigint := floor(extract(epoch FROM clock_timestamp()) * 1000)::bigint;\n        b     bytea  := uuid_send(gen_random_uuid());\n      BEGIN\n        b := overlay(b PLACING substring(int8send(ts_ms) FROM 3 FOR 6) FROM 1 FOR 6);\n        b := set_byte(b, 6, (get_byte(b, 6) & 15) | 112);\n        b := set_byte(b, 8, (get_byte(b, 8) & 63) | 128);\n        RETURN encode(b, 'hex')::uuid;\n      END $body$\n    $f$;\n  END IF;\nEND $outer$;\n\n-- Smallest valid UUIDv7 for the millisecond containing ts (baseline v4.6 §4.2).\nCREATE OR REPLACE FUNCTION uuid_v7_lower(ts timestamptz) RETURNS uuid\nLANGUAGE sql IMMUTABLE STRICT PARALLEL SAFE AS $$\n  SELECT encode(\n           substring(int8send(floor(extract(epoch FROM ts) * 1000)::bigint) FROM 3 FOR 6)\n           || '\\x70008000000000000000'::bytea,\n         'hex')::uuid\n$$;\n",
             reverse_sql='\nDROP FUNCTION IF EXISTS uuid_v7_lower(timestamptz);\nDROP FUNCTION IF EXISTS uuid_v7();\n',
+        ),
+        # Project-wide log helpers (TR-23): partition maintenance, append-only trigger,
+        # envelope check. Frozen copy of common.db.log_sql.
+        migrations.RunSQL(
+            sql="\nCREATE FUNCTION ensure_uuid7_partitions(parent regclass, step text, ahead integer)\nRETURNS integer LANGUAGE plpgsql AS $$\nDECLARE\n  base   timestamp;\n  lo     timestamp;\n  hi     timestamp;\n  pname  text;\n  made   integer := 0;\nBEGIN\n  IF step NOT IN ('month', 'year') THEN\n    RAISE EXCEPTION 'step must be month or year';\n  END IF;\n  base := date_trunc(step, now() AT TIME ZONE 'UTC');\n  FOR i IN 0..ahead LOOP\n    lo := base + CASE step WHEN 'month' THEN make_interval(months => i)\n                           ELSE make_interval(years => i) END;\n    hi := lo + CASE step WHEN 'month' THEN interval '1 month' ELSE interval '1 year' END;\n    pname := parent::text || '_' ||\n             to_char(lo, CASE step WHEN 'month' THEN 'YYYY_MM' ELSE 'YYYY' END);\n    IF to_regclass(pname) IS NULL THEN\n      EXECUTE format('CREATE TABLE %I PARTITION OF %s FOR VALUES FROM (%L) TO (%L)',\n                     pname, parent, uuid_v7_lower(lo AT TIME ZONE 'UTC'),\n                     uuid_v7_lower(hi AT TIME ZONE 'UTC'));\n      made := made + 1;\n    END IF;\n  END LOOP;\n  RETURN made;\nEND $$;\n\nCREATE FUNCTION reject_row_change() RETURNS trigger LANGUAGE plpgsql AS $$\nBEGIN\n  RAISE EXCEPTION '%: append-only, % rejected', TG_TABLE_NAME, TG_OP\n    USING ERRCODE = 'insufficient_privilege';\nEND $$;\n\nCREATE FUNCTION check_enc_parts() RETURNS trigger LANGUAGE plpgsql AS $$\nBEGIN\n  IF jsonb_typeof(NEW.enc_parts) <> 'array' THEN\n    RAISE EXCEPTION 'enc_parts must be a JSON array' USING ERRCODE = 'check_violation';\n  END IF;\n  IF EXISTS (SELECT 1 FROM jsonb_array_elements(NEW.enc_parts) e\n             WHERE jsonb_typeof(e) <> 'object'\n                OR NOT (e ?& ARRAY['pseudonym', 'key_id', 'kek_version', 'nonce', 'ciphertext'])) THEN\n    RAISE EXCEPTION 'enc_parts: malformed envelope' USING ERRCODE = 'check_violation';\n  END IF;\n  IF (SELECT count(*) FROM jsonb_array_elements(NEW.enc_parts))\n     <> (SELECT count(DISTINCT e->>'pseudonym') FROM jsonb_array_elements(NEW.enc_parts) e) THEN\n    RAISE EXCEPTION 'enc_parts: one envelope per pseudonym' USING ERRCODE = 'check_violation';\n  END IF;\n  RETURN NEW;\nEND $$;\n",
+            reverse_sql='\nDROP FUNCTION IF EXISTS check_enc_parts();\nDROP FUNCTION IF EXISTS reject_row_change();\nDROP FUNCTION IF EXISTS ensure_uuid7_partitions(regclass, text, integer);\n',
         ),
         migrations.CreateModel(
             name='User',
@@ -259,5 +266,31 @@ class Migration(migrations.Migration):
             DROP TRIGGER IF EXISTS accounts_subject_pseudonym_guard ON accounts_subject_pseudonym;
             DROP FUNCTION IF EXISTS accounts_subject_pseudonym_guard();
             """,
+        ),
+        migrations.CreateModel(
+            name='AccountSecurityEvent',
+            fields=[
+                ('id', models.UUIDField(default=common.db.uuid7.uuid7, editable=False, primary_key=True, serialize=False)),
+                ('event_type', models.CharField(choices=[('LOGIN_SUCCEEDED', 'LOGIN_SUCCEEDED'), ('LOGIN_FAILED', 'LOGIN_FAILED'), ('LOGIN_DENIED_ACCOUNT_STATE', 'LOGIN_DENIED_ACCOUNT_STATE'), ('SESSION_CREATED', 'SESSION_CREATED'), ('SESSION_REVOKED', 'SESSION_REVOKED'), ('REFRESH_REUSE_DETECTED', 'REFRESH_REUSE_DETECTED'), ('PASSWORD_RESET_REQUESTED', 'PASSWORD_RESET_REQUESTED'), ('PASSWORD_RESET_COMPLETED', 'PASSWORD_RESET_COMPLETED'), ('PASSWORD_RESET_FAILED', 'PASSWORD_RESET_FAILED'), ('PASSWORD_CHANGED', 'PASSWORD_CHANGED'), ('PASSWORD_CHANGE_FAILED', 'PASSWORD_CHANGE_FAILED'), ('OTP_VERIFICATION_FAILED', 'OTP_VERIFICATION_FAILED'), ('OTP_ATTEMPTS_EXHAUSTED', 'OTP_ATTEMPTS_EXHAUSTED'), ('OTP_RATE_LIMITED', 'OTP_RATE_LIMITED'), ('STEP_UP_SUCCEEDED', 'STEP_UP_SUCCEEDED'), ('STEP_UP_FAILED', 'STEP_UP_FAILED'), ('PHONE_CHANGED', 'PHONE_CHANGED'), ('EMAIL_CHANGED', 'EMAIL_CHANGED'), ('ADMIN_MFA_ENROLLED', 'ADMIN_MFA_ENROLLED'), ('ADMIN_MFA_REMOVED', 'ADMIN_MFA_REMOVED'), ('DEACTIVATED', 'DEACTIVATED'), ('REACTIVATED', 'REACTIVATED'), ('DELETION_REQUESTED', 'DELETION_REQUESTED'), ('DELETION_CANCELLED', 'DELETION_CANCELLED'), ('SUSPICIOUS_ACTIVITY', 'SUSPICIOUS_ACTIVITY'), ('RATE_LIMIT_TRIGGERED', 'RATE_LIMIT_TRIGGERED')], max_length=40)),
+                ('result', models.CharField(choices=[('SUCCESS', 'Success'), ('FAILURE', 'Failure'), ('INFO', 'Info')], max_length=7)),
+                ('reason_code', models.CharField(blank=True, max_length=40, null=True)),
+                ('actor_type', models.CharField(choices=[('SELF', 'Self'), ('ADMIN', 'Admin'), ('SYSTEM', 'System'), ('ANONYMOUS', 'Anonymous')], max_length=9)),
+                ('request_id', models.CharField(blank=True, max_length=64, null=True)),
+                ('occurred_at', models.DateTimeField()),
+                ('subject_pseudonym', models.UUIDField(blank=True, null=True)),
+                ('actor_pseudonym', models.UUIDField(blank=True, null=True)),
+                ('subject_hash', models.CharField(blank=True, max_length=64, null=True)),
+                ('enc_parts', models.JSONField(default=list)),
+            ],
+            options={
+                'db_table': 'account_security_event',
+                'managed': False,
+            },
+        ),
+        # AccountSecurityEvent (TR-17, TR-23): monthly UUIDv7 RANGE partitions, append-only,
+        # envelope check; partitions for the current month and the next three (doc 03 §22.15).
+        migrations.RunSQL(
+            sql="\nCREATE TABLE account_security_event (\n  id uuid NOT NULL DEFAULT uuid_v7(),\n  event_type varchar(40) NOT NULL,\n  result varchar(7) NOT NULL,\n  reason_code varchar(40),\n  actor_type varchar(9) NOT NULL,\n  request_id varchar(64),\n  occurred_at timestamptz NOT NULL,\n  subject_pseudonym uuid,\n  actor_pseudonym uuid,\n  subject_hash varchar(64),\n  enc_parts jsonb NOT NULL DEFAULT '[]'::jsonb,\n  CONSTRAINT ase_id_is_v7 CHECK (\n    substring(id::text, 15, 1) = '7' AND substring(id::text, 20, 1) IN ('8', '9', 'a', 'b')),\n  CONSTRAINT ase_result CHECK (result IN ('SUCCESS', 'FAILURE', 'INFO')),\n  CONSTRAINT ase_actor_type CHECK (actor_type IN ('SELF', 'ADMIN', 'SYSTEM', 'ANONYMOUS')),\n  CONSTRAINT ase_event_type CHECK (event_type IN ('LOGIN_SUCCEEDED', 'LOGIN_FAILED', 'LOGIN_DENIED_ACCOUNT_STATE', 'SESSION_CREATED', 'SESSION_REVOKED', 'REFRESH_REUSE_DETECTED', 'PASSWORD_RESET_REQUESTED', 'PASSWORD_RESET_COMPLETED', 'PASSWORD_RESET_FAILED', 'PASSWORD_CHANGED', 'PASSWORD_CHANGE_FAILED', 'OTP_VERIFICATION_FAILED', 'OTP_ATTEMPTS_EXHAUSTED', 'OTP_RATE_LIMITED', 'STEP_UP_SUCCEEDED', 'STEP_UP_FAILED', 'PHONE_CHANGED', 'EMAIL_CHANGED', 'ADMIN_MFA_ENROLLED', 'ADMIN_MFA_REMOVED', 'DEACTIVATED', 'REACTIVATED', 'DELETION_REQUESTED', 'DELETION_CANCELLED', 'SUSPICIOUS_ACTIVITY', 'RATE_LIMIT_TRIGGERED')),\n  CONSTRAINT ase_subject_hash_hex CHECK (subject_hash IS NULL OR subject_hash ~ '^[0-9a-f]{64}$'),\n  CONSTRAINT ase_hash_only_without_subject CHECK (subject_hash IS NULL OR subject_pseudonym IS NULL),\n  PRIMARY KEY (id)\n) PARTITION BY RANGE (id);\nCREATE INDEX ase_subject_time ON account_security_event (subject_pseudonym, occurred_at);\nCREATE INDEX ase_subject_hash ON account_security_event (subject_hash)\n  WHERE subject_hash IS NOT NULL;\nCREATE TRIGGER ase_append_only BEFORE UPDATE OR DELETE ON account_security_event\n  FOR EACH ROW EXECUTE FUNCTION reject_row_change();\nCREATE TRIGGER ase_enc_parts BEFORE INSERT ON account_security_event\n  FOR EACH ROW EXECUTE FUNCTION check_enc_parts();\nSELECT ensure_uuid7_partitions('account_security_event', 'month', 3);\n",
+            reverse_sql="DROP TABLE IF EXISTS account_security_event;",
         ),
     ]

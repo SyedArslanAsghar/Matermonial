@@ -39,6 +39,7 @@ INSTALLED_APPS = [
     "drf_spectacular",
     # Project domain apps (backend/apps/, DR-2026-11-17-G3-3)
     "apps.accounts",
+    "apps.audit",
 ]
 
 MIDDLEWARE = [
