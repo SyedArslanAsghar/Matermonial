@@ -1,6 +1,6 @@
 # Progress
 
-**Last updated:** 2026-11-18 (G3 finalization and integrity verification)
+**Last updated:** 2026-11-18 (G2 CI criterion accepted, DR-2026-11-18-G2C)
 
 ## Governance status
 
@@ -8,16 +8,17 @@
 |---|---|
 | Documentation baseline (v4–v4.6-F3) | APPROVED (see `docs/decisions/new_architecture_decisions.md`, DR-2026-11-16) |
 | G1 Documentation reconciliation | **COMPLETED. ACCEPTED by the project owner** (DR-2026-11-17-A, 2026-11-17). Final document statuses assigned (doc 20 §5). |
-| G2 Repository governance | **ACCEPTED** by the project owner with carried-forward items (DR-2026-11-17-G2A). Baseline commit `38f491dea79fb9bb10fd2010b1c2cb8a68d545f9`. Exit criterion "CI runs on the baseline" **OPEN**; must be met before G4 (DR-2026-11-17-G2X). |
-| G3 Backend foundation | **ACCEPTED** by the project owner on 2026-11-18, with an accepted exception and a carried-forward item (DR-2026-11-18-G3A). Exit criterion "tests green on PostgreSQL" is **not fully met**: the PostgreSQL foundation tests pass, but the 3 KI-14 User-model database tests are **OPEN** and must pass as part of G4. Changes uncommitted. |
-| G4 First migration | NOT STARTED. **NOT AUTHORIZED.** Before G4 entry: the G2 criterion "CI runs on the baseline" (DR-2026-11-17-G2X). GitHub remote and push are NOT AUTHORIZED (DR-2026-11-18-G3A-5). |
+| G2 Repository governance | **ACCEPTED** by the project owner with carried-forward items (DR-2026-11-17-G2A). Baseline commit `38f491dea79fb9bb10fd2010b1c2cb8a68d545f9`. Exit criterion "CI runs on the baseline" (carried forward under DR-2026-11-17-G2X): **satisfied by owner acceptance** (DR-2026-11-18-G2C, 2026-11-18) on the integrated run `44294474904` on commit `c5fc346` (success, 6/6 jobs). The baseline commit `38f491d` itself did not run independently. |
+| G3 Backend foundation | **ACCEPTED** by the project owner on 2026-11-18, with an accepted exception and a carried-forward item (DR-2026-11-18-G3A). Exit criterion "tests green on PostgreSQL" is **not fully met**: the PostgreSQL foundation tests pass, but the 3 KI-14 User-model database tests are **OPEN** and must pass as part of G4. The G3 changes were committed and pushed by the owner as `c5fc346` (DR-2026-11-18-GH). |
+| G4 First migration | NOT STARTED. **NOT AUTHORIZED.** The G2 precondition "CI runs on the baseline" is met (DR-2026-11-18-G2C), but G4 needs its own owner authorization. KI-14 is OPEN and part of G4. Remote `origin` and the push of `c5fc346` were performed by the owner (DR-2026-11-18-GH). Claude Code performs no commit, push or remote operation without explicit authorization. |
 | G5 Features | NOT STARTED. NOT AUTHORIZED. |
+| Current delivery scope | **CI/CD implementation and validation** (DR-2026-11-18-CI, 2026-11-18). AWS deployment and production infrastructure are **deferred** and out of current scope. CD execution stays disabled until a target and an authorization exist. This doesn't authorize a remote, a push, a commit, G4 or a deployment. |
 
 ## Implementation status
 
 No implementation work has been authorized or started. Doc 18 lists 126 requirements: 124 NOT_STARTED and 2 BLOCKED (FR-ACC-009 by OD-02a/b, FR-PRO-005 by OD-04a). Nothing is PLANNED or beyond.
 
-The `backend/` scaffold predates the baseline. G3 rebuilt it into the backend foundation, which has been **executed and verified**: system checks, `check --deploy`, WSGI/ASGI loading, and the test suite on Python 3.12 and 3.13. The PostgreSQL foundation tests pass on PostgreSQL 16 and 18. It has no migrations, so the 3 KI-14 User-model database tests stay deferred to G4. GitHub Actions has never run (no GitHub remote), and the G2 prerequisite "CI runs on the baseline" stays **OPEN** (DR-2026-11-17-G2X).
+The `backend/` scaffold predates the baseline. G3 rebuilt it into the backend foundation, which has been **executed and verified**: system checks, `check --deploy`, WSGI/ASGI loading, and the test suite on Python 3.12 and 3.13. The PostgreSQL foundation tests pass on PostgreSQL 16 and 18. It has no migrations, so the 3 KI-14 User-model database tests stay deferred to G4. GitHub Actions ran for the first time on the owner-pushed commit `c5fc346` (run `44294474904`, success, 6/6 jobs; DR-2026-11-18-GH). The owner accepted this run as satisfying the G2 prerequisite "CI runs on the baseline" (DR-2026-11-18-G2C). The baseline commit `38f491d` itself did not run independently.
 
 ## G1 progress (2026-11-16 to 2026-11-17)
 
@@ -224,3 +225,29 @@ Local verification: the workflow's own `run:` steps, parsed from `ci.yml`, were 
 | Failing PostgreSQL foundation test | Job fails (1 failed, 8 passed) |
 
 Not run on GitHub: no remote exists, and none is authorized.
+
+## Owner-performed GitHub actions and first CI run (2026-11-18, DR-2026-11-18-GH)
+
+The project owner manually:
+- made commit `c5fc346` ("added first commit", on top of the baseline `38f491d`; 69 files);
+- added the remote `origin` (`https://github.com/SyedArslanAsghar/Matermonial.git`, **public**);
+- pushed `main`.
+
+A content check of `c5fc346` found no `.env`, caches, virtual environment, keys or migrations.
+
+GitHub Actions evidence, from a read-only review through the public API:
+
+| Item | Result |
+|---|---|
+| Run | `44294474904`, workflow "CI", event `push`, branch `main`, commit `c5fc346` |
+| Conclusion | **success**: 6/6 jobs, every step succeeded (the lockfile check is skipped on 3.13 by design) |
+| Jobs | Backend quality (Python 3.12, 3.13); Backend tests (Python 3.12, 3.13 × PostgreSQL 16, 18) |
+| KI-14 | Each test job carries the notice "3 tests DEFERRED to G4 (KI-14) … not run and not passed" |
+| Warnings | Node.js 20 deprecation for `actions/checkout@v4` and `actions/setup-python@v5` (KI-19); `ubuntu-latest` label migration notice |
+| Not reviewed | Job logs and per-test counts on GitHub (they need authentication) |
+| Baseline commit `38f491d` | No workflow run exists for it |
+
+G2 criterion "CI runs on the baseline": **OPEN**, pending the owner's decision on whether the `c5fc346` run satisfies it.
+
+*Outcome (same day):* accepted by the owner as satisfying the criterion (Option A, DR-2026-11-18-G2C). `38f491d` did not run independently. The governance records are submitted on the branch `docs/ci-governance-acceptance` as a pull request to `main`, not merged (D2).
+

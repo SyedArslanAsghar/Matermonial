@@ -104,7 +104,7 @@ These are documented as their gates are delivered: migrations, superuser creatio
 - Branch model (owner decision, doc 07 §8): `main` is the primary branch. Work on short-lived `feature/<short-name>`, `fix/<short-name>` and `hotfix/<short-name>` branches; there is no `develop` branch. Production changes are always reviewed.
 - Commit messages follow Conventional Commits, for example `feat(accounts): …`, `fix(requests): …`, `docs(api): …` (doc 07 §9).
 - Pull requests use [`.github/pull_request_template.md`](.github/pull_request_template.md) (doc 07 §10).
-- No remote repository, push or branch protection is set up yet. Each needs separate owner authorization. A licence is still to be chosen by the owner.
+- Remote: `origin` on GitHub, set up and pushed by the owner (DR-2026-11-18-GH). Branch protection isn't set up yet. A licence is still to be chosen by the owner.
 
 ## CI/CD
 
@@ -116,7 +116,7 @@ These are documented as their gates are delivered: migrations, superuser creatio
     3. run the PostgreSQL foundation tests
     4. run every other test; the 3 KI-14 tests are reported as skipped, DEFERRED to G4
 - Any failure, error or collection error fails the job. There is no `continue-on-error`.
-- All steps pass when run locally with the same commands. CI has not yet run on GitHub: no remote is configured (D6).
+- All steps pass locally. On GitHub, the first run (commit `c5fc346`) succeeded on all 6 jobs. The owner accepted it as satisfying the G2 criterion "CI runs on the baseline" (DR-2026-11-18-G2C). The baseline commit `38f491d` itself did not run independently.
 - The full pipeline, including builds, migration and schema checks, staging and production, is described in docs 08 and 09. It is delivered in later gates.
 
 ## Docker's role
