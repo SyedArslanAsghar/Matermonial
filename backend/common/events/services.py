@@ -138,6 +138,9 @@ def claim_batch(limit: int = 50) -> list[tuple[uuid.UUID, uuid.UUID]]:
                 Q(status=OutboxEvent.Status.PENDING)
                 | Q(status=OutboxEvent.Status.CLAIMED, lease_expires_at__lt=now)
             )
+            # Only event types whose handler exists in this build: events of later phases
+            # (e.g. notification delivery, Phase 12) wait as PENDING instead of going DEAD.
+            .filter(event_type__in=list(HANDLERS))
             .order_by("id")
             .select_for_update(skip_locked=True)
             .values_list("id", flat=True)[:limit]

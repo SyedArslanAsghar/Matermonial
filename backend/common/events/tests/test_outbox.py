@@ -127,18 +127,22 @@ class TestProcessing:
         assert event.status == "DEAD" and event.attempts == services.MAX_ATTEMPTS
 
     def test_lost_lease_rolls_back_the_handler_work(self):
-        event = emit(event_type="test.creates_user")
-        [(event_id, token)] = services.claim_batch()
-
         @services.register_handler("test.creates_user")
         def creates_user(evt, payload):
             User.objects.create_user(phone_number="+923007770000")
             # Meanwhile another worker re-claimed the event after the lease expired.
             OutboxEvent.objects.filter(id=evt.id).update(lease_token=uuid.uuid4())
 
+        event = emit(event_type="test.creates_user")
+        [(event_id, token)] = services.claim_batch()
         assert services.process_claimed(event_id, token) == "CLAIMED"
         assert not User.objects.filter(phone_number="+923007770000").exists()
         assert OutboxEvent.objects.get(id=event.id).status == "CLAIMED"
+
+    def test_events_without_a_handler_wait_as_pending(self):
+        event = emit(event_type="later.phase.event")
+        assert services.claim_batch() == []
+        assert OutboxEvent.objects.get(id=event.id).status == "PENDING"
 
     def test_unknown_queue_key_makes_the_event_undecryptable(self, settings):
         event = emit()

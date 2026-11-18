@@ -128,7 +128,12 @@ REST_FRAMEWORK = {
     "DEFAULT_PAGINATION_CLASS": "common.api.pagination.StandardPagination",
     "PAGE_SIZE": env.int("API_PAGE_SIZE", default=20),
     "DEFAULT_RENDERER_CLASSES": ["rest_framework.renderers.JSONRenderer"],
-    "DEFAULT_AUTHENTICATION_CLASSES": ["rest_framework.authentication.SessionAuthentication"],
+    # TR-01: web = Django session linked to AuthSession; mobile = hashed bearer tokens.
+    "DEFAULT_AUTHENTICATION_CLASSES": [
+        # Bearer first: unauthenticated requests then get 401 with WWW-Authenticate.
+        "apps.accounts.authentication.BearerTokenAuthentication",
+        "apps.accounts.authentication.WebSessionAuthentication",
+    ],
     "DEFAULT_PERMISSION_CLASSES": ["rest_framework.permissions.IsAuthenticated"],
     "EXCEPTION_HANDLER": "common.api.exceptions.exception_handler",
 }
@@ -162,7 +167,7 @@ PUSH_PROVIDER = env("PUSH_PROVIDER", default="disabled")
 # Each ring is "<version>:<base64 32-byte key>,..." plus its active version. The defaults are
 # DEV-ONLY keys derived from a public label (common.crypto.keys): fine for local development and
 # tests, never for real data. Staging and production refuse them (common.config).
-for _purpose in ("KEK", "QUEUE", "DEDUPE", "SUBJECT_HASH", "REGISTRY", "OTP"):
+for _purpose in ("KEK", "QUEUE", "DEDUPE", "SUBJECT_HASH", "REGISTRY", "OTP", "ROT"):
     globals()[f"{_purpose}_KEYS"] = env(f"{_purpose}_KEYS", default=dev_keyring(_purpose))
     globals()[f"{_purpose}_ACTIVE_VERSION"] = env.int(f"{_purpose}_ACTIVE_VERSION", default=1)
 # Compliance registry (TR-24): "local" writes hash-chained JSON files under
@@ -175,6 +180,15 @@ COMPLIANCE_REGISTRY_LOCATION = env(
 OUTBOX_LEASE_SECONDS = env.int("OUTBOX_LEASE_SECONDS", default=300)
 OUTBOX_REDACT_AFTER_DAYS = env.int("OUTBOX_REDACT_AFTER_DAYS", default=7)
 OUTBOX_PURGE_AFTER_DAYS = env.int("OUTBOX_PURGE_AFTER_DAYS", default=30)
+# Session and token lifetimes (TR-01; doc 06 §22.2; all configurable).
+AUTH_WEB_IDLE_SECONDS = env.int("AUTH_WEB_IDLE_SECONDS", default=2 * 3600)
+AUTH_WEB_ABSOLUTE_SECONDS = env.int("AUTH_WEB_ABSOLUTE_SECONDS", default=7 * 86400)
+AUTH_MOBILE_ACCESS_SECONDS = env.int("AUTH_MOBILE_ACCESS_SECONDS", default=15 * 60)
+AUTH_MOBILE_REFRESH_IDLE_SECONDS = env.int("AUTH_MOBILE_REFRESH_IDLE_SECONDS", default=30 * 86400)
+AUTH_MOBILE_ABSOLUTE_SECONDS = env.int("AUTH_MOBILE_ABSOLUTE_SECONDS", default=90 * 86400)
+AUTH_REFRESH_GRACE_SECONDS = env.int("AUTH_REFRESH_GRACE_SECONDS", default=15)
+AUTH_SEEN_WRITE_INTERVAL_SECONDS = 60  # idle extension written at most once a minute
+SESSION_COOKIE_AGE = AUTH_WEB_ABSOLUTE_SECONDS  # cookie Max-Age = absolute limit (doc 06 §22.2)
 # One-time codes (doc 03 §2.5, doc 06 §3; configurable defaults).
 OTP_VALIDITY_SECONDS = env.int("OTP_VALIDITY_SECONDS", default=300)
 OTP_RESEND_COOLDOWN_SECONDS = env.int("OTP_RESEND_COOLDOWN_SECONDS", default=60)
