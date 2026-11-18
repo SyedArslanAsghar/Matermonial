@@ -1,3 +1,4 @@
+import base64
 import os
 import subprocess
 import sys
@@ -10,6 +11,18 @@ from django.core.exceptions import ImproperlyConfigured
 from django.db import models
 
 from common.config import deployed_settings_errors, validate_deployed_settings
+from common.crypto.keys import PURPOSES, dev_keyring
+
+# Non-dev test keys (distinct per purpose); deployed environments must not use dev-only keys.
+KEY_ENV = {
+    f"{purpose}_KEYS": "1:" + base64.b64encode(bytes([i + 1]) * 32).decode()
+    for i, purpose in enumerate(PURPOSES)
+}
+KEY_SETTINGS = {
+    **KEY_ENV,
+    **{f"{purpose}_ACTIVE_VERSION": 1 for purpose in PURPOSES},
+    "COMPLIANCE_REGISTRY_BACKEND": "external",
+}
 
 GOOD_DEPLOYED = {
     "DEBUG": False,
@@ -19,10 +32,12 @@ GOOD_DEPLOYED = {
     "PUSH_PROVIDER": "disabled",
     "EMAIL_BACKEND": "django.core.mail.backends.smtp.EmailBackend",
     "STORAGE_BACKEND": "local",
+    **KEY_SETTINGS,
 }
 GOOD_ENV = {
     "DATABASE_URL": "postgresql://u:p@db.example.test:5432/app",
     "CELERY_BROKER_URL": "redis://broker.example.test:6379/0",
+    **KEY_ENV,
 }
 
 
@@ -80,6 +95,12 @@ def test_valid_deployed_configuration_passes():
             "EMAIL_BACKEND",
         ),
         ({"STORAGE_BACKEND": "s3"}, GOOD_ENV, "STORAGE_BACKEND"),
+        # G4 (DR-2026-11-18-G4): key rings and the compliance registry (TR-23, TR-11, TR-24).
+        ({}, {**GOOD_ENV, "KEK_KEYS": ""}, "KEK_KEYS must be set explicitly"),
+        ({"QUEUE_KEYS": dev_keyring("QUEUE")}, GOOD_ENV, "QUEUE_KEYS contains a dev-only key"),
+        ({"DEDUPE_KEYS": "1:not-base64!"}, GOOD_ENV, "DEDUPE_KEYS: Key version 1"),
+        ({"SUBJECT_HASH_ACTIVE_VERSION": 2}, GOOD_ENV, "SUBJECT_HASH_KEYS: SUBJECT_HASH"),
+        ({"COMPLIANCE_REGISTRY_BACKEND": "local"}, GOOD_ENV, "COMPLIANCE_REGISTRY_BACKEND"),
     ],
 )
 def test_deployed_configuration_fails_closed(override, env, fragment):
@@ -101,13 +122,13 @@ SECRET_LOOKING_PASSWORD = "s3cr3t-broker-pa55word"
     ],
 )
 def test_explicit_broker_configuration_passes(broker_env):
-    env = {"DATABASE_URL": GOOD_ENV["DATABASE_URL"], **broker_env}
+    env = {"DATABASE_URL": GOOD_ENV["DATABASE_URL"], **KEY_ENV, **broker_env}
     assert deployed_settings_errors(GOOD_DEPLOYED, env) == []
 
 
 @pytest.mark.parametrize("broker_env", [{}, {"CELERY_BROKER_URL": ""}, {"REDIS_URL": ""}])
 def test_missing_broker_fails_closed(broker_env):
-    env = {"DATABASE_URL": GOOD_ENV["DATABASE_URL"], **broker_env}
+    env = {"DATABASE_URL": GOOD_ENV["DATABASE_URL"], **KEY_ENV, **broker_env}
     with pytest.raises(ImproperlyConfigured, match="CELERY_BROKER_URL or REDIS_URL"):
         validate_deployed_settings(GOOD_DEPLOYED, env)
 
@@ -120,6 +141,13 @@ def test_configuration_errors_never_contain_values():
     assert SECRET_LOOKING_PASSWORD not in str(excinfo.value)
 
 
+def test_key_errors_never_contain_key_material():
+    bad = {**GOOD_DEPLOYED, "KEK_KEYS": KEY_ENV["KEK_KEYS"] + ",2:short"}
+    message = "\n".join(deployed_settings_errors(bad, GOOD_ENV))
+    assert "KEK_KEYS" in message
+    assert KEY_ENV["KEK_KEYS"].split(":", 1)[1] not in message and "short" not in message
+
+
 def _load_settings_in_subprocess(module: str, extra_env: dict) -> subprocess.CompletedProcess:
     env = {
         "PATH": os.environ.get("PATH", ""),
@@ -128,6 +156,8 @@ def _load_settings_in_subprocess(module: str, extra_env: dict) -> subprocess.Com
         "DJANGO_ALLOWED_HOSTS": "api.example.test",
         "EMAIL_BACKEND": "django.core.mail.backends.smtp.EmailBackend",
         "DATABASE_URL": f"postgresql://app:{SECRET_LOOKING_PASSWORD}@db.example.test:5432/app",
+        "COMPLIANCE_REGISTRY_BACKEND": "external",
+        **KEY_ENV,
         **extra_env,
     }
     code = "import django; django.setup(); from django.conf import settings; print(settings.CELERY_BROKER_URL)"

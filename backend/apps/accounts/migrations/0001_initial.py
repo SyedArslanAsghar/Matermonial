@@ -176,4 +176,88 @@ class Migration(migrations.Migration):
             model_name='authtoken',
             constraint=models.CheckConstraint(condition=models.Q(models.Q(('generation', 0), ('parent_id__isnull', True)), models.Q(('generation__gt', 0), ('parent_id__isnull', False)), _connector='OR'), name='auth_token_generation_parent_consistent'),
         ),
+        migrations.CreateModel(
+            name='SubjectPseudonym',
+            fields=[
+                ('pseudonym', models.UUIDField(default=uuid.uuid4, editable=False, primary_key=True, serialize=False)),
+                ('subject_type', models.CharField(choices=[('ACCOUNT', 'Account'), ('PROFILE', 'Profile')], max_length=7)),
+                ('subject_id', models.UUIDField(blank=True, null=True)),
+                ('created_at', models.DateTimeField(auto_now_add=True)),
+                ('unlinked_at', models.DateTimeField(blank=True, null=True)),
+                ('hold_ref', models.CharField(blank=True, max_length=100, null=True)),
+            ],
+            options={
+                'db_table': 'accounts_subject_pseudonym',
+                'constraints': [models.UniqueConstraint(condition=models.Q(('subject_id__isnull', False)), fields=('subject_type', 'subject_id'), name='subject_pseudonym_one_per_subject'), models.CheckConstraint(condition=models.Q(models.Q(('subject_id__isnull', False), ('unlinked_at__isnull', True)), models.Q(('subject_id__isnull', True), ('unlinked_at__isnull', False)), _connector='OR'), name='subject_pseudonym_unlink_consistent')],
+            },
+        ),
+        migrations.CreateModel(
+            name='SubjectDataKey',
+            fields=[
+                ('key_id', models.UUIDField(default=uuid.uuid4, editable=False, primary_key=True, serialize=False)),
+                ('kek_version', models.PositiveIntegerField()),
+                ('wrapped_key', models.BinaryField(blank=True, null=True)),
+                ('created_at', models.DateTimeField(auto_now_add=True)),
+                ('destroyed_at', models.DateTimeField(blank=True, null=True)),
+                ('pseudonym', models.ForeignKey(db_column='pseudonym', on_delete=django.db.models.deletion.PROTECT, related_name='data_keys', to='accounts.subjectpseudonym')),
+            ],
+            options={
+                'db_table': 'accounts_subject_data_key',
+                'constraints': [models.CheckConstraint(condition=models.Q(models.Q(('destroyed_at__isnull', True), ('wrapped_key__isnull', False)), models.Q(('destroyed_at__isnull', False), ('wrapped_key__isnull', True)), _connector='OR'), name='subject_data_key_destroyed_iff_no_key'), models.UniqueConstraint(condition=models.Q(('destroyed_at__isnull', True)), fields=('pseudonym',), name='subject_data_key_one_live_per_pseudonym')],
+            },
+        ),
+        # TR-23 lifecycle guards (doc 03 §22.2, doc 06 §22.6), hand-written.
+        migrations.RunSQL(
+            sql="""
+            CREATE FUNCTION accounts_subject_pseudonym_guard() RETURNS trigger
+            LANGUAGE plpgsql AS $$
+            BEGIN
+              IF TG_OP = 'DELETE' THEN
+                RAISE EXCEPTION 'TR-23: subject pseudonyms are never deleted'
+                  USING ERRCODE = 'insufficient_privilege';
+              END IF;
+              IF NEW.pseudonym <> OLD.pseudonym OR NEW.subject_type <> OLD.subject_type
+                 OR NEW.created_at <> OLD.created_at THEN
+                RAISE EXCEPTION 'TR-23: pseudonym identity is immutable'
+                  USING ERRCODE = 'insufficient_privilege';
+              END IF;
+              IF NEW.subject_id IS NOT NULL AND NEW.subject_id IS DISTINCT FROM OLD.subject_id THEN
+                RAISE EXCEPTION 'TR-23: a pseudonym can be unlinked but never linked again'
+                  USING ERRCODE = 'insufficient_privilege';
+              END IF;
+              RETURN NEW;
+            END $$;
+            CREATE TRIGGER accounts_subject_pseudonym_guard
+              BEFORE UPDATE OR DELETE ON accounts_subject_pseudonym
+              FOR EACH ROW EXECUTE FUNCTION accounts_subject_pseudonym_guard();
+
+            CREATE FUNCTION accounts_subject_data_key_guard() RETURNS trigger
+            LANGUAGE plpgsql AS $$
+            BEGIN
+              IF TG_OP = 'DELETE' THEN
+                RAISE EXCEPTION 'TR-23: subject data keys are never deleted (tombstones remain)'
+                  USING ERRCODE = 'insufficient_privilege';
+              END IF;
+              IF OLD.destroyed_at IS NOT NULL THEN
+                RAISE EXCEPTION 'TR-23: a destroyed key tombstone is immutable'
+                  USING ERRCODE = 'insufficient_privilege';
+              END IF;
+              IF NEW.key_id <> OLD.key_id OR NEW.pseudonym <> OLD.pseudonym
+                 OR NEW.created_at <> OLD.created_at THEN
+                RAISE EXCEPTION 'TR-23: key identity is immutable'
+                  USING ERRCODE = 'insufficient_privilege';
+              END IF;
+              RETURN NEW;  -- a live key may be re-wrapped (KEK rotation) or destroyed
+            END $$;
+            CREATE TRIGGER accounts_subject_data_key_guard
+              BEFORE UPDATE OR DELETE ON accounts_subject_data_key
+              FOR EACH ROW EXECUTE FUNCTION accounts_subject_data_key_guard();
+            """,
+            reverse_sql="""
+            DROP TRIGGER IF EXISTS accounts_subject_data_key_guard ON accounts_subject_data_key;
+            DROP FUNCTION IF EXISTS accounts_subject_data_key_guard();
+            DROP TRIGGER IF EXISTS accounts_subject_pseudonym_guard ON accounts_subject_pseudonym;
+            DROP FUNCTION IF EXISTS accounts_subject_pseudonym_guard();
+            """,
+        ),
     ]

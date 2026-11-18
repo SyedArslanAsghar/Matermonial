@@ -2,6 +2,7 @@ import re
 
 from django.contrib.auth.base_user import BaseUserManager
 from django.core.exceptions import ValidationError
+from django.db import transaction
 
 # Same pattern in Python and in the database CHECK constraint (accounts_user_phone_e164).
 E164_REGEX = r"^\+[1-9][0-9]{7,14}$"
@@ -39,7 +40,13 @@ class UserManager(BaseUserManager):
             user.set_password(password)
         else:
             user.set_unusable_password()
-        user.save(using=self._db)
+        # TR-23 eager creation: the account's pseudonym and data key are created in the same
+        # transaction as the account (doc 03 §22.2).
+        from .services.pseudonyms import create_subject
+
+        with transaction.atomic(using=self._db):
+            user.save(using=self._db)
+            create_subject("ACCOUNT", user.id)
         return user
 
     def create_superuser(self, phone_number, password=None, **extra_fields):

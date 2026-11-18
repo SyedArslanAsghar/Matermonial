@@ -25,6 +25,9 @@ FK_LOCK_CLASSES: dict[str, str] = {
     # the account's User FOR SHARE first, and refresh locks AuthSession before AuthToken.
     "accounts.AuthSession.user": "P",
     "accounts.AuthToken.session": "P",
+    # TR-23: a data key is created in the same transaction as its pseudonym, and key
+    # destruction runs inside the deletion step that already locks the subject.
+    "accounts.SubjectDataKey.pseudonym": "P",
 }
 
 
