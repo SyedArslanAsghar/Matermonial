@@ -1,6 +1,6 @@
 # Progress
 
-**Last updated:** 2026-11-18 (G2 CI criterion accepted, DR-2026-11-18-G2C)
+**Last updated:** 2026-11-18 (G4 implemented, DR-2026-11-18-G4)
 
 ## Governance status
 
@@ -10,8 +10,8 @@
 | G1 Documentation reconciliation | **COMPLETED. ACCEPTED by the project owner** (DR-2026-11-17-A, 2026-11-17). Final document statuses assigned (doc 20 §5). |
 | G2 Repository governance | **ACCEPTED** by the project owner with carried-forward items (DR-2026-11-17-G2A). Baseline commit `38f491dea79fb9bb10fd2010b1c2cb8a68d545f9`. Exit criterion "CI runs on the baseline" (carried forward under DR-2026-11-17-G2X): **satisfied by owner acceptance** (DR-2026-11-18-G2C, 2026-11-18) on the integrated run `44294474904` on commit `c5fc346` (success, 6/6 jobs). The baseline commit `38f491d` itself did not run independently. |
 | G3 Backend foundation | **ACCEPTED** by the project owner on 2026-11-18, with an accepted exception and a carried-forward item (DR-2026-11-18-G3A). Exit criterion "tests green on PostgreSQL" is **not fully met**: the PostgreSQL foundation tests pass, but the 3 KI-14 User-model database tests are **OPEN** and must pass as part of G4. The G3 changes were committed and pushed by the owner as `c5fc346` (DR-2026-11-18-GH). |
-| G4 First migration | NOT STARTED. **NOT AUTHORIZED.** The G2 precondition "CI runs on the baseline" is met (DR-2026-11-18-G2C), but G4 needs its own owner authorization. KI-14 is OPEN and part of G4. Remote `origin` and the push of `c5fc346` were performed by the owner (DR-2026-11-18-GH). Claude Code performs no commit, push or remote operation without explicit authorization. |
-| G5 Features | NOT STARTED. NOT AUTHORIZED. |
+| G4 First migration | AUTHORIZED (DR-2026-11-18-G4). **IMPLEMENTED; exit criteria met** (2026-11-18): migrations reviewed and validated from empty on PostgreSQL 16 and 18; kernel tests pass (220/220 on Python 3.12 and 3.13 × PostgreSQL 16 and 18; KI-14 resolved). **Owner acceptance pending** (only the owner sets ACCEPTED, CC-R70). G5 already authorized (DR-2026-11-18-G4). |
+| G5 Features | **AUTHORIZED** (DR-2026-11-18-G4). Starts after G4. |
 | Current delivery scope | **CI/CD implementation and validation** (DR-2026-11-18-CI, 2026-11-18). AWS deployment and production infrastructure are **deferred** and out of current scope. CD execution stays disabled until a target and an authorization exist. This doesn't authorize a remote, a push, a commit, G4 or a deployment. |
 
 ## Implementation status
@@ -262,4 +262,28 @@ The owner approved `actions/checkout@v7` and `actions/setup-python@v7`.
   - Python 3.12.16 and 3.13.18 are published for Linux x64 on Ubuntu 22.04, 24.04 and 26.04.
 - **Evidence:** run `44298922332`: success, 6/6 jobs, 0 Node.js 20 warnings, 4/4 test jobs with the KI-14 DEFERRED notice.
 - **Status:** KI-19 resolved on the branch; it reaches `main` when the PR is merged after owner review.
+
+## G4 — First migration and backend kernel (2026-11-18, DR-2026-11-18-G4)
+
+Branch `feature/g4-kernel` (from `main` `f9cc3df`). Validation used disposable PostgreSQL 16.16 and 18.7 containers on ports 55432 / 55418; the owner's server on 5432 was never used.
+
+| Stage | Result | Commit |
+|---|---|---|
+| Decisions | DR-2026-11-18-G4 recorded; TR/ADR statuses updated | `a526f52` |
+| 1–2 `User` + `accounts.0001` | E.164 and deactivation CHECKs; case-insensitive unique email; nullable reason; D-4 A′ (link-table trigger, admin read-only flags); KI-14 marker removed — **the 3 tests pass unchanged**; D-7 migrations-in-sync guard; UUID-PK architecture test | `2c7c848` |
+| 3 UUIDv7 | `uuid_v7()` (native on 18, RFC 9562 body on 16), `uuid_v7_lower()`, Python twin; T-UUID 001–010 | `d0fba12` |
+| 4 Sessions | `AuthSession` (incl. TR-21 `DELETION_RECOVERY` scope), `AuthToken` (SHA-256 only); consistency CHECKs | `7ca9a16` |
+| 5 Pseudonyms and keys | `SubjectPseudonym`, `SubjectDataKey` (eager, one-way lifecycle triggers); AES-256-GCM envelopes; versioned key rings (dev-only locally, refused when deployed); `cryptography` 50.0.2 | `60f1461` |
+| 6 Logs | Partitioned append-only `account_security_event` and `audit_log`; envelope trigger; holds, `audit_log_all`, `archive_and_drop_audit_partition`, `release_held_events` | `83d7994` |
+| 7 Outbox and idempotency | `OutboxEvent` (encrypted payload, HMAC dedupe, redaction/purge guard, durable Tx-C claim with SKIP LOCKED, own-row-last completion, retries, DEAD / DEAD_UNDECRYPTABLE); `IdempotencyRecord` (same-transaction, replay/conflict); concurrency tests | `37b2269` |
+| 8 TR-24 | Maintenance tables, signed hash-chained local registry, Stream M protocol, PARTITION_CREATE / PARTITION_DROP / REGISTRY_CHECKPOINT, shred cache | `507f9d8` |
+| 9 Validation and docs | D-11 grant model + tests; documentation; this record | this stage |
+
+**Migration inventory** (one initial migration per app): `accounts.0001`, `audit.0001`, `events.0001`, `idempotency.0001`, `platform_ops.0001`. On fresh PostgreSQL 16.16 and 18.7: migrate from empty OK, `makemigrations --check` in sync, reverse of every app to zero leaves no project relation or function, re-migrate OK.
+
+**Final test matrix:** 220 collected; **220 passed, 0 failed, 0 skipped, 0 deferred** on each of Python 3.12.16 / 3.13 × PostgreSQL 16.16 / 18.7. Python 3.12: hash-checked development and production installs, `pip check` and the lockfile consistency check pass. Ruff lint and format clean.
+
+**G4 exit criteria (doc 10 §0.1):** migration reviewed — met (each stage's diff reviewed; this record); kernel tests pass — met (D-10 list, including KI-14); KI-14 carry-forward (DR-2026-11-18-G3A-2) — **resolved**.
+
+**Open items after G4:** KI-20 (TR-07 roles/backend/MFA, Phase 2), KI-21 (CI workflow step stale — owner), KI-22 (Stream R and operator approvals, Phases 15–16), KI-23 (production keys and registry store, deferred with AWS), KI-24 (bootstrap partitions, documented).
 

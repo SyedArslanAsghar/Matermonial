@@ -1,6 +1,6 @@
 # Pending Features
 
-**Last updated:** 2026-11-18 (G3 acceptance)
+**Last updated:** 2026-11-18 (G4)
 
 All features are pending. The authoritative per-requirement list, with domain, module, approval status, implementation status and owner-decision dependencies, is `docs/handover/18_REQUIREMENTS_TRACEABILITY_MATRIX.md`.
 
@@ -10,7 +10,7 @@ All features are pending. The authoritative per-requirement list, with domain, m
 |---|---|---|
 | G2 | Repository governance | **ACCEPTED** with carried-forward items (DR-2026-11-17-G2A); baseline commit `38f491dea79f`; "CI runs on the baseline" OPEN until before G4 |
 | G3 | Backend foundation, no migrations | **ACCEPTED** by the owner on 2026-11-18 with an accepted exception (DR-2026-11-18-G3A); KI-14's 3 User-model database tests are OPEN and carried forward to G4 |
-| G4 | First migration (kernel models) | NOT_STARTED (not authorized). Includes making the 3 KI-14 tests pass. Prerequisite: the G2 criterion "CI runs on the baseline" (DR-2026-11-17-G2X) |
+| G4 | First migration (kernel models) | IMPLEMENTED, exit criteria met; owner acceptance pending (DR-2026-11-18-G4) |
 | G5 Phase 2 | Auth flows + Django Admin MFA | NOT_STARTED |
 | G5 Phase 3 | Profiles, preferences, uploads | NOT_STARTED |
 | G5 Phase 4 | Family management and ActorContext | NOT_STARTED |

@@ -25,6 +25,8 @@ The project proceeds through five gates. **Each gate needs the project owner's e
 
 **G3 status (2026-11-18):** owner-accepted with an accepted exception and a carried-forward item (DR-2026-11-18-G3A). The G3 exit criterion "tests green on PostgreSQL" is not fully met. The PostgreSQL foundation tests pass; the 3 KI-14 User-model database tests are OPEN and must pass as part of G4. **G4 is NOT AUTHORIZED.**
 
+**G4 status (2026-11-18):** authorized together with G5 (DR-2026-11-18-G4). **IMPLEMENTED; exit criteria met** (2026-11-18): migrations reviewed and validated from empty on PostgreSQL 16 and 18; kernel tests pass (220/220 on Python 3.12 and 3.13 × PostgreSQL 16 and 18; KI-14 resolved). **Owner acceptance pending** (only the owner sets ACCEPTED, CC-R70). G5 already authorized (DR-2026-11-18-G4). Record: `docs/implementation/progress.md`; schema notes: doc 03 §22.17.
+
 ### 0.2 G5 phase order
 
 | Phase | Scope |

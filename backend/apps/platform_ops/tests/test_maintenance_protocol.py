@@ -278,7 +278,7 @@ def test_every_maintenance_command_is_in_the_catalogue():
     """doc 09 §19.10: no maintenance action outside the protocol (startup check)."""
     commands_dir = Path(maintenance.__file__).resolve().parents[1] / "management" / "commands"
     commands = {p.stem for p in commands_dir.glob("*.py") if p.stem != "__init__"}
-    read_only = {"verify_registry"}
+    read_only = {"verify_registry", "print_db_grants"}
     assert commands - read_only == set(maintenance.MAINTENANCE_COMMANDS)
     assert set(maintenance.MAINTENANCE_COMMANDS.values()) <= set(STREAM_M_KINDS)
 
