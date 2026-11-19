@@ -17,3 +17,10 @@ cryptography>=50.0,<51
 # Python 3.12 and 3.13; no known vulnerabilities. Only the core framework is used (the
 # project's own encrypted TOTP device); the bundled plugins are not installed.
 django-otp>=1.7.5,<1.8
+
+# Photo upload pipeline (TR-10, approved by DR-2026-11-19-P3-1): byte-level type detection
+# (filetype: pure Python, no dependencies; last release 2022) and decode, verify and re-encode
+# to strip EXIF/GPS (Pillow 13.0.0, 2026-10-16, wheels for Python 3.12/3.13). No known
+# vulnerabilities on PyPI at approval time (2026-11-19).
+Pillow>=13.0,<14
+filetype>=1.2,<1.3
