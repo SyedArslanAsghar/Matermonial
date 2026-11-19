@@ -49,3 +49,15 @@ def completion_percentage(profile) -> int:
         return 100
     done = sum(1 for item in items if _filled(view, item))
     return (100 * done) // len(items)
+
+
+def unconfigured_required_vocabularies() -> list[str]:
+    """Vocabularies behind required fields that have no active option (submission blocked)."""
+    from .. import reference
+
+    needed = {
+        reference.FIELD_VOCABULARY[item]
+        for item in settings.PROFILE_REQUIRED_FIELDS
+        if item in reference.FIELD_VOCABULARY
+    }
+    return reference.unconfigured(needed)

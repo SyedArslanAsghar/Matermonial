@@ -50,6 +50,18 @@ PERMISSIONS: tuple[PermissionSpec, ...] = (
     PermissionSpec(
         "admin_access.add_adminuserrole", "Assign roles in the admin", is_sensitive=True
     ),
+    PermissionSpec("profiles.view_vocabularyoption", "View profile value lists"),
+    PermissionSpec(
+        "profiles.add_vocabularyoption",
+        "Add profile value-list options",
+        is_sensitive=True,
+        description="New options start inactive unless activated; activation needs owner approval.",
+    ),
+    PermissionSpec(
+        "profiles.change_vocabularyoption",
+        "Relabel, reorder, activate or deactivate profile value-list options",
+        is_sensitive=True,
+    ),
     PermissionSpec(
         "accounts.view_user",
         "View accounts in the admin",

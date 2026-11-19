@@ -5,7 +5,11 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from ..services import profiles as service
-from ..services.completion import completion_percentage, missing_required
+from ..services.completion import (
+    completion_percentage,
+    missing_required,
+    unconfigured_required_vocabularies,
+)
 from .serializers import OwnProfileSerializer, ProfileUpdateSerializer
 
 
@@ -41,6 +45,7 @@ class ProfileCompletionView(APIView):
             {
                 "completion_percentage": completion_percentage(profile),
                 "missing_required": missing_required(profile),
+                "unconfigured_vocabularies": unconfigured_required_vocabularies(),
             }
         )
 

@@ -6,15 +6,20 @@ from datetime import date, timedelta
 from decimal import Decimal
 
 import pytest
-from django.db import IntegrityError, connection, transaction
+from django.db import DatabaseError, IntegrityError, connection, transaction
 from django.utils import timezone
 from rest_framework.test import APIClient
 
 from apps.accounts.models import SubjectPseudonym, User
 from apps.audit.models import AuditLog
-from apps.profiles import reference
-from apps.profiles.models import MatrimonialProfile, ProfileBasicInfo, ProfileProfession
+from apps.profiles.models import (
+    MatrimonialProfile,
+    ProfileBasicInfo,
+    ProfileProfession,
+    VocabularyOption,
+)
 from apps.profiles.services.profiles import ProfileExists, create_profile
+from apps.profiles.tests.conftest import activate
 
 pytestmark = pytest.mark.django_db
 URL, ME = "/api/v1/profiles/", "/api/v1/profiles/me/"
@@ -39,16 +44,13 @@ def years_ago(years: int, days: int = 0) -> date:
 
 
 @pytest.fixture
-def sensitive_lists(monkeypatch):
-    """Stand-in values for the owner-supplied lists (tests only)."""
-    for name, values in {
-        "gender": ("G1", "G2"),
-        "marital_status": ("NEVER_MARRIED",),
-        "religion": ("R1",),
-        "community": ("C1",),
-        "caste": ("K1",),
-    }.items():
-        monkeypatch.setitem(reference.LISTS, name, values)
+def sensitive_lists():
+    """Stand-in codes for the owner-supplied vocabularies (tests only)."""
+    activate("gender", "G1", "G2")
+    activate("marital_status", "NEVER_MARRIED")
+    activate("religion", "R1")
+    activate("community", "C1")
+    activate("caste", "K1")
 
 
 @pytest.fixture
@@ -163,7 +165,7 @@ class TestEditing:
         _, client = owner
         response = client.patch(ME, {"basic_info": {"gender": "G1"}}, format="json")
         assert response.status_code == 400
-        assert "hasn't been provided" in str(response.json())
+        assert "hasn't been configured" in str(response.json())
 
     def test_value_lists_and_iso_codes_are_enforced(self, owner):
         _, client = owner
@@ -294,3 +296,104 @@ def test_is_active_cannot_drift_from_status(owner):
     user, _ = owner
     with pytest.raises(IntegrityError), transaction.atomic():
         MatrimonialProfile.objects.filter(owner=user).update(is_active=True)
+
+
+class TestVocabularies:
+    def test_submission_is_unavailable_until_required_vocabularies_exist(self, owner):
+        user, client = owner
+        profile = MatrimonialProfile.objects.get(owner=user)
+        completion = client.get(f"{URL}{profile.id}/completion/").json()
+        assert completion["unconfigured_vocabularies"] == ["gender", "marital_status", "religion"]
+        response = client.post(f"{URL}{profile.id}/submit-review/")
+        assert response.status_code == 409
+        assert response.json()["error"]["code"] == "vocabulary_not_configured"
+
+    def test_deactivated_option_stays_on_existing_profiles_but_cannot_be_chosen(
+        self, owner, sensitive_lists
+    ):
+        user, client = owner
+        client.patch(ME, COMPLETE, format="json")
+        VocabularyOption.objects.filter(vocabulary="gender", code="G1").update(is_active=False)
+        kept = client.patch(
+            ME, {"basic_info": {**COMPLETE["basic_info"], "full_name": "New"}}, format="json"
+        )
+        assert kept.status_code == 200 and kept.json()["basic_info"]["gender"] == "G1"
+        other_client = client_for(make_user(9))
+        other_client.post(URL)
+        assert (
+            other_client.patch(ME, {"basic_info": {"gender": "G1"}}, format="json").status_code
+            == 400
+        )
+
+    def test_relabelling_never_touches_profile_data(self, owner, sensitive_lists):
+        user, client = owner
+        client.patch(ME, COMPLETE, format="json")
+        VocabularyOption.objects.filter(vocabulary="gender", code="G1").update(label_en="Renamed")
+        assert ProfileBasicInfo.objects.get(profile__owner=user).gender == "G1"
+
+    def test_codes_are_immutable_and_options_never_deleted(self):
+        option = VocabularyOption.objects.get(vocabulary="diet", code="VEGAN")
+        with pytest.raises(DatabaseError), transaction.atomic():
+            VocabularyOption.objects.filter(pk=option.pk).update(code="PLANT_BASED")
+        with pytest.raises(DatabaseError), transaction.atomic():
+            VocabularyOption.objects.filter(pk=option.pk).delete()
+        with pytest.raises(IntegrityError), transaction.atomic():
+            VocabularyOption.objects.create(vocabulary="unknown_list", code="X", label_en="X")
+
+    def test_new_options_need_no_code_change(self, owner):
+        _, client = owner
+        assert (
+            client.patch(ME, {"lifestyle": {"diet": "PESCATARIAN"}}, format="json").status_code
+            == 400
+        )
+        activate("diet", "PESCATARIAN")
+        assert (
+            client.patch(ME, {"lifestyle": {"diet": "PESCATARIAN"}}, format="json").status_code
+            == 200
+        )
+
+
+def test_proposals_are_seeded_inactive_and_invent_no_religion_community_or_caste():
+    import importlib
+
+    from django.apps import apps as django_apps
+
+    from apps.profiles import reference
+
+    migration = importlib.import_module("apps.profiles.migrations.0004_controlled_vocabularies")
+    assert not {"religion", "community", "caste"} & set(migration.PROPOSED)
+    assert migration.PROPOSED == reference.PROPOSED
+    migration.seed_inactive(django_apps, None)
+    seeded = VocabularyOption.objects.filter(vocabulary__in=["gender", "marital_status"])
+    assert seeded.count() == 6 and not seeded.filter(is_active=True).exists()
+    assert not VocabularyOption.objects.filter(
+        vocabulary__in=["religion", "community", "caste"]
+    ).exists()
+
+
+def test_vocabulary_admin_changes_are_audited():
+    from django.contrib.admin.sites import site
+    from django.test import RequestFactory
+
+    from apps.profiles.admin import VocabularyOptionAdmin
+
+    actor = make_user(77)
+    option = VocabularyOption.objects.get(vocabulary="diet", code="VEGAN")
+    request = RequestFactory().post("/")
+    request.user = actor
+    model_admin = VocabularyOptionAdmin(VocabularyOption, site)
+    assert model_admin.get_readonly_fields(request, option) == ("vocabulary", "code")
+    assert not model_admin.has_delete_permission(request, option)
+    option.is_active = False
+
+    class Form:
+        changed_data = ["is_active"]
+
+    model_admin.save_model(request, option, Form(), change=True)
+    entry = AuditLog.objects.get(action="profiles.vocabulary_option_changed")
+    assert entry.safe_metadata == {
+        "vocabulary": "diet",
+        "code": "VEGAN",
+        "is_active": False,
+        "changed": "is_active",
+    }

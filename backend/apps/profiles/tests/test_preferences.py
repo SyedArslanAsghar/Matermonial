@@ -5,8 +5,8 @@ from django.db import IntegrityError, transaction
 from rest_framework.test import APIClient
 
 from apps.accounts.models import User
-from apps.profiles import reference
 from apps.profiles.models import MatrimonialProfile, PartnerPreference
+from apps.profiles.tests.conftest import activate
 
 pytestmark = pytest.mark.django_db
 URL = "/api/v1/profiles/me/partner-preferences/"
@@ -80,9 +80,9 @@ def test_patch_checks_the_merged_range(client):
     assert PartnerPreference.objects.get().minimum_age == 25
 
 
-def test_sensitive_preferences_wait_for_owner_lists(client, monkeypatch):
+def test_sensitive_preferences_wait_for_owner_lists(client):
     assert client.patch(URL, {"religions": [{"religion": "R1"}]}, format="json").status_code == 400
-    monkeypatch.setitem(reference.LISTS, "religion", ("R1", "R2"))
+    activate("religion", "R1", "R2")
     body = client.patch(
         URL, {"religions": [{"religion": "R1"}, {"religion": "R2"}]}, format="json"
     ).json()

@@ -5,7 +5,8 @@
 - Age bounds are 18–100 and the minimum can't exceed the maximum; the same applies to earnings,
   which also need a currency and a frequency (FR-020). Ranges are checked on the merged result,
   so a PATCH can't create an inverted range with one bound.
-- Value-list fields accept codes from ``reference.py`` only (DR-2026-11-19-P3-2).
+- Value-list fields accept active controlled-vocabulary codes; stored codes stay valid after
+  deactivation (``reference.py``).
 - Strict criteria (OD-10b) and matching (Phase 8) aren't implemented; preferences are stored
   as optional criteria only.
 - ``replace=True`` (PUT) resets every omitted field to null and every omitted list to empty.
@@ -64,16 +65,14 @@ LISTS = {
 
 
 def _code_error(list_name: str) -> str:
-    values = reference.allowed(list_name)
-    if not values:
-        return "This field can't be set yet: its value list hasn't been provided."
-    return f"Choose one of: {', '.join(values)}."
+    return reference.choice_error(list_name)
 
 
-def _validate(merged: dict, lists: dict) -> dict:
+def _validate(merged: dict, lists: dict, current=None, current_religions=frozenset()) -> dict:
     errors: dict = {}
     for field, list_name in CODE_LISTS.items():
-        if not reference.is_allowed(list_name, merged.get(field)):
+        stored = getattr(current, field, None) if current is not None else None
+        if not reference.is_allowed(list_name, merged.get(field), current=stored):
             errors[field] = [_code_error(list_name)]
     if merged.get("nationality") and not reference.COUNTRY.fullmatch(merged["nationality"]):
         errors["nationality"] = ["Use an ISO 3166-1 alpha-2 country code."]
@@ -102,7 +101,12 @@ def _validate(merged: dict, lists: dict) -> dict:
                 errors[f"{name}.{i}.country"] = ["Use an ISO 3166-1 alpha-2 country code."]
             if name == "languages" and not reference.LANGUAGE.fullmatch(row.get("language") or ""):
                 errors[f"{name}.{i}.language"] = ["Use an ISO 639 language code."]
-            if name == "religions" and not reference.is_allowed("religion", row.get("religion")):
+            religion = row.get("religion")
+            if (
+                name == "religions"
+                and religion not in current_religions
+                and not reference.is_allowed("religion", religion)
+            ):
                 errors[f"{name}.{i}.religion"] = [_code_error("religion")]
     return errors
 
@@ -140,7 +144,12 @@ def save_preferences(user: User, data: dict, *, replace: bool) -> PartnerPrefere
             for name in LISTS
             if replace or name in data
         }
-        errors = _validate(merged, {k: v for k, v in lists.items() if v is not None})
+        kept = (
+            frozenset(current.religions.values_list("religion", flat=True))
+            if current
+            else frozenset()
+        )
+        errors = _validate(merged, {k: v for k, v in lists.items() if v is not None}, current, kept)
         if errors:
             raise ValidationError(errors)
 

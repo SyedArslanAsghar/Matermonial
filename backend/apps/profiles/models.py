@@ -15,6 +15,8 @@ import uuid
 from django.db import models
 from django.db.models import Q
 
+from .reference import VOCABULARIES
+
 CODE = r"^[A-Z][A-Z0-9_]{0,39}$"
 COUNTRY = r"^[A-Z]{2}$"
 
@@ -531,3 +533,36 @@ class ProfilePhoto(models.Model):
             ),
             code_check("photo_type", "photo_type_code"),
         ]
+
+
+# --- Controlled vocabularies (reference.py) -------------------------------------------------
+
+
+class VocabularyOption(models.Model):
+    """One option of a controlled vocabulary. ``vocabulary`` and ``code`` are immutable and rows
+    are never deleted (trigger, migration 0004); labels, order and activation are editable."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    vocabulary = models.CharField(max_length=40)
+    code = models.CharField(max_length=40)
+    label_en = models.CharField(max_length=150)
+    label_ur = models.CharField(max_length=150, blank=True)
+    sort_order = models.PositiveSmallIntegerField(default=0)
+    is_active = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = "profiles_vocabulary_option"
+        ordering = ["vocabulary", "sort_order", "code"]
+        indexes = [models.Index(fields=["vocabulary", "is_active"], name="vocab_active")]
+        constraints = [
+            models.UniqueConstraint(fields=["vocabulary", "code"], name="vocab_code_unique"),
+            models.CheckConstraint(condition=Q(code__regex=CODE), name="vocab_code_format"),
+            models.CheckConstraint(
+                condition=Q(vocabulary__in=sorted(VOCABULARIES)), name="vocab_known_vocabulary"
+            ),
+        ]
+
+    def __str__(self):
+        return f"{self.vocabulary}:{self.code}"

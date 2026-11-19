@@ -7,8 +7,9 @@ Rules:
 - The date of birth must make the person 18 or older and can't be in the future [DECIDED].
   An under-age date is rejected and not stored. Its further handling (generic message, security
   event) is OD-04b (OPEN) and isn't implemented.
-- Value-list fields accept only codes from ``reference.py``; countries, currencies and languages
-  must be ISO codes.
+- Value-list fields accept active controlled-vocabulary codes (``reference.py``); a code already
+  stored stays valid after it is deactivated. Countries, currencies and languages are ISO codes.
+- Submission is refused while a vocabulary behind a required field has no active option.
 - Education and profession stay editable whatever the verification state (FR-PRO-004). No field
   is identity-locked yet: which fields are locked is OD-04a (OPEN, FR-PRO-005 BLOCKED).
 - A CLOSED profile can't be edited through an ordinary endpoint; a SUSPENDED one can't change its
@@ -45,7 +46,11 @@ from ..models import (
     ProfileLocation,
     ProfileProfession,
 )
-from .completion import completion_percentage, missing_required
+from .completion import (
+    completion_percentage,
+    missing_required,
+    unconfigured_required_vocabularies,
+)
 
 ADULT_AGE = 18
 CROCKFORD = "0123456789ABCDEFGHJKMNPQRSTVWXYZ"
@@ -99,6 +104,14 @@ class InvalidProfileState(APIException):
     status_code = status.HTTP_409_CONFLICT
     default_code = "invalid_profile_state"
     default_detail = "This action isn't possible in the profile's current state."
+
+
+class VocabularyNotConfigured(APIException):
+    status_code = status.HTTP_409_CONFLICT
+    default_code = "vocabulary_not_configured"
+    default_detail = (
+        "Profile submission isn't available yet: required value lists aren't configured."
+    )
 
 
 class ProfileIncomplete(APIException):
@@ -179,15 +192,12 @@ def create_profile(user: User, request_id=None) -> MatrimonialProfile:
 # --- Update --------------------------------------------------------------------------------
 
 
-def _check_codes(section: str, values: dict, errors: dict, prefix: str = "") -> None:
+def _check_codes(section: str, values: dict, errors: dict, prefix: str = "", current=None) -> None:
     for field, list_name in CODE_FIELDS.get(section, {}).items():
         value = values.get(field)
-        if value is not None and not reference.is_allowed(list_name, value):
-            if reference.allowed(list_name):
-                message = f"Choose one of: {', '.join(reference.allowed(list_name))}."
-            else:
-                message = "This field can't be set yet: its value list hasn't been provided."
-            errors[f"{prefix}{field}"] = [message]
+        stored = getattr(current, field, None) if current is not None else None
+        if value is not None and not reference.is_allowed(list_name, value, current=stored):
+            errors[f"{prefix}{field}"] = [reference.choice_error(list_name)]
     for field in COUNTRY_FIELDS.get(section, []):
         value = values.get(field)
         if value is not None and not reference.COUNTRY.fullmatch(value):
@@ -196,7 +206,7 @@ def _check_codes(section: str, values: dict, errors: dict, prefix: str = "") -> 
 
 def _check_section(section: str, values: dict, current, today: date) -> dict:
     errors: dict = {}
-    _check_codes(section, values, errors)
+    _check_codes(section, values, errors, current=current)
     if section == "basic_info" and values.get("date_of_birth") is not None:
         dob = values["date_of_birth"]
         if dob > today or age_on(dob, today) < ADULT_AGE:
@@ -308,6 +318,8 @@ def submit_for_review(user: User, profile_id, request_id=None) -> MatrimonialPro
         )[0]
         if profile.profile_status != MatrimonialProfile.Status.DRAFT:
             raise InvalidProfileState()
+        if unconfigured_required_vocabularies():
+            raise VocabularyNotConfigured()
         if missing_required(profile):
             raise ProfileIncomplete()  # GET .../completion/ lists what is missing
         profile.profile_status = MatrimonialProfile.Status.PENDING_REVIEW

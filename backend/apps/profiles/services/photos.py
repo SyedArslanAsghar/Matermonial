@@ -106,9 +106,7 @@ def upload_photo(user: User, profile_id, upload, photo_type: str | None) -> Prof
     if isinstance(get_malware_scanner(), DisabledScanner):
         raise UploadsUnavailable()
     if photo_type is not None and not reference.is_allowed("photo_type", photo_type):
-        raise ValidationError(
-            {"photo_type": [f"Choose one of: {', '.join(reference.allowed('photo_type'))}."]}
-        )
+        raise ValidationError({"photo_type": [reference.choice_error("photo_type")]})
     if upload.size > settings.PHOTO_MAX_UPLOAD_BYTES:
         raise ValidationError({"image": ["The file is too large."]})
     data = upload.read(settings.PHOTO_MAX_UPLOAD_BYTES + 1)
@@ -264,7 +262,7 @@ def update_photo(user: User, profile_id, photo_id, data: dict) -> ProfilePhoto:
             raise NotFound()
         if "photo_type" in data:
             if data["photo_type"] is not None and not reference.is_allowed(
-                "photo_type", data["photo_type"]
+                "photo_type", data["photo_type"], current=photo.photo_type
             ):
                 raise ValidationError({"photo_type": ["Unknown photo type."]})
             photo.photo_type = data["photo_type"]
