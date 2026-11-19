@@ -59,6 +59,11 @@ FK_LOCK_CLASSES: dict[str, str] = {
     "profiles.ProfileProfession.profile": "P",
     "profiles.ProfileLifestyle.profile": "P",
     "profiles.ProfileLanguage.profile": "P",
+    "profiles.PartnerPreference.profile": "P",
+    "profiles.PartnerPreferenceLocation.preference": "P",
+    "profiles.PartnerPreferenceEducation.preference": "P",
+    "profiles.PartnerPreferenceLanguage.preference": "P",
+    "profiles.PartnerPreferenceReligion.preference": "P",
     # OTP verify locks the account (level 2) before the verification row; send runs with no
     # other business locks.
     "verification.PhoneVerification.user": "P",

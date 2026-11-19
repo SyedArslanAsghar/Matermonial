@@ -302,3 +302,147 @@ class ProfileLanguage(models.Model):
             ),
             code_check("proficiency", "language_proficiency_code"),
         ]
+
+
+# --- Module 03: partner preferences (doc 03 §4; FR-PREF-001…004) ----------------------------
+# Optional preferences never disqualify by themselves [DECIDED]. Which criteria may be strict is
+# OD-10b (OPEN), so no strictness flag exists yet. Religion is stored only in the multi-value
+# table (§4.2), which supersedes the single §4.1 field; community and caste stay single.
+
+
+class PartnerPreference(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    profile = models.OneToOneField(
+        MatrimonialProfile, on_delete=models.PROTECT, related_name="partner_preference"
+    )
+    minimum_age = models.PositiveSmallIntegerField(null=True, blank=True)
+    maximum_age = models.PositiveSmallIntegerField(null=True, blank=True)
+    preferred_gender = code_field()
+    preferred_marital_status = code_field()
+    community = code_field()
+    caste_or_subcast = code_field()
+    nationality = models.CharField(max_length=2, null=True, blank=True)
+    # NULL = no preference; never treated as False (FR-019).
+    own_house = models.BooleanField(null=True, blank=True)
+    job = models.BooleanField(null=True, blank=True)
+    business = models.BooleanField(null=True, blank=True)
+    # Whole-number earning bounds (CC-R33, FR-020).
+    minimum_earning = models.PositiveIntegerField(null=True, blank=True)
+    maximum_earning = models.PositiveIntegerField(null=True, blank=True)
+    earning_currency = models.CharField(max_length=3, null=True, blank=True)
+    earning_frequency = code_field()
+    residence_type = code_field()
+    additional_requirements = models.TextField(max_length=2000, null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = "profiles_partner_preference"
+        constraints = [
+            models.CheckConstraint(
+                condition=(
+                    Q(minimum_age__isnull=True) | Q(minimum_age__gte=18, minimum_age__lte=100)
+                )
+                & (Q(maximum_age__isnull=True) | Q(maximum_age__gte=18, maximum_age__lte=100)),
+                name="pref_age_bounds",
+            ),
+            models.CheckConstraint(
+                condition=Q(minimum_age__isnull=True)
+                | Q(maximum_age__isnull=True)
+                | Q(minimum_age__lte=models.F("maximum_age")),
+                name="pref_age_order",
+            ),
+            models.CheckConstraint(
+                condition=Q(minimum_earning__isnull=True)
+                | Q(maximum_earning__isnull=True)
+                | Q(minimum_earning__lte=models.F("maximum_earning")),
+                name="pref_earning_order",
+            ),
+            # Earnings are comparable only with a currency and frequency (FR-020).
+            models.CheckConstraint(
+                condition=(Q(minimum_earning__isnull=True) & Q(maximum_earning__isnull=True))
+                | Q(earning_currency__isnull=False, earning_frequency__isnull=False),
+                name="pref_earning_has_currency_and_frequency",
+            ),
+            models.CheckConstraint(
+                condition=Q(earning_currency__isnull=True)
+                | Q(earning_currency__regex=r"^[A-Z]{3}$"),
+                name="pref_currency_iso",
+            ),
+            country_check("nationality", "pref_nationality_iso"),
+            code_check("preferred_gender", "pref_gender_code"),
+            code_check("preferred_marital_status", "pref_marital_code"),
+            code_check("community", "pref_community_code"),
+            code_check("caste_or_subcast", "pref_caste_code"),
+            code_check("earning_frequency", "pref_frequency_code"),
+            code_check("residence_type", "pref_residence_code"),
+        ]
+
+
+class PartnerPreferenceLocation(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    preference = models.ForeignKey(
+        PartnerPreference, on_delete=models.PROTECT, related_name="locations"
+    )
+    country = models.CharField(max_length=2)
+    state_or_province = models.CharField(max_length=100, null=True, blank=True)
+    city = models.CharField(max_length=100, null=True, blank=True)
+
+    class Meta:
+        db_table = "profiles_pref_location"
+        constraints = [
+            country_check("country", "pref_location_country_iso"),
+            models.UniqueConstraint(
+                fields=["preference", "country", "state_or_province", "city"],
+                nulls_distinct=False,
+                name="pref_location_unique",
+            ),
+        ]
+
+
+class PartnerPreferenceEducation(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    preference = models.ForeignKey(
+        PartnerPreference, on_delete=models.PROTECT, related_name="education"
+    )
+    qualification = models.CharField(max_length=150)
+
+    class Meta:
+        db_table = "profiles_pref_education"
+        constraints = [
+            models.UniqueConstraint(
+                fields=["preference", "qualification"], name="pref_education_unique"
+            )
+        ]
+
+
+class PartnerPreferenceLanguage(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    preference = models.ForeignKey(
+        PartnerPreference, on_delete=models.PROTECT, related_name="languages"
+    )
+    language = models.CharField(max_length=3)
+
+    class Meta:
+        db_table = "profiles_pref_language"
+        constraints = [
+            models.UniqueConstraint(fields=["preference", "language"], name="pref_language_unique"),
+            models.CheckConstraint(
+                condition=Q(language__regex=r"^[a-z]{2,3}$"), name="pref_language_iso"
+            ),
+        ]
+
+
+class PartnerPreferenceReligion(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    preference = models.ForeignKey(
+        PartnerPreference, on_delete=models.PROTECT, related_name="religions"
+    )
+    religion = models.CharField(max_length=40)
+
+    class Meta:
+        db_table = "profiles_pref_religion"
+        constraints = [
+            models.UniqueConstraint(fields=["preference", "religion"], name="pref_religion_unique"),
+            code_check("religion", "pref_religion_code"),
+        ]
