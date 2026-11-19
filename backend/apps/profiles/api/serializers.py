@@ -39,8 +39,13 @@ class BasicInfoSerializer(serializers.ModelSerializer):
             "gender",
             "marital_status",
             "religion",
+            "religion_prefer_not_to_say",
+            "denomination",
+            "denomination_prefer_not_to_say",
             "community",
+            "community_prefer_not_to_say",
             "caste_or_subcast",
+            "caste_or_subcast_prefer_not_to_say",
             "nationality",
         ]
         extra_kwargs = {f: {"required": False} for f in fields}

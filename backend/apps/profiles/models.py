@@ -129,11 +129,30 @@ class ProfileBasicInfo(models.Model):
     religion = code_field()
     community = code_field()
     caste_or_subcast = code_field()
+    denomination = code_field()  # optional, belongs to the chosen religion (DR-2026-11-19-O-4)
+    # "Prefer not to say" is a privacy response, never a value (DR-2026-11-19-O-6).
+    religion_prefer_not_to_say = models.BooleanField(default=False)
+    denomination_prefer_not_to_say = models.BooleanField(default=False)
+    community_prefer_not_to_say = models.BooleanField(default=False)
+    caste_or_subcast_prefer_not_to_say = models.BooleanField(default=False)
     nationality = models.CharField(max_length=2, null=True, blank=True)
 
     class Meta:
         db_table = "profiles_basic_info"
         constraints = [
+            *[
+                models.CheckConstraint(
+                    condition=Q(**{f"{f}_prefer_not_to_say": False}) | Q(**{f"{f}__isnull": True}),
+                    name=f"basic_{f}_undisclosed_has_no_value",
+                )
+                for f in ("religion", "denomination", "community", "caste_or_subcast")
+            ],
+            # A denomination reveals the religion, so it needs a disclosed religion.
+            models.CheckConstraint(
+                condition=Q(denomination__isnull=True) | Q(religion__isnull=False),
+                name="basic_denomination_needs_religion",
+            ),
+            code_check("denomination", "basic_denomination_code"),
             code_check("gender", "basic_gender_code"),
             code_check("marital_status", "basic_marital_code"),
             code_check("religion", "basic_religion_code"),
@@ -549,6 +568,11 @@ class VocabularyOption(models.Model):
     label_ur = models.CharField(max_length=150, blank=True)
     sort_order = models.PositiveSmallIntegerField(default=0)
     is_active = models.BooleanField(default=False)
+    # Denomination options belong to one religion option (trigger checks the parent's
+    # vocabulary; the parent is immutable like the code).
+    parent = models.ForeignKey(
+        "self", on_delete=models.PROTECT, null=True, blank=True, related_name="children"
+    )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -561,6 +585,11 @@ class VocabularyOption(models.Model):
             models.CheckConstraint(condition=Q(code__regex=CODE), name="vocab_code_format"),
             models.CheckConstraint(
                 condition=Q(vocabulary__in=sorted(VOCABULARIES)), name="vocab_known_vocabulary"
+            ),
+            models.CheckConstraint(
+                condition=Q(vocabulary="denomination", parent__isnull=False)
+                | (~Q(vocabulary="denomination") & Q(parent__isnull=True)),
+                name="vocab_parent_only_for_denomination",
             ),
         ]
 

@@ -61,6 +61,8 @@ FK_LOCK_CLASSES: dict[str, str] = {
     "profiles.ProfileLanguage.profile": "P",
     "profiles.PartnerPreference.profile": "P",
     "profiles.ProfilePhoto.profile": "P",
+    # Reference data edited in the admin, outside business transactions.
+    "profiles.VocabularyOption.parent": "N",
     "profiles.ProfilePhoto.uploaded_by": "P",
     "profiles.PartnerPreferenceLocation.preference": "P",
     "profiles.PartnerPreferenceEducation.preference": "P",

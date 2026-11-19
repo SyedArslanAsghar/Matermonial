@@ -70,6 +70,7 @@ CODE_FIELDS = {
         "religion": "religion",
         "community": "community",
         "caste_or_subcast": "caste",
+        "denomination": "denomination",
     },
     "location": {"residence_type": "residence_type"},
     "family": {"family_type": "family_type", "family_values": "family_values"},
@@ -204,8 +205,38 @@ def _check_codes(section: str, values: dict, errors: dict, prefix: str = "", cur
             errors[f"{prefix}{field}"] = ["Use an ISO 3166-1 alpha-2 country code."]
 
 
+def _normalise_privacy_choices(values: dict, errors: dict) -> None:
+    """ "Prefer not to say" is a flag beside the value (DR-2026-11-19-O-6): choosing it clears the
+    value; giving a value clears the flag; both at once is an error."""
+    for field in reference.PRIVACY_CHOICE_FIELDS:
+        flag = f"{field}_prefer_not_to_say"
+        if values.get(flag) is True:
+            if values.get(field) is not None:
+                errors[field] = ["Give a value or choose prefer not to say, not both."]
+            values[field] = None
+        elif values.get(field) is not None:
+            values[flag] = False
+    # Withholding the religion also withholds the denomination, which would reveal it.
+    if values.get("religion_prefer_not_to_say") is True:
+        values["denomination"] = None
+
+
+def _check_denomination(values: dict, current, errors: dict) -> None:
+    religion = values.get("religion", getattr(current, "religion", None))
+    denomination = values.get("denomination", getattr(current, "denomination", None))
+    if denomination is None:
+        return
+    if religion is None:
+        errors["denomination"] = ["Choose a religion before a denomination or tradition."]
+    elif reference.denomination_parent(denomination) != religion:
+        errors["denomination"] = ["This denomination or tradition doesn't belong to the religion."]
+
+
 def _check_section(section: str, values: dict, current, today: date) -> dict:
     errors: dict = {}
+    if section == "basic_info":
+        _normalise_privacy_choices(values, errors)
+        _check_denomination(values, current, errors)
     _check_codes(section, values, errors, current=current)
     if section == "basic_info" and values.get("date_of_birth") is not None:
         dob = values["date_of_birth"]

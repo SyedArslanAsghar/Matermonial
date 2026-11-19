@@ -163,7 +163,8 @@ class TestEditing:
 
     def test_sensitive_fields_accept_nothing_until_lists_are_supplied(self, owner):
         _, client = owner
-        response = client.patch(ME, {"basic_info": {"gender": "G1"}}, format="json")
+        # Community has no approved list (DR-2026-11-19-O-5).
+        response = client.patch(ME, {"basic_info": {"community": "C9"}}, format="json")
         assert response.status_code == 400
         assert "hasn't been configured" in str(response.json())
 
@@ -301,6 +302,9 @@ def test_is_active_cannot_drift_from_status(owner):
 class TestVocabularies:
     def test_submission_is_unavailable_until_required_vocabularies_exist(self, owner):
         user, client = owner
+        VocabularyOption.objects.filter(
+            vocabulary__in=["gender", "marital_status", "religion"]
+        ).update(is_active=False)
         profile = MatrimonialProfile.objects.get(owner=user)
         completion = client.get(f"{URL}{profile.id}/completion/").json()
         assert completion["unconfigured_vocabularies"] == ["gender", "marital_status", "religion"]
@@ -363,12 +367,10 @@ def test_proposals_are_seeded_inactive_and_invent_no_religion_community_or_caste
     migration = importlib.import_module("apps.profiles.migrations.0004_controlled_vocabularies")
     assert not {"religion", "community", "caste"} & set(migration.PROPOSED)
     assert migration.PROPOSED == reference.PROPOSED
-    migration.seed_inactive(django_apps, None)
-    seeded = VocabularyOption.objects.filter(vocabulary__in=["gender", "marital_status"])
-    assert seeded.count() == 6 and not seeded.filter(is_active=True).exists()
-    assert not VocabularyOption.objects.filter(
-        vocabulary__in=["religion", "community", "caste"]
-    ).exists()
+    migration.seed_inactive(django_apps, None)  # get_or_create: never activates anything
+    assert VocabularyOption.objects.filter(vocabulary="gender").count() == 2
+    # Religion values come only from the owner's approval (0005); community and caste have none.
+    assert not VocabularyOption.objects.filter(vocabulary__in=["community", "caste"]).exists()
 
 
 def test_vocabulary_admin_changes_are_audited():
@@ -382,7 +384,7 @@ def test_vocabulary_admin_changes_are_audited():
     request = RequestFactory().post("/")
     request.user = actor
     model_admin = VocabularyOptionAdmin(VocabularyOption, site)
-    assert model_admin.get_readonly_fields(request, option) == ("vocabulary", "code")
+    assert model_admin.get_readonly_fields(request, option) == ("vocabulary", "code", "parent")
     assert not model_admin.has_delete_permission(request, option)
     option.is_active = False
 
@@ -397,3 +399,122 @@ def test_vocabulary_admin_changes_are_audited():
         "is_active": False,
         "changed": "is_active",
     }
+
+
+class TestApprovedVocabulariesAndPrivacyChoices:
+    """DR-2026-11-19-O-1..7."""
+
+    def test_migration_activates_exactly_the_owner_approved_options(self):
+        import importlib
+
+        from django.apps import apps as django_apps
+
+        migration = importlib.import_module(
+            "apps.profiles.migrations.0005_approved_vocabularies_and_privacy_choices"
+        )
+        migration.activate_approved(django_apps, None)
+        active = dict(
+            VocabularyOption.objects.filter(
+                vocabulary__in=["gender", "marital_status", "religion"], is_active=True
+            ).values_list("code", "label_en")
+        )
+        assert active["FEMALE"] == "Female" and active["NEVER_MARRIED"] == "Never Married"
+        assert (
+            active["ZOROASTRIANISM"] == "Zoroastrianism (Parsi)"
+            and active["BAHAI"] == "Baháʼí Faith"
+        )
+        assert len(active) == 2 + 4 + 12
+        assert not {"SUNNI", "SHIA", "PREFER_NOT_TO_SAY"} & set(active)
+        assert not VocabularyOption.objects.filter(
+            vocabulary__in=["community", "caste", "denomination"]
+        ).exists()
+
+    def test_prefer_not_to_say_is_a_flag_not_a_value_and_answers_religion(
+        self, owner, sensitive_lists
+    ):
+        user, client = owner
+        payload = {**COMPLETE, "basic_info": {**COMPLETE["basic_info"]}}
+        del payload["basic_info"]["religion"]
+        payload["basic_info"]["religion_prefer_not_to_say"] = True
+        body = client.patch(ME, payload, format="json").json()
+        assert body["basic_info"]["religion"] is None
+        assert body["basic_info"]["religion_prefer_not_to_say"] is True
+        profile = MatrimonialProfile.objects.get(owner=user)
+        assert (
+            "basic_info.religion"
+            not in client.get(f"{URL}{profile.id}/completion/").json()["missing_required"]
+        )
+        assert client.post(f"{URL}{profile.id}/submit-review/").status_code == 200
+        # Giving a value later clears the flag.
+        body = client.patch(ME, {"basic_info": {"religion": "R1"}}, format="json").json()
+        assert body["basic_info"]["religion_prefer_not_to_say"] is False
+
+    def test_value_and_prefer_not_to_say_together_are_rejected(self, owner, sensitive_lists):
+        _, client = owner
+        bad = {"basic_info": {"religion": "R1", "religion_prefer_not_to_say": True}}
+        assert client.patch(ME, bad, format="json").status_code == 400
+        with pytest.raises(IntegrityError), transaction.atomic():
+            ProfileBasicInfo.objects.create(
+                profile=MatrimonialProfile.objects.first(),
+                caste_or_subcast="K1",
+                caste_or_subcast_prefer_not_to_say=True,
+            )
+
+    def test_denomination_is_optional_separate_and_scoped_to_its_religion(
+        self, owner, sensitive_lists
+    ):
+        user, client = owner
+        activate("religion", "R2")
+        r1 = VocabularyOption.objects.get(vocabulary="religion", code="R1")
+        VocabularyOption.objects.create(
+            vocabulary="denomination", code="D1", label_en="D1", parent=r1, is_active=True
+        )
+        assert client.patch(ME, COMPLETE, format="json").status_code == 200  # none given: fine
+        ok = client.patch(ME, {"basic_info": {"denomination": "D1"}}, format="json")
+        assert ok.status_code == 200 and ok.json()["basic_info"]["denomination"] == "D1"
+        # Changing the religion leaves a denomination of the old religion: rejected.
+        assert (
+            client.patch(ME, {"basic_info": {"religion": "R2"}}, format="json").status_code == 400
+        )
+        moved = client.patch(
+            ME, {"basic_info": {"religion": "R2", "denomination": None}}, format="json"
+        )
+        assert moved.status_code == 200
+        # Withholding the religion also clears the denomination.
+        client.patch(ME, {"basic_info": {"religion": "R1", "denomination": "D1"}}, format="json")
+        hidden = client.patch(
+            ME, {"basic_info": {"religion_prefer_not_to_say": True}}, format="json"
+        )
+        assert hidden.json()["basic_info"]["denomination"] is None
+
+    def test_denomination_options_need_a_religion_parent(self):
+        diet = VocabularyOption.objects.get(vocabulary="diet", code="VEGAN")
+        with pytest.raises(DatabaseError), transaction.atomic():
+            VocabularyOption.objects.create(
+                vocabulary="denomination", code="X", label_en="X", parent=diet
+            )
+        with pytest.raises(IntegrityError), transaction.atomic():
+            VocabularyOption.objects.create(vocabulary="denomination", code="Y", label_en="Y")
+
+    def test_community_caste_and_denomination_are_never_required(self, settings):
+        from apps.profiles.reference import FIELD_VOCABULARY
+
+        required = set(settings.PROFILE_REQUIRED_FIELDS)
+        assert not required & {
+            "basic_info.community",
+            "basic_info.caste_or_subcast",
+            "basic_info.denomination",
+        }
+        assert required == {
+            "basic_info.full_name",
+            "basic_info.date_of_birth",
+            "basic_info.gender",
+            "basic_info.marital_status",
+            "basic_info.religion",
+            "basic_info.nationality",
+            "location.country",
+            "location.city",
+            "languages",
+            "profession.employment_status",
+        }
+        assert FIELD_VOCABULARY["basic_info.denomination"] == "denomination"

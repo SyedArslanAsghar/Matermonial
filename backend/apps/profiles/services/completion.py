@@ -20,6 +20,9 @@ def _filled(profile, item: str) -> bool:
     if section is None:
         return False
     value = getattr(section, field)
+    # "Prefer not to say" answers the question (DR-2026-11-19-O-6).
+    if getattr(section, f"{field}_prefer_not_to_say", False):
+        return True
     return value not in (None, "")
 
 
