@@ -29,7 +29,9 @@ ALLOWED_HOSTS = env("DJANGO_ALLOWED_HOSTS")
 CSRF_TRUSTED_ORIGINS = env("DJANGO_CSRF_TRUSTED_ORIGINS")
 
 INSTALLED_APPS = [
-    "django.contrib.admin",
+    # Django Admin with the project's site: MFA (django-otp) and AdminRole authorization
+    # (TR-07, ADR-027). Same app label "admin".
+    "apps.admin_access.admin_config.MatermonialAdminConfig",
     "django.contrib.auth",
     "django.contrib.contenttypes",
     "django.contrib.sessions",
@@ -37,8 +39,10 @@ INSTALLED_APPS = [
     "django.contrib.staticfiles",
     "rest_framework",
     "drf_spectacular",
+    "django_otp",
     # Project domain apps (backend/apps/, DR-2026-11-17-G3-3)
     "apps.accounts",
+    "apps.admin_access",
     "apps.audit",
     "apps.platform_ops",
     "apps.verification",
@@ -50,10 +54,13 @@ INSTALLED_APPS = [
 MIDDLEWARE = [
     "common.middleware.RequestIDMiddleware",
     "django.middleware.security.SecurityMiddleware",
-    "django.contrib.sessions.middleware.SessionMiddleware",
+    # Django's SessionMiddleware with a separate admin session cookie (doc 06 §22.2).
+    "apps.admin_access.middleware.AdminAwareSessionMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
+    "django_otp.middleware.OTPMiddleware",
+    "apps.admin_access.middleware.AdminSessionGuardMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
 ]
@@ -91,6 +98,8 @@ DB_LOCK_TIMEOUT_MS = env.int("DB_LOCK_TIMEOUT_MS", default=5000)
 LOCK_TRACKER_ENABLED = env.bool("LOCK_TRACKER_ENABLED", default=False)
 
 AUTH_USER_MODEL = "accounts.User"
+# The only backend (TR-07): ModelBackend password checks; permissions only from AdminRole tables.
+AUTHENTICATION_BACKENDS = ["apps.admin_access.backends.AdminRoleBackend"]
 AUTH_PASSWORD_VALIDATORS = [
     {"NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator"},
     {"NAME": "django.contrib.auth.password_validation.MinimumLengthValidator"},
@@ -167,7 +176,7 @@ PUSH_PROVIDER = env("PUSH_PROVIDER", default="disabled")
 # Each ring is "<version>:<base64 32-byte key>,..." plus its active version. The defaults are
 # DEV-ONLY keys derived from a public label (common.crypto.keys): fine for local development and
 # tests, never for real data. Staging and production refuse them (common.config).
-for _purpose in ("KEK", "QUEUE", "DEDUPE", "SUBJECT_HASH", "REGISTRY", "OTP", "ROT"):
+for _purpose in ("KEK", "QUEUE", "DEDUPE", "SUBJECT_HASH", "REGISTRY", "OTP", "ROT", "ADMIN_MFA"):
     globals()[f"{_purpose}_KEYS"] = env(f"{_purpose}_KEYS", default=dev_keyring(_purpose))
     globals()[f"{_purpose}_ACTIVE_VERSION"] = env.int(f"{_purpose}_ACTIVE_VERSION", default=1)
 # Compliance registry (TR-24): "local" writes hash-chained JSON files under
@@ -190,6 +199,14 @@ AUTH_REFRESH_GRACE_SECONDS = env.int("AUTH_REFRESH_GRACE_SECONDS", default=15)
 AUTH_STEP_UP_WINDOW_SECONDS = env.int("AUTH_STEP_UP_WINDOW_SECONDS", default=300)  # TR-16 later
 AUTH_SEEN_WRITE_INTERVAL_SECONDS = 60  # idle extension written at most once a minute
 SESSION_COOKIE_AGE = AUTH_WEB_ABSOLUTE_SECONDS  # cookie Max-Age = absolute limit (doc 06 §22.2)
+# Django Admin (doc 06 §22.2; TR-07): separate session, 30 min idle / 12 h absolute, TOTP MFA.
+ADMIN_URL_PATH = env("ADMIN_URL_PATH", default="admin/")
+ADMIN_SESSION_COOKIE_NAME = env("ADMIN_SESSION_COOKIE_NAME", default="mat_admin_session")
+ADMIN_SESSION_IDLE_SECONDS = env.int("ADMIN_SESSION_IDLE_SECONDS", default=30 * 60)
+ADMIN_SESSION_ABSOLUTE_SECONDS = env.int("ADMIN_SESSION_ABSOLUTE_SECONDS", default=12 * 3600)
+ADMIN_MFA_ENROLLMENT_TTL_SECONDS = env.int("ADMIN_MFA_ENROLLMENT_TTL_SECONDS", default=86400)
+ADMIN_MFA_THROTTLE_FACTOR = env.int("ADMIN_MFA_THROTTLE_FACTOR", default=1)  # 1, 2, 4, 8 … s
+OTP_TOTP_ISSUER = env("OTP_TOTP_ISSUER", default="Matermonial")
 # Authentication rate limits, "<count>/<seconds>" (doc 06 §22.1 §8.4; common/api/throttles.py).
 AUTH_RATE_LIMITS = {
     "login_phone_ip": env("RATE_LOGIN_PHONE_IP", default="5/900"),
@@ -198,6 +215,10 @@ AUTH_RATE_LIMITS = {
     "otp_ip": env("RATE_OTP_IP", default="10/3600"),
     "password_ip": env("RATE_PASSWORD_IP", default="10/3600"),
     "refresh_session": env("RATE_REFRESH_SESSION", default="30/3600"),
+    "admin_login_phone_ip": env("RATE_ADMIN_LOGIN_PHONE_IP", default="5/900"),
+    "admin_login_ip": env("RATE_ADMIN_LOGIN_IP", default="20/900"),
+    "admin_enroll_phone_ip": env("RATE_ADMIN_ENROLL_PHONE_IP", default="5/3600"),
+    "admin_enroll_ip": env("RATE_ADMIN_ENROLL_IP", default="10/3600"),
 }
 # Cache: rate limits and flood control. Local/test: in-process; deployed: Redis (validated).
 CACHES = {"default": env.cache("CACHE_URL", default="locmemcache://")}
@@ -213,6 +234,7 @@ CELERY_BEAT_SCHEDULE = {
     "purge-idempotency-records": {"task": "idempotency.purge_expired", "schedule": 3600.0},
     "ensure-log-partitions": {"task": "platform_ops.ensure_log_partitions", "schedule": 86400.0},
     "registry-checkpoint": {"task": "platform_ops.write_registry_checkpoint", "schedule": 86400.0},
+    "admin-role-expiry": {"task": "admin_access.sync_expired_assignments", "schedule": 300.0},
 }
 
 # --- Celery and Redis (DR-2026-11-17-G3-4; CC-R53, CC-R54) ---

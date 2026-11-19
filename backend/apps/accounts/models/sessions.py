@@ -19,6 +19,9 @@ class AuthSession(models.Model):
     class ClientType(models.TextChoices):
         WEB = "WEB"
         MOBILE = "MOBILE"
+        # Django Admin: a separate session (own cookie), 30 min idle / 12 h absolute, MFA
+        # verified at login (doc 06 §22.2; TR-07). Never accepted by the API.
+        ADMIN = "ADMIN"
 
     class Scope(models.TextChoices):
         FULL = "FULL"

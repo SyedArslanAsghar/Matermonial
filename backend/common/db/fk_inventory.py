@@ -35,6 +35,18 @@ FK_LOCK_CLASSES: dict[str, str] = {
     # is a staff actor (class B2, bounded wait).
     "platform_ops.MaintenanceApproval.operation": "P",
     "platform_ops.MaintenanceApproval.approver": "B2",
+    # TR-07 admin access: every write locks the target User FOR UPDATE first (level 2), so the
+    # account FK is prior-locked; the acting administrator is a staff actor (B2). Role and
+    # permission rows are reference data changed only by the catalogue sync, outside business
+    # transactions (N).
+    "admin_access.AdminUserRole.user": "P",
+    "admin_access.AdminUserRole.assigned_by": "B2",
+    "admin_access.AdminUserRole.role": "N",
+    "admin_access.AdminRolePermission.role": "N",
+    "admin_access.AdminRolePermission.permission": "N",
+    "admin_access.AdminTotpDevice.user": "P",
+    "admin_access.AdminMfaEnrollment.user": "P",
+    "admin_access.AdminMfaEnrollment.issued_by": "B2",
     # OTP verify locks the account (level 2) before the verification row; send runs with no
     # other business locks.
     "verification.PhoneVerification.user": "P",

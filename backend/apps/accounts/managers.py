@@ -50,11 +50,8 @@ class UserManager(BaseUserManager):
         return user
 
     def create_superuser(self, phone_number, password=None, **extra_fields):
-        extra_fields.setdefault("is_staff", True)
-        extra_fields.setdefault("is_superuser", True)
-        extra_fields.setdefault("is_active", True)
-        if extra_fields.get("is_staff") is not True:
-            raise ValueError("Superuser must have is_staff=True.")
-        if extra_fields.get("is_superuser") is not True:
-            raise ValueError("Superuser must have is_superuser=True.")
-        return self.create_user(phone_number, password, **extra_fields)
+        """Break-glass superuser (TR-07): created through the admin-access service, which
+        enforces the two-account limit, writes the ``is_staff`` projection and audits."""
+        from apps.admin_access.services.superusers import create_break_glass_superuser
+
+        return create_break_glass_superuser(self, phone_number, password, **extra_fields)

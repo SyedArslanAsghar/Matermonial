@@ -136,6 +136,10 @@ def _create_session(user: User, client_type: str, meta: dict, request_id=None) -
     if client_type == AuthSession.ClientType.WEB:
         idle, absolute = _seconds("AUTH_WEB_IDLE_SECONDS"), _seconds("AUTH_WEB_ABSOLUTE_SECONDS")
         key_version = None
+    elif client_type == AuthSession.ClientType.ADMIN:
+        idle = _seconds("ADMIN_SESSION_IDLE_SECONDS")
+        absolute = _seconds("ADMIN_SESSION_ABSOLUTE_SECONDS")
+        key_version = None
     else:
         idle = _seconds("AUTH_MOBILE_REFRESH_IDLE_SECONDS")
         absolute = _seconds("AUTH_MOBILE_ABSOLUTE_SECONDS")
@@ -177,9 +181,17 @@ def login_web(request, user: User, meta: dict, request_id=None) -> AuthSession:
     with transaction.atomic(), lock_plan("auth.login.web", [LockLevel.ACCOUNT]):
         lock_rows_for_share(User.objects.filter(pk=user.pk), LockLevel.ACCOUNT)
         session = _create_session(user, AuthSession.ClientType.WEB, meta, request_id)
-    django_login(request, user, backend="django.contrib.auth.backends.ModelBackend")
+    django_login(request, user, backend=settings.AUTHENTICATION_BACKENDS[0])
     request.session["auth_session_id"] = str(session.id)
     return session
+
+
+def create_admin_session(user: User, meta: dict, request_id=None) -> AuthSession:
+    """The AuthSession behind a Django Admin login (apps.admin_access performs the login after
+    the password and the TOTP code are verified)."""
+    with transaction.atomic(), lock_plan("auth.login.admin", [LockLevel.ACCOUNT]):
+        lock_rows_for_share(User.objects.filter(pk=user.pk), LockLevel.ACCOUNT)
+        return _create_session(user, AuthSession.ClientType.ADMIN, meta, request_id)
 
 
 def login_mobile(user: User, meta: dict, request_id=None) -> MobileCredentials:
@@ -236,10 +248,14 @@ def touch(session: AuthSession, ip: str | None = None) -> None:
     if (now - session.last_seen_at).total_seconds() < settings.AUTH_SEEN_WRITE_INTERVAL_SECONDS:
         return
     values = {"last_seen_at": now, "last_ip": ip or session.last_ip}
-    if session.client_type == "WEB":
+    if session.client_type in ("WEB", "ADMIN"):
         # Mobile idle is the refresh window, extended only by a successful refresh (doc 06 §22.2).
-        idle = _seconds("AUTH_WEB_IDLE_SECONDS")
-        values["idle_expires_at"] = min(now + idle, session.absolute_expires_at)
+        name = (
+            "AUTH_WEB_IDLE_SECONDS"
+            if session.client_type == "WEB"
+            else "ADMIN_SESSION_IDLE_SECONDS"
+        )
+        values["idle_expires_at"] = min(now + _seconds(name), session.absolute_expires_at)
     AuthSession.objects.filter(pk=session.pk, status="ACTIVE").update(**values)
 
 
@@ -283,7 +299,7 @@ def logout(request, session: AuthSession, request_id=None) -> None:
     revoke_sessions(
         session.user, [session], AuthSession.RevokedReason.LOGOUT, request_id=request_id
     )
-    if session.client_type == "WEB":
+    if session.client_type in ("WEB", "ADMIN"):
         django_logout(request)
 
 

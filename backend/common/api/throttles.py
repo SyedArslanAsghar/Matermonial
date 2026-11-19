@@ -24,6 +24,11 @@ def _digest(*parts: str) -> str:
     return keyed_hash(ring("SUBJECT_HASH").active_key, "\x00".join(parts))
 
 
+def _parse(rate: str) -> tuple[int, int]:
+    count, seconds = rate.split("/")
+    return int(count), int(seconds)
+
+
 class AuthRateThrottle(SimpleRateThrottle):
     """Rates are ``"<count>/<seconds>"`` (e.g. ``5/900``), read from ``AUTH_RATE_LIMITS``."""
 
@@ -33,8 +38,7 @@ class AuthRateThrottle(SimpleRateThrottle):
         return settings.AUTH_RATE_LIMITS[self.scope]
 
     def parse_rate(self, rate):
-        count, seconds = rate.split("/")
-        return int(count), int(seconds)
+        return _parse(rate)
 
     def identity(self, request) -> str | None:  # pragma: no cover - overridden
         raise NotImplementedError
@@ -112,3 +116,27 @@ class RefreshSessionThrottle(AuthRateThrottle):
             .first()
         )
         return f"session:{session_id}" if session_id else f"ip:{_ip(request)}"
+
+
+def allow(scope: str, identity: str) -> bool:
+    """Fixed-window limit for non-DRF views (the Django Admin login and MFA enrollment).
+
+    Same rates table, keyed-hash cache keys and flood-controlled RATE_LIMIT_TRIGGERED event as
+    the DRF throttles. Returns False when the request must be refused.
+    """
+    from django.core.cache import cache
+
+    count, seconds = _parse(settings.AUTH_RATE_LIMITS[scope])
+    key = f"throttle:{scope}:{_digest(scope, identity)}"
+    cache.add(key, 0, seconds)
+    try:
+        hits = cache.incr(key)
+    except ValueError:  # expired between add and incr
+        cache.add(key, 1, seconds)
+        hits = 1
+    if hits <= count:
+        return True
+    from apps.accounts.services.security_events import record_rate_limit_once
+
+    record_rate_limit_once(key, actor_type="ANONYMOUS", reason_code=scope.upper())
+    return False

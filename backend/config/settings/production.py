@@ -15,6 +15,7 @@ CSRF_COOKIE_SECURE = True
 # __Host- cookies (doc 06 §22.2 / §10.3): Secure, Path=/, no Domain. Local HTTP can't use them.
 SESSION_COOKIE_NAME = "__Host-mat_session"
 CSRF_COOKIE_NAME = "__Host-mat_csrf"
+ADMIN_SESSION_COOKIE_NAME = "__Host-mat_admin_session"
 SESSION_COOKIE_DOMAIN = None
 CSRF_COOKIE_DOMAIN = None
 SESSION_COOKIE_PATH = "/"

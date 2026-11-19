@@ -102,9 +102,13 @@ def test_project_models_use_uuid_primary_keys():
 
     # Natural keys required by the specification (control rows, not domain entities).
     spec_natural_keys = {"platform_ops.RegistryStreamHead"}  # doc 09 §19.2: (stream PK, ...)
+    # Library-imposed integer keys (internal tables, never exposed through the API):
+    # django-otp resolves a session's device from "<app>.<model>/<int id>" (ADR-033).
+    library_integer_keys = {"admin_access.AdminTotpDevice"}
     offenders = [
         f"{m._meta.label}: {pk_types(m)}"
         for m in project_models()
-        if m._meta.label not in spec_natural_keys and any(t != "UUIDField" for t in pk_types(m))
+        if m._meta.label not in spec_natural_keys | library_integer_keys
+        and any(t != "UUIDField" for t in pk_types(m))
     ]
     assert offenders == []

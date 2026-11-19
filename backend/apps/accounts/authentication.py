@@ -51,6 +51,8 @@ class WebSessionAuthentication(SessionAuthentication):
         raw_id = request._request.session.get("auth_session_id")
         session = AuthSession.objects.filter(pk=raw_id).first() if raw_id else None
         problem = session_problem(session, user.pk)
+        if problem is None and session.client_type != AuthSession.ClientType.WEB:
+            problem = "revoked"  # an admin or mobile session is never a web API session
         if problem:
             if session is not None and problem == "expired":
                 mark_expired(session)
@@ -88,6 +90,8 @@ class BearerTokenAuthentication(BaseAuthentication):
             raise InvalidToken() if token is None else SessionRevoked()
         session, user = token.session, token.session.user
         problem = session_problem(session, user.pk)
+        if problem is None and session.client_type != AuthSession.ClientType.MOBILE:
+            problem = "revoked"
         if problem == "revoked":
             raise SessionRevoked()
         # The access token is independent of rotation; it lives to its own expiry (doc 06 §8.3).
