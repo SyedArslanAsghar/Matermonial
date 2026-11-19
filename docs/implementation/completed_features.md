@@ -15,4 +15,15 @@ Branch `feature/g5-phase2-auth`; evidence in `progress.md` (347/347 tests on Pyt
 | Login, logout, web sessions, mobile tokens with rotation, session management, step-up (password only, OD-04c), password reset/change, rate limits, security events | FR-ACC-005, TR-01 | TESTED |
 | AdminRole authorization, audited role changes, two-superuser limit, admin MFA, admin session limits | FR-ADM-002 (part), TR-07 | TESTED (FR-ADM-002 stays IN_PROGRESS for Phase 16) |
 
+## G5 Phase 3 — Profiles, preferences and photos (TESTED, 2026-11-19)
+
+Evidence in `progress.md` (404/404 tests on Python 3.12 and 3.13 × PostgreSQL 16 and 18).
+
+| Feature | Requirement | Status |
+|---|---|---|
+| Own profile creation (one per account), sections, completion, submit for review | FR-PRO-001, 003, 004, 010, 011, 013 | TESTED |
+| Sections needing owner value lists; visibility; lifecycle; family and lifestyle visibility | FR-PRO-002, 006, 009, 012 | IN_PROGRESS |
+| Partner preferences | FR-PREF-002 TESTED; FR-PREF-001, 003 IN_PROGRESS | — |
+| Photos through the TR-10 pipeline | FR-PRO-008 | IN_PROGRESS (delivery Phase 6) |
+
 Documentation work completed under G1 is recorded in `docs/handover/20_DOCUMENTATION_CORRECTION_REGISTER.md`.

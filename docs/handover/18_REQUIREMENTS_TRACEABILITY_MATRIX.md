@@ -85,9 +85,9 @@ One row per requirement, from the SRS (doc 01) to its domain, module, status and
 | FR-NOT-004 | — | Generic SMS/push content | D19 | M12 | APPROVED | NOT_STARTED | — | T-NOT, T-OUT |
 | FR-NOT-005 | — | Transactional outbox and retryable delivery (approved core; ADR-014 core. Refinements are TR-11 / ADR-028, PROPOSED, not part of this row's approval) | D19 | M12 | APPROVED | IN_PROGRESS (G4: outbox core and TR-11 processing tested; provider delivery G5 Phase 12) | — | T-NOT, T-OUT |
 | FR-NOT-006 | — | English and Urdu templates | D19 | M12 | APPROVED | NOT_STARTED | — | T-NOT, T-OUT |
-| FR-PREF-001 | FR-018 | Partner preference management (FR-018) | D07 | M03 | APPROVED | NOT_STARTED | — | — |
-| FR-PREF-002 | FR-019 | Nullable Boolean preferences (FR-019) | D07 | M03 | APPROVED | NOT_STARTED | — | — |
-| FR-PREF-003 | FR-020 | Financial preference range (FR-020) | D07 | M03 | APPROVED | NOT_STARTED | — | — |
+| FR-PREF-001 | FR-018 | Partner preference management (FR-018) | D07 | M03 | APPROVED | IN_PROGRESS (G5 Phase 3c: preferences TESTED; sensitive lists await the owner; FR-018 "profession" preference has no doc 03 §4 table yet) | — | — |
+| FR-PREF-002 | FR-019 | Nullable Boolean preferences (FR-019) | D07 | M03 | APPROVED | TESTED (G5 Phase 3c: three-state own_house / job / business) | — | — |
+| FR-PREF-003 | FR-020 | Financial preference range (FR-020) | D07 | M03 | APPROVED | IN_PROGRESS (G5 Phase 3c: range, currency and frequency TESTED; compatibility-aware comparison is matching, Phase 8) | — | — |
 | FR-PREF-004 | FR-021 | Optional criteria (FR-021) | D07 | M03 | APPROVED | NOT_STARTED | OD-10b (dependent behaviour BLOCKED) | — |
 | FR-PRI-001 | — | Blocking | D16 | M10 | APPROVED | NOT_STARTED | — | T-MAT-017…022 |
 | FR-PRI-002 | — | Unblocking | D16 | M10 | APPROVED | NOT_STARTED | — | T-MAT-017…022 |
@@ -98,19 +98,19 @@ One row per requirement, from the SRS (doc 01) to its domain, module, status and
 | FR-PRI-007 | — | Private browsing | D16 | M10 | APPROVED | NOT_STARTED | OD-03g (dependent behaviour BLOCKED) | T-MAT-017…022 |
 | FR-PRI-008 | — | Visitor history removal | D16 | M10 | APPROVED | NOT_STARTED | — | T-MAT-017…022 |
 | FR-PRI-009 | — | Private media | D05 | M02, M10, M13 | APPROVED | NOT_STARTED | — | — |
-| FR-PRO-001 | FR-008 | Profile creation | D04 | M02 | APPROVED | NOT_STARTED | OD-02a (FR-008 wording) (dependent behaviour BLOCKED) | T-ACT |
-| FR-PRO-002 | FR-008 | Profile sections | D04 | M02 | APPROVED | NOT_STARTED | — | T-ACT |
-| FR-PRO-003 | — | Date of birth privacy | D04 | M02 | APPROVED | NOT_STARTED | — | T-ACT |
-| FR-PRO-004 | FR-014 | Education and profession | D04 | M02 | APPROVED | NOT_STARTED | — | T-ACT |
+| FR-PRO-001 | FR-008 | Profile creation | D04 | M02 | APPROVED | TESTED (G5 Phase 3b: one profile per account; creation needs an active, phone-verified account; final gate wording OD-02a) | OD-02a (FR-008 wording) (dependent behaviour BLOCKED) | T-ACT |
+| FR-PRO-002 | FR-008 | Profile sections | D04 | M02 | APPROVED | IN_PROGRESS (G5 Phase 3: all sections TESTED; gender, marital status, religion, community and caste lists await the owner, DR-2026-11-19-P3-2) | — | T-ACT |
+| FR-PRO-003 | — | Date of birth privacy | D04 | M02 | APPROVED | TESTED (G5 Phase 3b: DOB only in the owner's own view; age computed; under-age DOB rejected and not stored) | — | T-ACT |
+| FR-PRO-004 | FR-014 | Education and profession | D04 | M02 | APPROVED | TESTED (G5 Phase 3b: editable in every non-closed state) | — | T-ACT |
 | FR-PRO-005 | FR-012 | Verified information | D04 | M02 | APPROVED | BLOCKED | OD-04a (whole requirement) | T-ACT |
-| FR-PRO-006 | — | Profile visibility | D04 | M02 | APPROVED | NOT_STARTED | OD-03 (dependent behaviour BLOCKED) | T-ACT |
+| FR-PRO-006 | — | Profile visibility | D04 | M02 | APPROVED | IN_PROGRESS (G5 Phase 3b: visibility stored separately and set by the owner, frozen while suspended; behaviour for viewers OD-03, Phases 6/8) | OD-03 (dependent behaviour BLOCKED) | T-ACT |
 | FR-PRO-007 | FR-011 | Profile activation | D04 | M02 | APPROVED | NOT_STARTED | OD-03e (dependent behaviour BLOCKED) | T-ACT |
-| FR-PRO-008 | FR-017 | Profile photographs | D05 | M02, M10, M13 | APPROVED | NOT_STARTED | — | — |
-| FR-PRO-009 | FR-009 | Profile lifecycle (from FR-009) | D04 | M02 | APPROVED | NOT_STARTED | — | T-ACT |
-| FR-PRO-010 | FR-013 | Profile location (from FR-013) | D04 | M02 | APPROVED | NOT_STARTED | — | T-ACT |
-| FR-PRO-011 | FR-014 | Income (from FR-014) | D04 | M02 | APPROVED | NOT_STARTED | — | T-ACT |
-| FR-PRO-012 | FR-015 | Family and lifestyle (from FR-015) | D04 | M02 | APPROVED | NOT_STARTED | — | T-ACT |
-| FR-PRO-013 | FR-016 | Profile languages (from FR-016) | D04 | M02 | APPROVED | NOT_STARTED | — | T-ACT |
+| FR-PRO-008 | FR-017 | Profile photographs | D05 | M02, M10, M13 | APPROVED | IN_PROGRESS (G5 Phase 3d: upload pipeline TR-10, multiple photos, primary, private storage, moderation status, soft delete TESTED; controlled delivery Module 10, Phase 6; moderation Phase 14) | — | — |
+| FR-PRO-009 | FR-009 | Profile lifecycle (from FR-009) | D04 | M02 | APPROVED | IN_PROGRESS (G5 Phase 3b: DRAFT → PENDING_REVIEW TESTED; activation Phase 5, suspension Phase 14) | — | T-ACT |
+| FR-PRO-010 | FR-013 | Profile location (from FR-013) | D04 | M02 | APPROVED | TESTED (G5 Phase 3b: worldwide ISO country, state, city, area, residence type; nationality separate) | — | T-ACT |
+| FR-PRO-011 | FR-014 | Income (from FR-014) | D04 | M02 | APPROVED | TESTED (G5 Phase 3b: Decimal income with ISO currency and frequency, DB CHECK) | — | T-ACT |
+| FR-PRO-012 | FR-015 | Family and lifestyle (from FR-015) | D04 | M02 | APPROVED | IN_PROGRESS (G5 Phase 3b: family and lifestyle fields TESTED; visibility rules for sensitive fields Phase 6) | — | T-ACT |
+| FR-PRO-013 | FR-016 | Profile languages (from FR-016) | D04 | M02 | APPROVED | TESTED (G5 Phase 3b: multiple languages with proficiency, unique per profile) | — | T-ACT |
 | FR-REQ-001 | — | Express interest | D12 | M07 | APPROVED | NOT_STARTED | OD-06a–g (dependent behaviour BLOCKED) | T-INT |
 | FR-REQ-002 | — | Interest response | D12 | M07 | APPROVED | NOT_STARTED | OD-06a–c (dependent behaviour BLOCKED) | T-INT |
 | FR-REQ-003 | — | Declined interest history | D12 | M07 | APPROVED | NOT_STARTED | OD-06g (dependent behaviour BLOCKED) | T-INT |

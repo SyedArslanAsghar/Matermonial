@@ -264,3 +264,11 @@ Implementation record (CC-R63). The names are in `backend/.env.example`; the cod
 | `ADMIN_SESSION_COOKIE_NAME` | Separate admin session cookie | `mat_admin_session` | `__Host-mat_admin_session` (set in production settings) |
 | `ADMIN_SESSION_IDLE_SECONDS`, `ADMIN_SESSION_ABSOLUTE_SECONDS` | Admin session limits (doc 06 §22.2) | 1800 / 43200 | Same |
 | `ADMIN_MFA_ENROLLMENT_TTL_SECONDS`, `ADMIN_MFA_THROTTLE_FACTOR`, `OTP_TOTP_ISSUER` | Enrollment-code lifetime; TOTP failure back-off (1, 2, 4 … s × factor); issuer shown in authenticator apps | 86400 / 1 / `Matermonial` | Same |
+
+## 13. Configuration added in G5 Phase 3 (2026-11-19)
+
+| Variable | Purpose | Default (local) | Deployed environments |
+|---|---|---|---|
+| `MALWARE_SCANNER` | Upload scanner (TR-10): `mock` flags only the EICAR test string; `disabled` refuses uploads | `mock` (local, test) | `mock` refused; `disabled` until a real scanner is approved |
+| `PHOTO_MAX_UPLOAD_BYTES`, `PHOTO_MAX_PIXELS`, `PHOTO_MAX_EDGE`, `PHOTO_MIN_EDGE`, `PHOTO_MAX_PER_PROFILE` | Photo pipeline limits (AS-24) | 10 MB, 40 MP, 2048, 200, 6 | Same |
+| `PROFILE_REQUIRED_FIELDS`, `PROFILE_OPTIONAL_FIELDS` (settings, not environment) | Completion and the review gate (AS-23) | see `config/settings/base.py` | Same |

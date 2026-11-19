@@ -1,6 +1,6 @@
 # Progress
 
-**Last updated:** 2026-11-19 (G5 Phase 2 implemented and tested)
+**Last updated:** 2026-11-19 (G5 Phases 2 and 3 implemented and tested)
 
 ## Governance status
 
@@ -11,7 +11,7 @@
 | G2 Repository governance | **ACCEPTED** by the project owner with carried-forward items (DR-2026-11-17-G2A). Baseline commit `38f491dea79fb9bb10fd2010b1c2cb8a68d545f9`. Exit criterion "CI runs on the baseline" (carried forward under DR-2026-11-17-G2X): **satisfied by owner acceptance** (DR-2026-11-18-G2C, 2026-11-18) on the integrated run `44294474904` on commit `c5fc346` (success, 6/6 jobs). The baseline commit `38f491d` itself did not run independently. |
 | G3 Backend foundation | **ACCEPTED** by the project owner on 2026-11-18, with an accepted exception and a carried-forward item (DR-2026-11-18-G3A). Exit criterion "tests green on PostgreSQL" is **not fully met**: the PostgreSQL foundation tests pass, but the 3 KI-14 User-model database tests are **OPEN** and must pass as part of G4. The G3 changes were committed and pushed by the owner as `c5fc346` (DR-2026-11-18-GH). |
 | G4 First migration | **ACCEPTED by the project owner** (DR-2026-11-18-G4A, 2026-11-18). |
-| G5 Features | **IN PROGRESS** (authorized DR-2026-11-18-G4). Phase 2 (auth flows + Django Admin MFA) **IMPLEMENTED and TESTED** on `feature/g5-phase2-auth` (not pushed; owner review pending). Phase 3 next. |
+| G5 Features | **IN PROGRESS** (authorized DR-2026-11-18-G4). Phases 2 (auth + Django Admin MFA) and 3 (profiles, preferences, photos) **IMPLEMENTED and TESTED** on `feature/g5-phase2-auth` (not pushed; owner review pending). Phase 4 next. |
 | Current delivery scope | **CI/CD implementation and validation** (DR-2026-11-18-CI, 2026-11-18). AWS deployment and production infrastructure are **deferred** and out of current scope. CD execution stays disabled until a target and an authorization exist. This doesn't authorize a remote, a push, a commit, G4 or a deployment. |
 
 ## Implementation status
@@ -367,4 +367,55 @@ The 9 PostgreSQL foundation tests run in every combination (`MATERMONIAL_TEST_PO
 | Final validation across the matrix | Met (table above) |
 
 Implementation status: **TESTED**. REVIEWED and ACCEPTED are set by the reviewer and the owner (CC-R70). Open items: KI-21 (owner, CI step), KI-25…KI-28.
+
+## G5 Phase 3 — Profiles, preferences and photos (2026-11-19, DR-2026-11-18-G4, DR-2026-11-19-P3)
+
+Same branch (`feature/g5-phase2-auth`); same disposable databases; nothing pushed.
+
+**Owner decisions** (DR-2026-11-19-P3, asked at phase start because CC-R26/CC-R68 applied):
+1. TR-10 approved with Pillow and filetype.
+2. Value lists are code-defined; the sensitive ones (gender, marital status, religion, community, caste) stay empty until the owner supplies them.
+3. The required set was not answered and is recorded as assumption AS-23.
+
+| Stage | Scope | Commit | Tests after |
+|---|---|---|---|
+| governance | DR-2026-11-19-P3; TR-10 → APPROVED (doc 19) | `53e6ce6` | 347 |
+| 3b | Profile and sections, completion, submit-for-review, owner API | `c3ad04d` | 368 |
+| 3c | Partner preferences and multi-value tables | `53a91b2` | 387 |
+| deps | Pillow 13.0.0, filetype 1.2.0 (only these added to the lockfiles) | `ceec69c` | 387 |
+| 3d | Photos and the TR-10 pipeline, scanner provider | `2d3283a` | 404 |
+
+**Not implemented (dependencies):**
+- managers acting on profiles: Phase 4 (TR-02);
+- identity-locked fields: FR-PRO-005, OD-04a;
+- activation: Phase 5;
+- visibility behaviour for viewers: OD-03, Phases 6/8;
+- strict preference criteria: OD-10b;
+- photo delivery to viewers: Module 10, Phase 6;
+- photo moderation: Phase 14.
+
+**Final validation (2026-11-19):** throwaway `python:3.12-slim` / `python:3.13-slim` containers, source read-only.
+
+| Check | Python 3.12.16 | Python 3.13.18 |
+|---|---|---|
+| Hash-checked dev and production installs, `pip check` | pass | pass |
+| Lockfiles match inputs (3.12) | consistent | n/a |
+| Ruff lint and format | pass (171 files) | same source |
+| PostgreSQL 16.16 | **404 passed, 0 skipped, 0 failed** | **404 passed, 0 skipped, 0 failed** |
+| PostgreSQL 18.7 | **404 passed, 0 skipped, 0 failed** | **404 passed, 0 skipped, 0 failed** |
+
+**Migrations:** `profiles.0001`–`0003` apply from empty on 16.16 and 18.7; `makemigrations --check` reports no changes; `profiles` → zero leaves no `profiles_*` table; re-migrate OK.
+
+**Phase 3 acceptance (doc 10 §5):**
+
+| Criterion | Status |
+|---|---|
+| Users can create and edit their own profile | Met |
+| No duplicate personal profiles | Met (unique constraint plus a race test) |
+| DOB remains private | Met |
+| Income uses Decimal | Met |
+| Nullable-boolean semantics | Met |
+| Education and profession stay editable | Met |
+
+A profile can't yet complete basic info, because the sensitive value lists await the owner (KI-29).
 

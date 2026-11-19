@@ -2,7 +2,7 @@
 
 **Last updated:** 2026-11-19 (G5 Phase 2)
 
-Phase 2 is implemented and tested; everything after it is pending. The authoritative per-requirement list, with domain, module, approval status, implementation status and owner-decision dependencies, is `docs/handover/18_REQUIREMENTS_TRACEABILITY_MATRIX.md`.
+Phases 2 and 3 are implemented and tested; everything after them is pending. The authoritative per-requirement list, with domain, module, approval status, implementation status and owner-decision dependencies, is `docs/handover/18_REQUIREMENTS_TRACEABILITY_MATRIX.md`.
 
 ## Sequence (doc 10 §0)
 
@@ -12,7 +12,7 @@ Phase 2 is implemented and tested; everything after it is pending. The authorita
 | G3 | Backend foundation, no migrations | **ACCEPTED** by the owner on 2026-11-18 with an accepted exception (DR-2026-11-18-G3A); KI-14's 3 User-model database tests are OPEN and carried forward to G4 |
 | G4 | First migration (kernel models) | **ACCEPTED** (DR-2026-11-18-G4A) |
 | G5 Phase 2 | Auth flows + Django Admin MFA | **TESTED** (2026-11-19, `feature/g5-phase2-auth`; owner review pending) |
-| G5 Phase 3 | Profiles, preferences, uploads | NOT_STARTED |
+| G5 Phase 3 | Profiles, preferences, uploads | **TESTED** (2026-11-19; owner review pending; KI-29…KI-32) |
 | G5 Phase 4 | Family management and ActorContext | NOT_STARTED |
 | G5 Phase 5 | Identity verification | NOT_STARTED |
 | G5 Phase 6 | Privacy, central eligibility, restrictions | NOT_STARTED |

@@ -2273,3 +2273,16 @@ Editorial record of the schema added in G5 Phase 2 (authentication and admin acc
 | **Superuser limit** | Trigger `admin_superuser_limit` on `accounts_user` (`BEFORE INSERT OR UPDATE OF is_superuser`). It takes a transaction-level advisory lock (namespace 0x4144) and then rejects a third `is_superuser = true` row (`check_violation`, constraint name `admin_superuser_limit`). Deactivated superusers still count until revoked |
 | `is_staff` | Written only by `admin_access.services.roles.refresh_staff_projection`: true when the account is eligible and has a live role, or is a break-glass superuser |
 | Implicit-lock classes (doc 12 §5.5) | `AdminUserRole.user`, `AdminTotpDevice.user`, `AdminMfaEnrollment.user`: P (the target User is locked FOR UPDATE first). `assigned_by`, `issued_by`: B2. Role and permission FKs: N (reference data, catalogue sync) |
+
+### 22.19 G5 Phase 3 implementation record (2026-11-19, DR-2026-11-19-P3)
+
+Editorial record of the Module 02/03 schema (app `profiles`; migrations `profiles.0001`–`0003`). It adds no requirement.
+
+| Item | Implementation |
+|---|---|
+| `MatrimonialProfile` | §3.1 fields plus `submitted_at` and `suspended_from_status` (§22.3). `owner` unique (one personal profile per account). `profile_code` `MP` + 8 Crockford base32 characters. CHECKs: completion 0–100; `is_active` ⇔ `profile_status = ACTIVE`; `suspended_from_status` set exactly while SUSPENDED. A PROFILE pseudonym is created with the profile (TR-23) |
+| Sections | §3.2–§3.8 as listed. One-to-one: basic info, location, family, profession, lifestyle. Many: education (`position` order), languages (unique per profile). `height` is stored as `height_cm` (90–250). Code columns store codes from `reference.py` (format CHECK only). Country, currency and language columns are ISO codes (CHECK). `income_amount` Decimal(14,2) ≥ 0, with currency and frequency required by CHECK |
+| `PartnerPreference` (§4.1) | Ages 18–100, ordered; three-state `own_house`/`job`/`business`; whole-number earnings, ordered and requiring currency and frequency (CHECK). Religion is only in `PartnerPreferenceReligion` (§4.2 supersedes the single field). Community and caste stay single |
+| Multi-value preferences (§4.2) | `profiles_pref_location` (unique, NULLS NOT DISTINCT), `profiles_pref_education`, `profiles_pref_language`, `profiles_pref_religion` |
+| `ProfilePhoto` (§3.9, §22.3, TR-10) | Adds `uploaded_by`, `mime_type`, `size`, `checksum` (SHA-256), `width`, `height`, `processing_status` (QUARANTINED / READY / REJECTED, with `rejection_reason`). CHECKs: a READY row has every stored-file fact and others have no storage key; the storage key is never a URL; a primary photo is READY and live. Partial unique: one live primary per profile. Soft delete keeps the row |
+| FKs | All PROTECT. Implicit-lock class P (the acting User FOR SHARE, then the profile FOR UPDATE, precede every write) |
