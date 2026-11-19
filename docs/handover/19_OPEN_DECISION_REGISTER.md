@@ -113,7 +113,7 @@ Doc 13 §4 lists **OD-001…OD-007** (commercial structure, credit packages, Jaz
 | TR-07 | Admin authorization from a single source | **APPROVED** (DR-2026-11-18-G4, 2026-11-18) | G4 | v4 §16 |
 | TR-08 | View billing mechanics | PROPOSED | Phase 8 | A4 §10; v4 §8 |
 | TR-09 | Constraints, global lock order, anchors | **APPROVED** (DR-2026-11-17-G3-2, 2026-11-17) | — | v4.2; v4.3 §3; v4.5 §6 |
-| TR-10 | Upload pipeline | PROPOSED | Phase 3 | A4 §3 |
+| TR-10 | Upload pipeline | **APPROVED** (DR-2026-11-19-P3-1, 2026-11-19; with Pillow and filetype; scanner disabled when deployed until a real one is approved) | Phase 3 | A4 §3 |
 | TR-11 | Audit and outbox refinements (two-phase processing, queue key, redaction, event classes). The core transactional outbox itself is an approved requirement (FR-NOT-005; ADR-014 core, DR-2026-11-17-C2) and is not part of this TR. | **APPROVED** (DR-2026-11-18-G4, 2026-11-18) | G4 | v4.5 §1; v4.6 §1; F1 Corr. 4 |
 | TR-12 | Same-origin deployment | **APPROVED** (DR-2026-11-17-G3-1, 2026-11-17; architectural direction only, no deployment) | — | A4 §3 |
 | TR-13 | PostgreSQL tests and concurrency harness (CI on PostgreSQL 16 and 18) | **APPROVED** (DR-2026-11-17-G2D-2, 2026-11-17) | — | v4.5 §6; v4.6 §4 |

@@ -472,6 +472,23 @@ No speculative infrastructure tasks are added.
 
 ---
 
+## Decision record DR-2026-11-19-P3: G5 Phase 3 decisions (TR-10, value lists)
+
+- **Decision ID:** DR-2026-11-19-P3
+- **Date:** 2026-11-19
+- **Decided by:** Project owner (answers given in the Claude Code session at the start of G5 Phase 3)
+- **Decision status:** APPROVED (items 1–2); item 3 is an implementation ASSUMPTION awaiting owner confirmation
+
+| # | ID | Item | Decision |
+|---|---|---|---|
+| 1 | DR-2026-11-19-P3-1 | TR-10 upload pipeline | **APPROVED** with the dependencies **Pillow** and **filetype**. Pipeline: quarantine, byte-level type detection, malware scan, re-encode to strip EXIF/GPS, discard originals, private storage. The scanner is a provider interface: mock locally and in tests, **disabled (uploads refused) when deployed** until a real scanner is approved |
+| 2 | DR-2026-11-19-P3-2 | Profile and preference value lists | Reference lists defined in code (like the admin catalogue). Only neutral lists are seeded, as documented assumptions. **Gender, marital status, religion, community and caste stay empty until the owner supplies or approves them**; those fields accept no value until then |
+| 3 | DR-2026-11-19-P3-3 | Required fields for completion and DRAFT → PENDING_REVIEW | *Not answered.* Configurable default, recorded as an assumption: basic info (name, DOB 18+, gender, marital status, religion, nationality), location (country, city), at least one language, employment status. Education, family and lifestyle count toward the percentage only. Photos are excluded |
+
+**Consequence:** until item 2's sensitive lists are supplied, no profile can complete basic info, so none can be submitted for review.
+
+---
+
 ## OD-01 approved functional-domain catalogue
 
 **Source key:**
