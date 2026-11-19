@@ -44,6 +44,7 @@ INSTALLED_APPS = [
     "apps.accounts",
     "apps.admin_access",
     "apps.audit",
+    "apps.family",
     "apps.platform_ops",
     "apps.profiles",
     "apps.verification",
@@ -62,6 +63,8 @@ MIDDLEWARE = [
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django_otp.middleware.OTPMiddleware",
     "apps.admin_access.middleware.AdminSessionGuardMiddleware",
+    # Account-scoped API endpoints refuse X-Acting-Profile (doc 04 §24.1 step 2).
+    "apps.family.middleware.ActingProfileHeaderMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
 ]
@@ -224,6 +227,8 @@ AUTH_RATE_LIMITS = {
     "admin_login_ip": env("RATE_ADMIN_LOGIN_IP", default="20/900"),
     "admin_enroll_phone_ip": env("RATE_ADMIN_ENROLL_PHONE_IP", default="5/3600"),
     "admin_enroll_ip": env("RATE_ADMIN_ENROLL_IP", default="10/3600"),
+    # Manager invitations per owner account (limits phone-number probing; KI-34).
+    "family_invite_account": env("RATE_FAMILY_INVITE_ACCOUNT", default="10/86400"),
 }
 # Cache: rate limits and flood control. Local/test: in-process; deployed: Redis (validated).
 CACHES = {"default": env.cache("CACHE_URL", default="locmemcache://")}
@@ -240,6 +245,7 @@ CELERY_BEAT_SCHEDULE = {
     "ensure-log-partitions": {"task": "platform_ops.ensure_log_partitions", "schedule": 86400.0},
     "registry-checkpoint": {"task": "platform_ops.write_registry_checkpoint", "schedule": 86400.0},
     "admin-role-expiry": {"task": "admin_access.sync_expired_assignments", "schedule": 300.0},
+    "family-authorization-expiry": {"task": "family.expire_authorizations", "schedule": 300.0},
     "admin-mfa-recovery-expiry": {
         "task": "admin_access.expire_recovery_requests",
         "schedule": 300.0,

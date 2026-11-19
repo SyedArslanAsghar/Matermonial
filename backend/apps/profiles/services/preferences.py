@@ -14,10 +14,9 @@
 """
 
 from django.db import transaction
-from rest_framework.exceptions import NotFound, ValidationError
+from rest_framework.exceptions import ValidationError
 
-from apps.accounts.models import User
-from common.db.locking import LockLevel, lock_plan, lock_rows_for_share, lock_rows_for_update
+from common.db.locking import LockLevel, lock_plan
 
 from .. import reference
 from ..models import (
@@ -111,25 +110,22 @@ def _validate(merged: dict, lists: dict, current=None, current_religions=frozens
     return errors
 
 
-def get_preferences(user: User) -> PartnerPreference | None:
-    profile = MatrimonialProfile.objects.filter(owner_id=user.pk).first()
-    if profile is None:
-        raise NotFound()
-    return PartnerPreference.objects.filter(profile=profile).first()
+def get_preferences(ctx) -> PartnerPreference | None:
+    """Context resolved with ``view_partner_preferences`` (owner or manager)."""
+    return PartnerPreference.objects.filter(profile_id=ctx.profile_id).first()
 
 
-def save_preferences(user: User, data: dict, *, replace: bool) -> PartnerPreference:
+def save_preferences(ctx, data: dict, *, replace: bool) -> PartnerPreference:
+    """Context resolved with ``edit_partner_preferences`` (owner or manager)."""
+    from apps.family.services.acting import LEVELS, lock_represented_profile, record_manager_action
+
+    user = ctx.actual_account
     with (
         transaction.atomic(),
-        lock_plan("profiles.preferences", [LockLevel.ACCOUNT, LockLevel.PROFILE, LockLevel.INSERT]),
+        lock_plan("profiles.preferences", [*LEVELS, LockLevel.INSERT]),
     ):
-        lock_rows_for_share(User.objects.filter(pk=user.pk), LockLevel.ACCOUNT)
-        locked = lock_rows_for_update(
-            MatrimonialProfile.objects.filter(owner_id=user.pk), LockLevel.PROFILE, anchor=True
-        )
-        if not locked:
-            raise NotFound()
-        profile = locked[0]
+        profile = lock_represented_profile(ctx, "edit_partner_preferences")
+        record_manager_action(ctx, "preferences.updated", "profiles.partner_preference")
         if profile.profile_status == MatrimonialProfile.Status.CLOSED:
             raise InvalidProfileState()
         current = PartnerPreference.objects.filter(profile=profile).first()

@@ -31,10 +31,9 @@ from PIL import Image, ImageOps
 from rest_framework import status
 from rest_framework.exceptions import APIException, NotFound, ValidationError
 
-from apps.accounts.models import User
 from apps.accounts.services.pseudonyms import pseudonym_for
 from apps.audit.services import record_audit
-from common.db.locking import LockLevel, lock_plan, lock_rows_for_share, lock_rows_for_update
+from common.db.locking import LockLevel, lock_plan, lock_rows_for_update
 from common.providers import DisabledScanner, ProviderDisabledError, get_malware_scanner
 
 from .. import reference
@@ -66,11 +65,12 @@ def _final_key(photo) -> str:
     return f"profile-photos/{photo.profile_id}/{photo.id}.jpg"
 
 
-def _audit(user, profile, action, **metadata):
+def _audit(ctx, profile, action, **metadata):
+    user = ctx.actual_account
     record_audit(
         action=action,
         resource_type="profiles.photo",
-        actor_type="USER",
+        actor_type=ctx.audit_actor_type,
         result="SUCCESS",
         category="STATE_CHANGE",
         actor_user_id=user.pk,
@@ -80,16 +80,17 @@ def _audit(user, profile, action, **metadata):
     )
 
 
-def _lock_own_profile(user, profile_id) -> MatrimonialProfile:
-    lock_rows_for_share(User.objects.filter(pk=user.pk), LockLevel.ACCOUNT)
-    locked = lock_rows_for_update(
-        MatrimonialProfile.objects.filter(pk=profile_id, owner_id=user.pk),
-        LockLevel.PROFILE,
-        anchor=True,
-    )
-    if not locked:
-        raise NotFound()
-    profile = locked[0]
+def _manager_action(ctx, action, photo_id):
+    from apps.family.services.acting import record_manager_action
+
+    record_manager_action(ctx, action, "profiles.photo", photo_id)
+
+
+def _lock_profile(ctx) -> MatrimonialProfile:
+    """Authorization (re-checked, ``manage_photos``) → acting User → represented profile."""
+    from apps.family.services.acting import lock_represented_profile
+
+    profile = lock_represented_profile(ctx, "manage_photos")
     if profile.profile_status == MatrimonialProfile.Status.CLOSED:
         raise InvalidProfileState()
     return profile
@@ -102,7 +103,8 @@ def live_photos(profile_id):
 # --- Upload --------------------------------------------------------------------------------
 
 
-def upload_photo(user: User, profile_id, upload, photo_type: str | None) -> ProfilePhoto:
+def upload_photo(ctx, upload, photo_type: str | None) -> ProfilePhoto:
+    user = ctx.actual_account
     if isinstance(get_malware_scanner(), DisabledScanner):
         raise UploadsUnavailable()
     if photo_type is not None and not reference.is_allowed("photo_type", photo_type):
@@ -118,17 +120,19 @@ def upload_photo(user: User, profile_id, upload, photo_type: str | None) -> Prof
         with (
             transaction.atomic(),
             lock_plan(
-                "profiles.photo.upload", [LockLevel.ACCOUNT, LockLevel.PROFILE, LockLevel.INSERT]
+                "profiles.photo.upload",
+                [LockLevel.AUTHORIZATION, LockLevel.ACCOUNT, LockLevel.PROFILE, LockLevel.INSERT],
             ),
         ):
-            profile = _lock_own_profile(user, profile_id)
+            profile = _lock_profile(ctx)
             if live_photos(profile.id).count() >= settings.PHOTO_MAX_PER_PROFILE:
                 raise PhotoLimitReached()
             photo = ProfilePhoto.objects.create(
                 profile=profile, uploaded_by=user, photo_type=photo_type
             )
             stored_key = default_storage.save(_quarantine_key(photo), ContentFile(data))
-            _audit(user, profile, "profile.photo_uploaded")
+            _audit(ctx, profile, "profile.photo_uploaded")
+            _manager_action(ctx, "photo.uploaded", photo.pk)
             from ..tasks import process_photo
 
             transaction.on_commit(lambda: process_photo.delay(str(photo.id)))
@@ -248,14 +252,15 @@ def process_photo(photo_id) -> str:
 # --- Owner management ----------------------------------------------------------------------
 
 
-def update_photo(user: User, profile_id, photo_id, data: dict) -> ProfilePhoto:
+def update_photo(ctx, photo_id, data: dict) -> ProfilePhoto:
     with (
         transaction.atomic(),
         lock_plan(
-            "profiles.photo.update", [LockLevel.ACCOUNT, LockLevel.PROFILE, LockLevel.DOMAIN]
+            "profiles.photo.update",
+            [LockLevel.AUTHORIZATION, LockLevel.ACCOUNT, LockLevel.PROFILE, LockLevel.DOMAIN],
         ),
     ):
-        profile = _lock_own_profile(user, profile_id)
+        profile = _lock_profile(ctx)
         rows = lock_rows_for_update(live_photos(profile.id), LockLevel.DOMAIN)
         photo = next((p for p in rows if p.pk == photo_id), None)
         if photo is None:
@@ -280,17 +285,19 @@ def update_photo(user: User, profile_id, photo_id, data: dict) -> ProfilePhoto:
         elif data.get("is_primary") is False:
             photo.is_primary = False
         photo.save(update_fields=["photo_type", "is_primary", "updated_at"])
+        _manager_action(ctx, "photo.updated", photo.pk)
     return photo
 
 
-def delete_photo(user: User, profile_id, photo_id) -> None:
+def delete_photo(ctx, photo_id) -> None:
     with (
         transaction.atomic(),
         lock_plan(
-            "profiles.photo.delete", [LockLevel.ACCOUNT, LockLevel.PROFILE, LockLevel.DOMAIN]
+            "profiles.photo.delete",
+            [LockLevel.AUTHORIZATION, LockLevel.ACCOUNT, LockLevel.PROFILE, LockLevel.DOMAIN],
         ),
     ):
-        profile = _lock_own_profile(user, profile_id)
+        profile = _lock_profile(ctx)
         rows = lock_rows_for_update(live_photos(profile.id).filter(pk=photo_id), LockLevel.DOMAIN)
         if not rows:
             raise NotFound()
@@ -298,7 +305,8 @@ def delete_photo(user: User, profile_id, photo_id) -> None:
         photo.deleted_at = timezone.now()
         photo.is_primary = False
         photo.save(update_fields=["deleted_at", "is_primary", "updated_at"])
-        _audit(user, profile, "profile.photo_deleted")
+        _audit(ctx, profile, "profile.photo_deleted")
+        _manager_action(ctx, "photo.deleted", photo.pk)
         if photo.storage_key:
             key = photo.storage_key
             transaction.on_commit(lambda: default_storage.delete(key))

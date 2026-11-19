@@ -188,6 +188,9 @@ class OwnProfileSerializer(serializers.Serializer):
         dob = (
             getattr(getattr(profile, "basic_info", None), "date_of_birth", None) if basic else None
         )
+        if basic is not None and not self.context.get("show_dob", True):
+            # Managers without edit_basic_info see the age only (FR-PRO-003).
+            basic = {k: v for k, v in basic.items() if k != "date_of_birth"}
         return {
             "id": str(profile.id),
             "profile_code": profile.profile_code,

@@ -6,9 +6,10 @@ from rest_framework.parsers import MultiPartParser
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from apps.family.context import resolve
+
 from ..models import ProfilePhoto
 from ..services import photos as service
-from ..services.profiles import own_profile_by_id
 
 FIELDS = (
     "id",
@@ -49,16 +50,16 @@ class PhotoListView(APIView):
     parser_classes = [MultiPartParser]
 
     def get(self, request, profile_id):
-        profile = own_profile_by_id(request.user, profile_id)
-        return Response([represent(p) for p in service.live_photos(profile.id)])
+        ctx = resolve(request, permission="view_profile", path_profile_id=profile_id)
+        return Response([represent(p) for p in service.live_photos(ctx.profile_id)])
 
     def post(self, request, profile_id):
-        own_profile_by_id(request.user, profile_id)  # identical 404 before any upload work
+        # Identical 404 / permission errors before any upload work.
+        ctx = resolve(request, permission="manage_photos", path_profile_id=profile_id)
         serializer = UploadSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         photo = service.upload_photo(
-            request.user,
-            profile_id,
+            ctx,
             serializer.validated_data["image"],
             serializer.validated_data.get("photo_type"),
         )
@@ -68,11 +69,13 @@ class PhotoListView(APIView):
 
 class PhotoDetailView(APIView):
     def patch(self, request, profile_id, photo_id):
+        ctx = resolve(request, permission="manage_photos", path_profile_id=profile_id)
         serializer = PhotoUpdateSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        photo = service.update_photo(request.user, profile_id, photo_id, serializer.validated_data)
+        photo = service.update_photo(ctx, photo_id, serializer.validated_data)
         return Response(represent(photo))
 
     def delete(self, request, profile_id, photo_id):
-        service.delete_photo(request.user, profile_id, photo_id)
+        ctx = resolve(request, permission="manage_photos", path_profile_id=profile_id)
+        service.delete_photo(ctx, photo_id)
         return Response(status=status.HTTP_204_NO_CONTENT)

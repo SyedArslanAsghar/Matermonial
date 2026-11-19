@@ -69,6 +69,17 @@ PERMISSIONS: tuple[PermissionSpec, ...] = (
         "Relabel, reorder, activate or deactivate profile value-list options",
         is_sensitive=True,
     ),
+    PermissionSpec("family.view_managerpermission", "View the manager permission catalogue"),
+    PermissionSpec(
+        "family.change_managerpermission",
+        "Activate or deactivate manager permissions",
+        is_sensitive=True,
+    ),
+    PermissionSpec("family.view_managerpermissiongroup", "View manager templates"),
+    PermissionSpec("family.add_managerpermissiongroup", "Add manager templates", is_sensitive=True),
+    PermissionSpec(
+        "family.change_managerpermissiongroup", "Edit manager templates", is_sensitive=True
+    ),
     PermissionSpec(
         "accounts.view_user",
         "View accounts in the admin",

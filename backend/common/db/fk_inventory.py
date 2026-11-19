@@ -72,6 +72,26 @@ FK_LOCK_CLASSES: dict[str, str] = {
     "profiles.PartnerPreferenceEducation.preference": "P",
     "profiles.PartnerPreferenceLanguage.preference": "P",
     "profiles.PartnerPreferenceReligion.preference": "P",
+    # Family management (Phase 4): writes lock the authorization (level 1), then the acting
+    # account(s) FOR SHARE (level 2), then the profile; access history is a lone autocommit
+    # insert (N); catalogue and templates are reference data (N).
+    "family.ProfileManagerAuthorization.profile": "P",
+    "family.ProfileManagerAuthorization.manager": "P",
+    "family.ProfileManagerAuthorization.invited_by": "P",
+    "family.ProfileManagerAuthorization.permission_group": "N",
+    "family.AuthorizationPermission.authorization": "P",
+    "family.AuthorizationPermission.permission": "N",
+    "family.AuthorizationPermission.granted_by": "P",
+    "family.ManagerAuthorizationHistory.authorization": "P",
+    "family.ManagerAuthorizationHistory.performed_by": "P",
+    "family.ManagerActionLog.authorization": "P",
+    "family.ManagerActionLog.profile": "P",
+    "family.ManagerActionLog.manager": "P",
+    "family.ProfileAccessHistory.profile": "N",
+    "family.ProfileAccessHistory.authorization": "N",
+    "family.ProfileAccessHistory.manager": "N",
+    "family.ManagerPermissionGroupPermission.group": "N",
+    "family.ManagerPermissionGroupPermission.permission": "N",
     # OTP verify locks the account (level 2) before the verification row; send runs with no
     # other business locks.
     "verification.PhoneVerification.user": "P",

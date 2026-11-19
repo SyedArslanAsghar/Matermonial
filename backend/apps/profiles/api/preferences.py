@@ -72,7 +72,10 @@ def represent(preference: PartnerPreference | None) -> dict:
 
 class PartnerPreferenceView(APIView):
     def get(self, request):
-        return Response(represent(service.get_preferences(request.user)))
+        from apps.family.context import resolve
+
+        ctx = resolve(request, permission="view_partner_preferences")
+        return Response(represent(service.get_preferences(ctx)))
 
     def put(self, request):
         return self._save(request, replace=True)
@@ -81,9 +84,10 @@ class PartnerPreferenceView(APIView):
         return self._save(request, replace=False)
 
     def _save(self, request, *, replace):
+        from apps.family.context import resolve
+
+        ctx = resolve(request, permission="edit_partner_preferences")
         serializer = PreferenceWriteSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        preference = service.save_preferences(
-            request.user, serializer.validated_data, replace=replace
-        )
+        preference = service.save_preferences(ctx, serializer.validated_data, replace=replace)
         return Response(represent(preference))

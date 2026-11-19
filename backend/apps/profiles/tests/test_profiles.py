@@ -107,8 +107,10 @@ class TestCreate:
                 owner=user, profile_code="MP00000000", created_by=user, updated_by=user
             )
 
-    def test_no_profile_yet_is_404(self):
-        assert client_for(make_user()).get(ME).status_code == 404
+    def test_no_profile_yet_needs_a_selection(self):
+        response = client_for(make_user()).get(ME)  # doc 04 §24.1 step 3
+        assert response.status_code == 400
+        assert response.json()["error"]["code"] == "acting_profile_required"
 
 
 @pytest.mark.django_db(transaction=True)
@@ -234,7 +236,8 @@ class TestEditing:
         MatrimonialProfile.objects.filter(owner=user).update(
             profile_status="CLOSED", suspended_from_status=None
         )
-        assert client.patch(ME, {"location": {"city": "Lahore"}}, format="json").status_code == 409
+        # A CLOSED profile is not available to act for (doc 04 §24.1 step 4).
+        assert client.patch(ME, {"location": {"city": "Lahore"}}, format="json").status_code == 404
 
     def test_education_and_profession_stay_editable_after_submission(self, owner, sensitive_lists):
         user, client = owner
@@ -289,7 +292,7 @@ class TestCompletionAndReview:
             for method, suffix in (("get", "completion/"), ("post", "submit-review/")):
                 response = getattr(client, method)(f"{URL}{target}/{suffix}")
                 assert response.status_code == 404
-                assert response.json()["error"]["code"] == "not_found"
+                assert response.json()["error"]["code"] == "acting_profile_not_available"
         assert MatrimonialProfile.objects.get(pk=theirs.pk).profile_status == "DRAFT"
 
 

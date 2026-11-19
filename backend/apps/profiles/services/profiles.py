@@ -33,7 +33,7 @@ from rest_framework.exceptions import APIException, NotFound, ValidationError
 from apps.accounts.models import User
 from apps.accounts.services.pseudonyms import create_subject, pseudonym_for
 from apps.audit.services import record_audit
-from common.db.locking import LockLevel, lock_plan, lock_rows_for_share, lock_rows_for_update
+from common.db.locking import LockLevel, lock_plan, lock_rows_for_share
 
 from .. import reference
 from ..models import (
@@ -271,22 +271,50 @@ def _check_list(section: str, rows: list[dict]) -> dict:
     return errors
 
 
-def update_profile(user: User, data: dict, request_id=None) -> MatrimonialProfile:
-    """Apply a validated partial update. ``data`` may hold ``visibility_status``, any single
-    section as a dict of fields, and ``languages`` / ``education`` as complete replacement lists.
-    """
+# Manager permission needed per part of an update (doc 14 §3). Location, lifestyle and languages
+# have no permission in the approved catalogue (doc 14 §9 proposes them; OD-05), so they stay
+# owner-only. Visibility is a privacy setting (Sensitive).
+SECTION_PERMISSIONS = {
+    "basic_info": "edit_basic_info",
+    "family": "edit_family_details",
+    "education": "edit_education",
+    "profession": "edit_profession",
+    "visibility_status": "manage_privacy_settings",
+}
+OWNER_ONLY_PARTS = {"location", "lifestyle", "languages"}
+EDIT_PERMISSIONS = ("edit_basic_info", "edit_education", "edit_profession", "edit_family_details")
+
+
+def permissions_for_update(data: dict) -> tuple[str, ...]:
+    """The manager permissions an update needs; raises for owner-only parts."""
+    from apps.family.context import PermissionNotGranted
+
+    if OWNER_ONLY_PARTS & set(data):
+        raise PermissionNotGranted()
+    return tuple(sorted({SECTION_PERMISSIONS[k] for k in data if k in SECTION_PERMISSIONS}))
+
+
+def update_profile(ctx, data: dict, request_id=None) -> MatrimonialProfile:
+    """Apply a validated partial update for the represented profile (owner or authorized
+    manager). ``data`` may hold ``visibility_status``, any single section as a dict of fields,
+    and ``languages`` / ``education`` as complete replacement lists."""
+    from apps.family.services.acting import LEVELS, lock_represented_profile, record_manager_action
+
+    user = ctx.actual_account
+    if not ctx.is_owner:
+        needed = permissions_for_update(data)
+        ctx.require(*needed)
+    else:
+        needed = ()
     today = timezone.now().date()
     with (
         transaction.atomic(),
-        lock_plan("profiles.update", [LockLevel.ACCOUNT, LockLevel.PROFILE, LockLevel.INSERT]),
+        lock_plan("profiles.update", [*LEVELS, LockLevel.INSERT]),
     ):
-        lock_rows_for_share(User.objects.filter(pk=user.pk), LockLevel.ACCOUNT)
-        locked = lock_rows_for_update(
-            MatrimonialProfile.objects.filter(owner_id=user.pk), LockLevel.PROFILE, anchor=True
+        profile = lock_represented_profile(ctx, *needed)
+        record_manager_action(
+            ctx, "profile.updated", "profiles.profile", profile.pk, ".".join(sorted(data))
         )
-        if not locked:
-            raise NotFound()
-        profile = locked[0]
         if profile.profile_status == MatrimonialProfile.Status.CLOSED:
             raise InvalidProfileState()
 
@@ -325,6 +353,21 @@ def update_profile(user: User, data: dict, request_id=None) -> MatrimonialProfil
             )
         if "visibility_status" in data:
             profile.visibility_status = data["visibility_status"]
+            if not ctx.is_owner:  # a Sensitive permission was used: tell the owner (doc 14 §6)
+                from common.events.services import emit
+
+                emit(
+                    "family.sensitive_action",
+                    event_class="NOTIFICATION",
+                    category="ACCOUNT",
+                    aggregate_type="MatrimonialProfile",
+                    recipient_pseudonym=pseudonym_for("ACCOUNT", profile.owner_id),
+                    payload={
+                        "action": "visibility_changed",
+                        "authorization_id": str(ctx.authorization_id),
+                    },
+                    dedupe_identity=f"family:visibility:{profile.pk}:{timezone.now().isoformat()}",
+                )
         profile.completion_percentage = completion_percentage(profile)
         profile.updated_by = user
         profile.save(
@@ -336,17 +379,16 @@ def update_profile(user: User, data: dict, request_id=None) -> MatrimonialProfil
 # --- Lifecycle -----------------------------------------------------------------------------
 
 
-def submit_for_review(user: User, profile_id, request_id=None) -> MatrimonialProfile:
-    """DRAFT → PENDING_REVIEW when the required fields are complete (doc 15 §2). Activation
-    (PENDING_REVIEW → ACTIVE) needs identity approval and review: Phases 5 and 14 (OD-03e)."""
-    own_profile_by_id(user, profile_id)  # identical 404 for anything else
-    with transaction.atomic(), lock_plan("profiles.submit", [LockLevel.ACCOUNT, LockLevel.PROFILE]):
-        lock_rows_for_share(User.objects.filter(pk=user.pk), LockLevel.ACCOUNT)
-        profile = lock_rows_for_update(
-            MatrimonialProfile.objects.filter(pk=profile_id, owner_id=user.pk),
-            LockLevel.PROFILE,
-            anchor=True,
-        )[0]
+def submit_for_review(ctx, request_id=None) -> MatrimonialProfile:
+    """DRAFT → PENDING_REVIEW when the required fields are complete (doc 15 §2: owner, or a
+    manager with an ``edit_*`` permission). Activation needs identity approval and review:
+    Phases 5 and 14 (OD-03e)."""
+    from apps.family.services.acting import LEVELS, lock_represented_profile, record_manager_action
+
+    user = ctx.actual_account
+    with transaction.atomic(), lock_plan("profiles.submit", list(LEVELS)):
+        profile = lock_represented_profile(ctx, any_of=EDIT_PERMISSIONS)
+        record_manager_action(ctx, "profile.submitted_for_review", "profiles.profile", profile.pk)
         if profile.profile_status != MatrimonialProfile.Status.DRAFT:
             raise InvalidProfileState()
         if unconfigured_required_vocabularies():
@@ -360,11 +402,11 @@ def submit_for_review(user: User, profile_id, request_id=None) -> MatrimonialPro
         record_audit(
             action="profile.submitted_for_review",
             resource_type="profiles.profile",
-            actor_type="USER",
+            actor_type=ctx.audit_actor_type,
             result="SUCCESS",
             category="STATE_CHANGE",
             actor_user_id=user.pk,
-            subject_user_id=user.pk,
+            subject_user_id=profile.owner_id,
             represented_profile_pseudonym=pseudonym_for("PROFILE", profile.id),
             request_id=request_id,
             metadata={"from_status": "DRAFT", "to_status": "PENDING_REVIEW"},

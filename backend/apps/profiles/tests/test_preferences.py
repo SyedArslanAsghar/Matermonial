@@ -27,7 +27,9 @@ def test_needs_a_profile_and_authentication():
     user = User.objects.create_user(phone_number="+923006000002")
     api = APIClient()
     api.force_authenticate(user)
-    assert api.get(URL).status_code == 404
+    response = api.get(URL)  # doc 04 §24.1 step 3: no profile to act for
+    assert response.status_code == 400
+    assert response.json()["error"]["code"] == "acting_profile_required"
 
 
 def test_empty_preferences_read_as_no_preference(client):
@@ -121,4 +123,6 @@ def test_database_rejects_inverted_ranges(client):
 
 def test_closed_profile_preferences_are_read_only(client):
     MatrimonialProfile.objects.update(profile_status="CLOSED")
-    assert client.patch(URL, {"job": True}, format="json").status_code == 409
+    response = client.patch(URL, {"job": True}, format="json")  # doc 04 §24.1 step 4
+    assert response.status_code == 404
+    assert response.json()["error"]["code"] == "acting_profile_not_available"
