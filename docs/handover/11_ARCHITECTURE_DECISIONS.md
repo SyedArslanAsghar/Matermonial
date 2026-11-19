@@ -373,6 +373,6 @@ All ADR decisions below are due **before G4** (baseline v4.6, approval-by-gate t
 | ADR-030 | Ledger as the permanent record; balances as projections | PROPOSED (TR-15) | `docs/decisions/ADR-030-ledger-projections.md` |
 | ADR-031 | Global lock-order and anchor policy | PROPOSED (the ADR document). The TRs it records, TR-09 and TR-22, are APPROVED (DR-2026-11-17-G3-2). | `docs/decisions/ADR-031-lock-order.md` |
 | ADR-032 | Security-event model and log pseudonymisation | PROPOSED (TR-17, TR-23) | `docs/decisions/ADR-032-security-events.md` |
-| ADR-033 | Admin MFA, enrollment, recovery and the admin session | PROPOSED (implementation record within approved TR-07; owner review requested, 2026-11-19) | `docs/decisions/ADR-033-admin-mfa.md` |
+| ADR-033 | Admin MFA, enrollment, recovery and the admin session | PROPOSED (implementation record within approved TR-07; owner review requested, 2026-11-19). Amendment 1 (two-person recovery) PROPOSED, not implemented (DR-2026-11-19-R-3) | `docs/decisions/ADR-033-admin-mfa.md` |
 
 Pending decisions on existing ADRs: ADR-022 and ADR-023 (see the notes under each). ADR-014 is APPROVED for its core decision only (DR-2026-11-17-C2).

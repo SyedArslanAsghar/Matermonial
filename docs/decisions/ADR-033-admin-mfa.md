@@ -50,3 +50,57 @@ The approved documents name the library (django-otp) and require MFA, but they d
 ## Where implemented
 
 `backend/apps/admin_access/` (`services/mfa.py`, `middleware.py`, `site.py`, `views.py`); `backend/apps/accounts/services/auth.py` (`create_admin_session`); doc 03 §22.18; doc 06 §22.10; doc 16 §12.
+
+---
+
+## Amendment 1 (PROPOSED, 2026-11-19): two-person MFA recovery
+
+**Status:** PROPOSED. **Not implemented.** Requested by the owner's Phase 2/3 review (DR-2026-11-19-R-3). The current behaviour (§Decision 6–7) stays in force until the owner approves this amendment; nothing has changed silently.
+
+### Review of the current implementation (`services/mfa.py`, `admin_access` command)
+
+| Aspect | Current behaviour | Gap |
+|---|---|---|
+| Who initiates | One administrator holding `admin_access.reset_admin_mfa` (never for themselves), or the CLI operator | A single person can remove another admin's second factor |
+| Approval | None; the reset executes immediately | No separation of duties |
+| Audit | `admin.mfa_reset` audit row; `ADMIN_MFA_REMOVED` security event; sessions revoked (`SESSION_REVOKED`, reason ADMIN) | Adequate |
+| Notification | None to the affected account | The account holder isn't told that their factor was removed |
+| Replacement | Password + single-use enrollment code (HMAC-stored, 24 h) + TOTP confirmation | The code is shown to the initiating admin, who could pass it to anyone (they still need the target's password) |
+| Recovery codes | None | n/a |
+| Server-access recovery | `manage.py admin_access reset-mfa` and `issue-mfa-enrollment`: audited with `channel=cli`, but no reason code and no notification | Not marked as an emergency procedure |
+
+### Proposed changes
+
+1. **Two-person recovery.**
+   - An administrator with `admin_access.reset_admin_mfa` creates a recovery *request* (reason code required; expires after 24 h). It is stored as an `AdminActionApproval` (doc 03 §16.7, already in the approved schema list): `action_type = ADMIN_MFA_RECOVERY`.
+   - A *different* administrator with a new sensitive permission `admin_access.approve_admin_mfa_recovery` approves or rejects it. The approver is never the requester or the target (service check plus a database CHECK).
+   - Only approval executes the reset: device removed, open codes revoked, admin sessions ended.
+   - States: PENDING, APPROVED (executed), REJECTED, EXPIRED. Every transition is audited.
+2. **Security notifications.**
+   - A `security.admin_mfa_recovery` notice is sent to the target account through the outbox on request, on approval or rejection, and on completed re-enrollment.
+   - A copy goes to every active superuser.
+   - New security-event types `ADMIN_MFA_RECOVERY_REQUESTED` and `ADMIN_MFA_RECOVERY_DECIDED`. This needs a migration that widens the `ase_event_type` CHECK.
+3. **Replacement enrollment.**
+   - Unchanged factors: password, single-use code and TOTP confirmation.
+   - The enrollment code is delivered by **SMS to the target's verified phone number** instead of being displayed to an administrator. This adds possession of the phone, and nobody else sees the code.
+   - If SMS is unavailable, the approver (not the requester) sees the code once.
+4. **Recovery codes (optional; owner choice).**
+   - If introduced: 10 codes of at least 100 bits each, shown once at enrollment and stored only as HMAC (ADMIN_MFA ring). Each is single use, and regeneration revokes the old set.
+   - Using one records a security event, sends a notice, and forces a new authenticator enrollment in the same session.
+   - *Recommendation:* don't introduce them for the MVP. Two-person recovery covers the need with fewer secrets to protect.
+5. **Server access as audited break-glass only.**
+   - The CLI `reset-mfa` / `issue-mfa-enrollment` need `--break-glass --reason CODE`, and record `admin.mfa_break_glass` (audit, `channel=cli`).
+   - They notify the target and every superuser, and are refused without both flags.
+   - They are documented as an emergency procedure (for example, the only administrator is locked out).
+
+### Decisions requested from the owner
+
+| # | Decision | Recommendation |
+|---|---|---|
+| A1-1 | Require two-person approval for admin MFA recovery | Yes |
+| A1-2 | Deliver replacement enrollment codes by SMS to the verified phone | Yes, with approver display as fallback |
+| A1-3 | Introduce hashed recovery codes | No, for the MVP |
+| A1-4 | CLI recovery only as flagged, reason-coded, notifying break-glass | Yes |
+| A1-5 | Add the two security-event types (migration widening `ase_event_type`) | Yes, if A1-1 is approved |
+
+Implementation, when approved: the `AdminActionApproval` table (§16.7), the services and admin actions, the outbox notice (delivery handlers arrive with Phase 12; until then the notice waits in the outbox), and tests for separation of duties, expiry, races (one execution per request) and notifications.

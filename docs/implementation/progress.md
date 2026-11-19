@@ -419,3 +419,23 @@ Same branch (`feature/g5-phase2-auth`); same disposable databases; nothing pushe
 
 A profile can't yet complete basic info, because the sensitive value lists await the owner (KI-29).
 
+## Owner review of Phases 2 and 3 (2026-11-19, DR-2026-11-19-R)
+
+| Item | Outcome | Status |
+|---|---|---|
+| Phase 2 completion | Recorded (above); unchanged | TESTED; owner review of ADR-033 pending |
+| Phase 3 implementation | Recorded (above); unchanged except the vocabulary change | TESTED |
+| R-1 value lists | Admin-managed `VocabularyOption` with stable codes, labels, order and deactivation; immutable codes, no deletes (trigger); audited admin page; proposals seeded inactive; no religion, community or caste values (`414ec8e`) | Implemented and tested |
+| R-2 required fields | Owner-proposed MVP baseline recorded (AS-23); submission blocked while required vocabularies are unconfigured | PROPOSED, confirmation pending |
+| R-3 MFA recovery | ADR-033 Amendment 1 drafted; current behaviour unchanged | PROPOSED, decision pending (KI-25) |
+| R-4 scanner | Fail-closed behaviour preserved; a test now proves deployed settings refuse `MALWARE_SCANNER=mock` | Production requirement KI-33 |
+| R-5 scope | Phase 4 not started | — |
+
+**Remaining Phase 3 business dependencies:**
+- approve and activate vocabulary options, and supply religion, community and caste (KI-29);
+- confirm the required fields (KI-30);
+- OD-02a (creation gate), OD-03 (visibility), OD-03e (pre-activation review), OD-04a (locked fields; FR-PRO-005 BLOCKED), OD-10b (strict criteria);
+- a real scanner (KI-33).
+
+**Validation:** **412 passed, 0 skipped, 0 failed** on Python 3.12.16 and 3.13.18 × PostgreSQL 16.16 and 18.7. Lockfiles consistent; Ruff clean. On a fresh database `profiles.0004` seeds 46 options, **0 active**; it reverses to 0003 and re-applies cleanly; `makemigrations --check` reports no changes.
+

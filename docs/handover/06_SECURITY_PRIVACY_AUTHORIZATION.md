@@ -822,3 +822,5 @@ Editorial record (CC-R63). It adds no requirement. Details are in ADR-033 and `d
   - administrator-assisted recovery, no backup codes;
   - separate cookie and `ADMIN` AuthSession, 30 min idle and 12 h absolute, checked on every admin request;
   - admin password-change pages disabled.
+- **Admin MFA recovery review (DR-2026-11-19-R-3):** ADR-033 Amendment 1 (PROPOSED) proposes two-person recovery, notifications to the account holder and superusers, SMS delivery of the replacement enrollment code, optional hashed recovery codes, and CLI recovery only as flagged, reason-coded break-glass. Until the owner decides, the implemented single-administrator reset stays in force.
+- **Uploads (TR-10, DR-2026-11-19-R-4):** fail closed. Deployed environments refuse the mock scanner and refuse uploads until a real scanner is approved and integrated.

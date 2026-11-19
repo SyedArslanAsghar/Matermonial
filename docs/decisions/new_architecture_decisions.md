@@ -482,10 +482,27 @@ No speculative infrastructure tasks are added.
 | # | ID | Item | Decision |
 |---|---|---|---|
 | 1 | DR-2026-11-19-P3-1 | TR-10 upload pipeline | **APPROVED** with the dependencies **Pillow** and **filetype**. Pipeline: quarantine, byte-level type detection, malware scan, re-encode to strip EXIF/GPS, discard originals, private storage. The scanner is a provider interface: mock locally and in tests, **disabled (uploads refused) when deployed** until a real scanner is approved |
-| 2 | DR-2026-11-19-P3-2 | Profile and preference value lists | Reference lists defined in code (like the admin catalogue). Only neutral lists are seeded, as documented assumptions. **Gender, marital status, religion, community and caste stay empty until the owner supplies or approves them**; those fields accept no value until then |
-| 3 | DR-2026-11-19-P3-3 | Required fields for completion and DRAFT → PENDING_REVIEW | *Not answered.* Configurable default, recorded as an assumption: basic info (name, DOB 18+, gender, marital status, religion, nationality), location (country, city), at least one language, employment status. Education, family and lifestyle count toward the percentage only. Photos are excluded |
+| 2 | DR-2026-11-19-P3-2 *(implementation superseded by DR-2026-11-19-R-1)* | Profile and preference value lists | Reference lists defined in code (like the admin catalogue). Only neutral lists are seeded, as documented assumptions. **Gender, marital status, religion, community and caste stay empty until the owner supplies or approves them**; those fields accept no value until then |
+| 3 | DR-2026-11-19-P3-3 *(superseded by DR-2026-11-19-R-2)* | Required fields for completion and DRAFT → PENDING_REVIEW | *Not answered.* Configurable default, recorded as an assumption: basic info (name, DOB 18+, gender, marital status, religion, nationality), location (country, city), at least one language, employment status. Education, family and lifestyle count toward the percentage only. Photos are excluded |
 
 **Consequence:** until item 2's sensitive lists are supplied, no profile can complete basic info, so none can be submitted for review.
+
+---
+
+## Decision record DR-2026-11-19-R: owner review of G5 Phases 2 and 3
+
+- **Decision ID:** DR-2026-11-19-R
+- **Date:** 2026-11-19
+- **Decided by:** Project owner (review of the Phase 2/3 completion report)
+- **Decision status:** item 1 APPROVED (direction) and implemented; items 2–3 PROPOSED, awaiting owner confirmation; items 4–5 standing instructions
+
+| # | ID | Item | Decision |
+|---|---|---|---|
+| 1 | DR-2026-11-19-R-1 | Profile value lists | **Supersedes DR-2026-11-19-P3-2's hardcoded lists.** Admin-managed controlled vocabularies: stable codes separate from labels, ordering, deactivation, existing data preserved, new options without code changes. No religion, community or caste value is invented, and no new mandatory disclosure is added. Proposals are seeded **inactive**; nothing unapproved is active. Implemented in `414ec8e` |
+| 2 | DR-2026-11-19-R-2 | Required profile fields | **Proposed MVP baseline, subject to owner confirmation** (replaces assumption DR-2026-11-19-P3-3): name, date of birth, gender, marital status, religion, nationality, country, city, at least one language, employment status. Submission stays unavailable while a required vocabulary has no active option (`vocabulary_not_configured`) |
+| 3 | DR-2026-11-19-R-3 | Admin MFA recovery | Review requested. **ADR-033 Amendment 1 (PROPOSED)** prepared; the current behaviour stays until the owner decides A1-1…A1-5 |
+| 4 | DR-2026-11-19-R-4 | Malware scanner | TR-10 and fail-closed behaviour preserved: deployed environments refuse the mock scanner, and uploads are refused while no real scanner exists. A real scanner (and any infrastructure for it) needs owner approval before production |
+| 5 | DR-2026-11-19-R-5 | Scope | Phase 4 is **not authorized** until the owner says so explicitly. No push, PR, CI/CD, AWS or port 5432 work |
 
 ---
 
