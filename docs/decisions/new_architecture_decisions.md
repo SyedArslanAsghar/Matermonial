@@ -499,10 +499,34 @@ No speculative infrastructure tasks are added.
 | # | ID | Item | Decision |
 |---|---|---|---|
 | 1 | DR-2026-11-19-R-1 | Profile value lists | **Supersedes DR-2026-11-19-P3-2's hardcoded lists.** Admin-managed controlled vocabularies: stable codes separate from labels, ordering, deactivation, existing data preserved, new options without code changes. No religion, community or caste value is invented, and no new mandatory disclosure is added. Proposals are seeded **inactive**; nothing unapproved is active. Implemented in `414ec8e` |
-| 2 | DR-2026-11-19-R-2 | Required profile fields | **Proposed MVP baseline, subject to owner confirmation** (replaces assumption DR-2026-11-19-P3-3): name, date of birth, gender, marital status, religion, nationality, country, city, at least one language, employment status. Submission stays unavailable while a required vocabulary has no active option (`vocabulary_not_configured`) |
+| 2 | DR-2026-11-19-R-2 *(approved by DR-2026-11-19-O-7)* | Required profile fields | **Proposed MVP baseline, subject to owner confirmation** (replaces assumption DR-2026-11-19-P3-3): name, date of birth, gender, marital status, religion, nationality, country, city, at least one language, employment status. Submission stays unavailable while a required vocabulary has no active option (`vocabulary_not_configured`) |
 | 3 | DR-2026-11-19-R-3 | Admin MFA recovery | Review requested. **ADR-033 Amendment 1 (PROPOSED)** prepared; the current behaviour stays until the owner decides A1-1…A1-5 |
 | 4 | DR-2026-11-19-R-4 | Malware scanner | TR-10 and fail-closed behaviour preserved: deployed environments refuse the mock scanner, and uploads are refused while no real scanner exists. A real scanner (and any infrastructure for it) needs owner approval before production |
 | 5 | DR-2026-11-19-R-5 | Scope | Phase 4 is **not authorized** until the owner says so explicitly. No push, PR, CI/CD, AWS or port 5432 work |
+
+---
+
+## Decision record DR-2026-11-19-O: owner decisions on vocabularies, required fields, MFA recovery, scanner; Phase 4 authorized
+
+- **Decision ID:** DR-2026-11-19-O
+- **Date:** 2026-11-19
+- **Decided by:** Project owner (explicit decisions, "approved, not proposed")
+- **Decision status:** APPROVED
+
+| # | ID | Item | Decision |
+|---|---|---|---|
+| 1 | DR-2026-11-19-O-1 | Gender | Activate `FEMALE` (Female), `MALE` (Male) |
+| 2 | DR-2026-11-19-O-2 | Marital status | Activate `NEVER_MARRIED` (Never Married), `DIVORCED` (Divorced), `WIDOWED` (Widowed), `SEPARATED` (Separated) |
+| 3 | DR-2026-11-19-O-3 | Religion | Activate `ISLAM`, `HINDUISM`, `CHRISTIANITY`, `SIKHISM`, `BUDDHISM`, `JAINISM`, `ZOROASTRIANISM` (Zoroastrianism (Parsi)), `BAHAI` (Baháʼí Faith), `JUDAISM`, `INDIGENOUS_TRADITIONAL` (Indigenous / Traditional / Folk Religions), `NO_RELIGION`, `OTHER` |
+| 4 | DR-2026-11-19-O-4 | Denomination / tradition | Separate from religion (no Sunni, Shia or other denominations in the religion list). Optional and admin-managed, scoped per religion, never required, and no common structure assumed across religions. Religion, denomination, community and caste stay distinct |
+| 5 | DR-2026-11-19-O-5 | Community and caste | Separate from religion; optional; never required for completion or submission; no values seeded without an approved list; admin-managed |
+| 6 | DR-2026-11-19-O-6 | "Prefer not to say" | A field-level privacy response, never stored as a religion or denomination value |
+| 7 | DR-2026-11-19-O-7 | Required profile fields | **APPROVED baseline:** name, date of birth, gender, marital status, religion, nationality, country, city, at least one language, employment status. Community, caste and denomination never mandatory |
+| 8 | DR-2026-11-19-O-8 | ADR-033 Amendment 1 | **APPROVED:** A1-1 two-person recovery through `AdminActionApproval` (§16.7); the requester never approves. A1-2 replacement enrollment secret by SMS to the verified phone only, **never shown to any admin; SMS failure fails safely** (no admin fallback), with an audited emergency procedure; no plaintext logging or persistence beyond delivery. A1-3 recovery codes **NOT APPROVED** for the MVP. A1-4 server-access recovery only as an emergency procedure (explicit flag, reason code, full audit, notify the account holder and all superusers, no secret shown, distinct from normal recovery). A1-5 new security-event types and schema change approved |
+| 9 | DR-2026-11-19-O-9 | Malware scanner | No production scanner approved. Keep fail-closed behaviour; mock only for local and test; no selection or integration without a separate decision |
+| 10 | DR-2026-11-19-O-10 | G5 Phase 4 | **AUTHORIZED** (family management) on the approved documents. A genuine conflict, a significant risk or an irreversible operation stops only the affected part. Nothing beyond Phase 4 |
+
+**Scope boundaries (unchanged):** no AWS, production, port 5432, push, PR, merge or CI/CD changes.
 
 ---
 
