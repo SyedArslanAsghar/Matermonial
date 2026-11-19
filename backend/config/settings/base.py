@@ -45,6 +45,7 @@ INSTALLED_APPS = [
     "apps.admin_access",
     "apps.audit",
     "apps.platform_ops",
+    "apps.profiles",
     "apps.verification",
     # Shared kernel infrastructure (common/, DR-2026-11-18-G4-6)
     "common.events",
@@ -236,6 +237,29 @@ CELERY_BEAT_SCHEDULE = {
     "registry-checkpoint": {"task": "platform_ops.write_registry_checkpoint", "schedule": 86400.0},
     "admin-role-expiry": {"task": "admin_access.sync_expired_assignments", "schedule": 300.0},
 }
+
+# --- Profiles (FR-008; doc 15 §2). Required fields gate DRAFT -> PENDING_REVIEW; the default
+# is the assumption in DR-2026-11-19-P3-3 (owner confirmation pending). Photos join with TR-10.
+PROFILE_REQUIRED_FIELDS = [
+    "basic_info.full_name",
+    "basic_info.date_of_birth",
+    "basic_info.gender",
+    "basic_info.marital_status",
+    "basic_info.religion",
+    "basic_info.nationality",
+    "location.country",
+    "location.city",
+    "languages",
+    "profession.employment_status",
+]
+PROFILE_OPTIONAL_FIELDS = [
+    "location.state_or_province",
+    "education",
+    "profession.profession",
+    "family.family_type",
+    "lifestyle.height_cm",
+    "lifestyle.diet",
+]
 
 # --- Celery and Redis (DR-2026-11-17-G3-4; CC-R53, CC-R54) ---
 REDIS_URL = env("REDIS_URL", default="redis://127.0.0.1:6379/0")

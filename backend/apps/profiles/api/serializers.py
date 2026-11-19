@@ -1,0 +1,203 @@
+"""Profile serializers with explicit field allowlists (CC-R44).
+
+``OwnProfileSerializer`` is used only for the owner's own profile, which is the only place the
+full date of birth appears (FR-PRO-003). Representations for other viewers arrive with search
+and profile detail (Phase 8) and will never include it.
+"""
+
+from django.core.exceptions import ObjectDoesNotExist
+from django.utils import timezone
+from rest_framework import serializers
+
+from ..models import (
+    MatrimonialProfile,
+    ProfileBasicInfo,
+    ProfileEducation,
+    ProfileFamilyDetails,
+    ProfileLanguage,
+    ProfileLifestyle,
+    ProfileLocation,
+    ProfileProfession,
+)
+from ..services.profiles import age_on
+
+
+def _code(**kw):
+    return serializers.CharField(max_length=40, allow_null=True, required=False, **kw)
+
+
+def _country():
+    return serializers.CharField(max_length=2, min_length=2, allow_null=True, required=False)
+
+
+class BasicInfoSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ProfileBasicInfo
+        fields = [
+            "full_name",
+            "date_of_birth",
+            "gender",
+            "marital_status",
+            "religion",
+            "community",
+            "caste_or_subcast",
+            "nationality",
+        ]
+        extra_kwargs = {f: {"required": False} for f in fields}
+
+
+class LocationSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ProfileLocation
+        fields = [
+            "country",
+            "state_or_province",
+            "city",
+            "area_or_locality",
+            "residence_type",
+            "show_location",
+        ]
+        extra_kwargs = {f: {"required": False} for f in fields}
+
+
+class FamilySerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ProfileFamilyDetails
+        fields = [
+            "father_occupation",
+            "mother_occupation",
+            "family_type",
+            "family_values",
+            "number_of_brothers",
+            "number_of_sisters",
+            "family_description",
+        ]
+        extra_kwargs = {f: {"required": False} for f in fields}
+
+
+class ProfessionSerializer(serializers.ModelSerializer):
+    income_amount = serializers.DecimalField(
+        max_digits=14,
+        decimal_places=2,
+        min_value=0,
+        allow_null=True,
+        required=False,
+        coerce_to_string=True,
+    )
+
+    class Meta:
+        model = ProfileProfession
+        fields = [
+            "employment_status",
+            "profession",
+            "job_title",
+            "employer_or_business_name",
+            "income_amount",
+            "income_currency",
+            "income_frequency",
+            "show_income",
+            "description",
+        ]
+        extra_kwargs = {f: {"required": False} for f in fields}
+
+
+class LifestyleSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ProfileLifestyle
+        fields = [
+            "height_cm",
+            "diet",
+            "smoking_status",
+            "drinking_status",
+            "exercise_habit",
+            "description",
+        ]
+        extra_kwargs = {f: {"required": False} for f in fields}
+
+
+class LanguageSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ProfileLanguage
+        fields = ["language", "proficiency", "is_native"]
+        validators = []  # uniqueness is checked by the service across the whole list
+
+
+class EducationSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ProfileEducation
+        fields = [
+            "qualification",
+            "field_of_study",
+            "institution",
+            "country",
+            "completion_year",
+            "is_current",
+            "description",
+        ]
+
+
+SECTION_SERIALIZERS = {
+    "basic_info": BasicInfoSerializer,
+    "location": LocationSerializer,
+    "family": FamilySerializer,
+    "profession": ProfessionSerializer,
+    "lifestyle": LifestyleSerializer,
+}
+
+
+class ProfileUpdateSerializer(serializers.Serializer):
+    """Partial update: each section is optional; lists replace the stored rows."""
+
+    visibility_status = serializers.ChoiceField(
+        choices=MatrimonialProfile.Visibility.choices, required=False
+    )
+    basic_info = BasicInfoSerializer(required=False)
+    location = LocationSerializer(required=False)
+    family = FamilySerializer(required=False)
+    profession = ProfessionSerializer(required=False)
+    lifestyle = LifestyleSerializer(required=False)
+    languages = LanguageSerializer(many=True, required=False, max_length=20)
+    education = EducationSerializer(many=True, required=False, max_length=20)
+
+    def validate(self, attrs):
+        unknown = set(self.initial_data) - set(self.fields)
+        if unknown:
+            raise serializers.ValidationError({k: ["Unknown field."] for k in sorted(unknown)})
+        return attrs
+
+
+def _section(profile, name, serializer):
+    try:
+        row = getattr(profile, name)
+    except ObjectDoesNotExist:
+        return None
+    return serializer(row).data
+
+
+class OwnProfileSerializer(serializers.Serializer):
+    """The owner's view of their own profile (allowlisted)."""
+
+    def to_representation(self, profile):
+        today = timezone.now().date()
+        basic = _section(profile, "basic_info", BasicInfoSerializer)
+        dob = (
+            getattr(getattr(profile, "basic_info", None), "date_of_birth", None) if basic else None
+        )
+        return {
+            "id": str(profile.id),
+            "profile_code": profile.profile_code,
+            "profile_status": profile.profile_status,
+            "visibility_status": profile.visibility_status,
+            "verification_status": profile.verification_status,
+            "completion_percentage": profile.completion_percentage,
+            "age": age_on(dob, today) if dob else None,
+            "basic_info": basic,
+            "location": _section(profile, "location", LocationSerializer),
+            "family": _section(profile, "family", FamilySerializer),
+            "profession": _section(profile, "profession", ProfessionSerializer),
+            "lifestyle": _section(profile, "lifestyle", LifestyleSerializer),
+            "languages": LanguageSerializer(profile.languages.all(), many=True).data,
+            "education": EducationSerializer(profile.education.all(), many=True).data,
+            "created_at": profile.created_at,
+            "updated_at": profile.updated_at,
+        }

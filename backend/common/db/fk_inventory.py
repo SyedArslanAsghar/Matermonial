@@ -47,6 +47,18 @@ FK_LOCK_CLASSES: dict[str, str] = {
     "admin_access.AdminTotpDevice.user": "P",
     "admin_access.AdminMfaEnrollment.user": "P",
     "admin_access.AdminMfaEnrollment.issued_by": "B2",
+    # Profiles (Phase 3): the owner/actor User is locked FOR SHARE first and the profile FOR
+    # UPDATE before any section write, so every FK below is prior-locked.
+    "profiles.MatrimonialProfile.owner": "P",
+    "profiles.MatrimonialProfile.created_by": "P",
+    "profiles.MatrimonialProfile.updated_by": "P",
+    "profiles.ProfileBasicInfo.profile": "P",
+    "profiles.ProfileLocation.profile": "P",
+    "profiles.ProfileFamilyDetails.profile": "P",
+    "profiles.ProfileEducation.profile": "P",
+    "profiles.ProfileProfession.profile": "P",
+    "profiles.ProfileLifestyle.profile": "P",
+    "profiles.ProfileLanguage.profile": "P",
     # OTP verify locks the account (level 2) before the verification row; send runs with no
     # other business locks.
     "verification.PhoneVerification.user": "P",
