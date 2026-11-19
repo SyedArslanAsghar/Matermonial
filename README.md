@@ -8,7 +8,7 @@ A privacy-conscious matrimonial platform: a Django REST API backend, a React web
 
 Work proceeds through owner-authorized gates (doc 10 §0): G1 documentation → G2 repository governance → G3 backend foundation → **G4 first migration and backend kernel** → G5 features (G4 and G5 authorized, DR-2026-11-18-G4). Current status: [`docs/implementation/progress.md`](docs/implementation/progress.md).
 
-There are no product features yet. The backend foundation (G3) and the G4 kernel are in place: the final `User` model and migrations, sessions and tokens, pseudonyms and envelope encryption, partitioned security-event and audit logs, the transactional outbox, idempotency records and the TR-24 maintenance protocol with a local compliance registry. Status and open items: [`progress.md`](docs/implementation/progress.md) and [`known_issues.md`](docs/implementation/known_issues.md).
+G5 Phase 2 (authentication and admin access) is implemented and tested on `feature/g5-phase2-auth`, pending owner review: registration, phone OTP, login, logout, web sessions, mobile tokens, password reset, rate limits, AdminRole authorization and Django Admin MFA. The backend foundation (G3) and the G4 kernel are in place: the final `User` model and migrations, sessions and tokens, pseudonyms and envelope encryption, partitioned security-event and audit logs, the transactional outbox, idempotency records and the TR-24 maintenance protocol with a local compliance registry. Status and open items: [`progress.md`](docs/implementation/progress.md) and [`known_issues.md`](docs/implementation/known_issues.md).
 
 ## Repository structure
 
@@ -104,6 +104,22 @@ pytest                  # tests
   ```bash
   DJANGO_SETTINGS_MODULE=config.settings.local CELERY_TASK_ALWAYS_EAGER=false celery -A config worker -l info
   ```
+
+### Django Admin access (TR-07, ADR-033)
+
+Admin access comes only from administrative roles, and every administrator, superusers included, signs in with a password **and** a TOTP code from an authenticator app. To set up a local administrator:
+
+```bash
+cd backend
+python manage.py migrate
+python manage.py admin_access sync-catalogue          # role definitions from apps/admin_access/catalogue.py
+python manage.py createsuperuser                      # break-glass account (at most two exist)
+# or a normal administrator:
+python manage.py admin_access assign-role --phone +923001234567 --role system_admin
+python manage.py admin_access issue-mfa-enrollment --phone +923001234567   # prints a single-use code
+```
+
+Then open `/admin/mfa/enroll/`, enter the password and the enrollment code, add the shown key to an authenticator app, and confirm with a code. Sign in at `/admin/login/`. The admin uses its own session cookie (30 min idle, 12 h absolute). If an authenticator is lost, another administrator uses the account action "Reset admin MFA", or the operator runs `python manage.py admin_access reset-mfa --phone ...`. Other subcommands: `revoke-role`, `grant-superuser`, `revoke-superuser` (with `--reason CODE`).
 
 ### Later setup steps
 

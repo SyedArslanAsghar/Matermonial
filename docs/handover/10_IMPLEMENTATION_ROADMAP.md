@@ -50,6 +50,8 @@ The project proceeds through five gates. **Each gate needs the project owner's e
 | 18 | Mobile (each module only after its API contract is approved) |
 | 19 | Release |
 
+**G5 Phase 2 status (2026-11-19):** **IMPLEMENTED and TESTED** on `feature/g5-phase2-auth`: auth flows (2a–2d), rate limits (2e-1), admin roles and permissions (2e-2), Django Admin MFA and admin session (2e-3). 347/347 tests pass on Python 3.12 and 3.13 × PostgreSQL 16 and 18. Not pushed. Owner review and acceptance pending (CC-R70). Record: `docs/implementation/progress.md`.
+
 **Dependency check:**
 - Auth and User are final before 0001 (G4).
 - Audit and outbox exist at G4.

@@ -249,3 +249,18 @@ Added by the G3 correction (DR-2026-11-17-G3C-3). Test code reads it (`backend/t
   - Teardown fails the test if a table was created or an advisory lock is left behind, and closes every connection it opened.
 - **Not covered:** tests that need application tables, including the 3 User-model database tests, need the first migration and belong to G4 (KI-14).
 
+## 12. Configuration added in G5 Phase 2 (2026-11-19)
+
+Implementation record (CC-R63). The names are in `backend/.env.example`; the code is in `backend/config/settings/base.py`.
+
+| Variable | Purpose | Default (local) | Deployed environments |
+|---|---|---|---|
+| `OTP_KEYS`, `ROT_KEYS`, `ADMIN_MFA_KEYS` and each `*_ACTIVE_VERSION` | OTP code HMAC (doc 06 §3); K_rot refresh-token derivation (TR-01); admin TOTP seed encryption and enrollment-code HMAC (TR-07, ADR-033) | Dev-only keys | **Required**; dev keys refused (same rules as §11) |
+| `OTP_VALIDITY_SECONDS`, `OTP_RESEND_COOLDOWN_SECONDS`, `OTP_MAX_ATTEMPTS`, `OTP_MAX_SENDS_PER_HOUR` | One-time codes | 300 / 60 / 5 / 5 | Same |
+| `AUTH_WEB_*`, `AUTH_MOBILE_*`, `AUTH_REFRESH_GRACE_SECONDS`, `AUTH_STEP_UP_WINDOW_SECONDS` | Session and token lifetimes (doc 06 §22.2) | 2 h / 7 d web; 15 min access, 30 d / 90 d mobile; 15 s; 300 s | Same |
+| `RATE_*` (`RATE_LOGIN_PHONE_IP` … `RATE_ADMIN_ENROLL_IP`) | Authentication rate limits, `"<count>/<seconds>"` | doc 06 §22.1 §8.4 values; admin login 5/900 per phone+IP and 20/900 per IP; enrollment 5/3600 and 10/3600 | Same; a shared Redis `CACHE_URL` is required |
+| `CACHE_URL` | Rate-limit and flood-control counters | in-process | **Redis required** |
+| `ADMIN_URL_PATH` | Django Admin URL prefix | `admin/` | Recommended: a non-default path |
+| `ADMIN_SESSION_COOKIE_NAME` | Separate admin session cookie | `mat_admin_session` | `__Host-mat_admin_session` (set in production settings) |
+| `ADMIN_SESSION_IDLE_SECONDS`, `ADMIN_SESSION_ABSOLUTE_SECONDS` | Admin session limits (doc 06 §22.2) | 1800 / 43200 | Same |
+| `ADMIN_MFA_ENROLLMENT_TTL_SECONDS`, `ADMIN_MFA_THROTTLE_FACTOR`, `OTP_TOTP_ISSUER` | Enrollment-code lifetime; TOTP failure back-off (1, 2, 4 … s × factor); issuer shown in authenticator apps | 86400 / 1 / `Matermonial` | Same |

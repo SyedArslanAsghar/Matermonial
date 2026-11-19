@@ -19,18 +19,18 @@ One row per requirement, from the SRS (doc 01) to its domain, module, status and
 
 | Requirement | Legacy | Title | Domain | Module(s) | Approval | Implementation | OD dependency | Tests (specified) |
 |---|---|---|---|---|---|---|---|---|
-| FR-ACC-001 | FR-002 | Registration | D01 | M01 | APPROVED | NOT_STARTED | — | T-AUTH |
-| FR-ACC-002 | FR-003 | Phone verification | D03 | M04, M01 | APPROVED | NOT_STARTED | — | T-AUTH |
+| FR-ACC-001 | FR-002 | Registration | D01 | M01 | APPROVED | TESTED (G5 Phase 2b, `b53d1bd`: phone + password registration, enumeration-safe; `apps/accounts/tests/test_auth_api.py`) | — | T-AUTH |
+| FR-ACC-002 | FR-003 | Phone verification | D03 | M04, M01 | APPROVED | IN_PROGRESS (G5 Phases 2a–2b: OTP service and endpoints TESTED, `apps/verification/tests`; gating of protected matrimonial activities arrives with those features, Phase 3+) | — | T-AUTH |
 | FR-ACC-003 | — | Email | D01 | M01 | APPROVED | NOT_STARTED | — | T-AUTH |
 | FR-ACC-004 | FR-001 | Adult eligibility | D01 | M01 | APPROVED | NOT_STARTED | OD-04b (underage handling) (dependent behaviour BLOCKED) | T-AUTH |
-| FR-ACC-005 | FR-007 | Authentication | D02 | M01, M15 | APPROVED | IN_PROGRESS (G4: AuthSession/AuthToken schema; flows G5 Phase 2) | — | T-AUTH, T-SEC, T-CONC-001…004 |
+| FR-ACC-005 | FR-007 | Authentication | D02 | M01, M15 | APPROVED | TESTED (G5 Phases 2b–2e: login, logout, web sessions, mobile tokens and rotation, session management, password-only step-up (OD-04c), password reset/change, rate limits, security events; Django Admin MFA and admin session; `apps/accounts/tests`, `apps/admin_access/tests`) | — | T-AUTH, T-SEC, T-CONC-001…004 |
 | FR-ACC-006 | FR-004 | Account/profile separation | D01 | M01 | APPROVED | NOT_STARTED | — | T-AUTH |
 | FR-ACC-007 | FR-005 | Account audit fields | D01 | M01 | APPROVED | IN_PROGRESS (G4: created_by/updated_by fields with PROTECT; set by services from G5) | — | T-AUTH |
 | FR-ACC-008 | FR-002 | Phone normalization | D01 | M01 | APPROVED | TESTED (G4, DR-2026-11-18-G4: E.164 normalisation, unique, DB CHECK; tests in apps/accounts/tests) | — | T-AUTH |
 | FR-ACC-009 | — | Limited browsing | D01 | M01 | APPROVED | BLOCKED | OD-02a/b (whole requirement) | T-AUTH |
 | FR-ACC-010 | FR-006 | Account deactivation (from FR-006) | D01 | M01 | APPROVED | NOT_STARTED | OD-02c (dependent behaviour BLOCKED) | T-AUTH |
 | FR-ADM-001 | — | Administrative capabilities | D22 | M15, M16 | APPROVED | NOT_STARTED | — | T-LOG, T-REG |
-| FR-ADM-002 | — | Least-privilege, audited administration | D22 | M15, M16 | APPROVED | IN_PROGRESS (G4: audit log, maintenance protocol, DB grant model; admin roles G5 Phase 2) | — | T-LOG, T-REG |
+| FR-ADM-002 | — | Least-privilege, audited administration | D22 | M15, M16 | APPROVED | IN_PROGRESS (G4: audit log, maintenance protocol, DB grant model. G5 Phase 2e TESTED: AdminRole authorization (deny by default, audited assignment and revocation, no escalation), two-superuser limit, mandatory admin MFA, admin session limits. Remaining: role permissions per later phase, dual approval and access reviews, Phase 16) | — | T-LOG, T-REG |
 | FR-CON-001 | — | Connection creation | D14 | M08 | APPROVED | NOT_STARTED | — | T-CON |
 | FR-CON-002 | — | Connection states | D14 | M08 | APPROVED | NOT_STARTED | OD-06h/i/l (dependent behaviour BLOCKED) | T-CON |
 | FR-CON-003 | — | Reopening | D14 | M08 | APPROVED | NOT_STARTED | OD-06n (dependent behaviour BLOCKED) | T-CON |

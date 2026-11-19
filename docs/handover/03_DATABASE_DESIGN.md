@@ -2258,3 +2258,18 @@ Editorial record of how G4 implemented §22 (the TRs above were approved by DR-2
 | Partitions | Created 3 months (logs) / 1 year (maintenance log) ahead. The first partitions are created by the migrations, before the registry exists; every later partition change is a recorded PARTITION_CREATE / PARTITION_DROP operation |
 | `registry_stream_head` | Natural key `stream` (the only non-UUID primary key; a two-row control table) |
 | Database roles (D-11) | Append-only enforced by triggers for every role; the application-role GRANT model is `common/db/grants.py` (tested); applying it to deployed roles is deployment work |
+
+### 22.18 G5 Phase 2 implementation record (2026-11-19, DR-2026-11-18-G4)
+
+Editorial record of the schema added in G5 Phase 2 (authentication and admin access). It adds no requirement. Choices were made under the DR-2026-11-18-G4 clarification policy; the admin MFA choices are in ADR-033.
+
+| Item | Implementation |
+|---|---|
+| `verification.PhoneVerification` (Phase 2a) | §2.5 / §5.1: code stored only as HMAC (OTP key ring); one pending code per phone and purpose; state and E.164 CHECKs |
+| `AuthSession.client_type` (`accounts.0002`) | Adds `ADMIN`: the separate Django Admin session (doc 06 §22.2; 30 min idle, 12 h absolute). The API accepts only `WEB` (session) and `MOBILE` (bearer) sessions |
+| **`admin_role`, `admin_permission`, `admin_role_permission`, `admin_user_role`** (`admin_access.0001`) | §16.2–16.5 fields. Additions: code CHECKs; `admin_user_role.assigned_by` nullable for CLI-operator assignments (the audit log records `channel=cli`); partial unique index `(user, role) WHERE revoked_at IS NULL`; CHECKs: expiry after assignment, revocation after assignment, `user <> assigned_by`. Rows are never deleted; roles and permissions are retired (`is_active = false`). All FKs `PROTECT` |
+| **`admin_totp_device`** | django-otp device. **Integer primary key** (library-imposed, ADR-033 §3). One per account (`user` unique, `PROTECT`). Seed stored only as AES-256-GCM ciphertext (`key_version`, `key_nonce`, `key_ciphertext`; ADMIN_MFA key ring). Also `digits` (6/8), `step` (≥ 15), `tolerance` (≤ 2), `drift`, `last_t` (replay), throttling and timestamp columns |
+| **`admin_mfa_enrollment`** | Single-use enrollment code: `code_hash` (HMAC, unique), `issued_by` (nullable for the CLI), `created_at`, `expires_at`, `used_at`, `revoked_at`. CHECKs: hash format, expiry after creation, not both used and revoked, not self-issued; at most one open code per account (partial unique index) |
+| **Superuser limit** | Trigger `admin_superuser_limit` on `accounts_user` (`BEFORE INSERT OR UPDATE OF is_superuser`). It takes a transaction-level advisory lock (namespace 0x4144) and then rejects a third `is_superuser = true` row (`check_violation`, constraint name `admin_superuser_limit`). Deactivated superusers still count until revoked |
+| `is_staff` | Written only by `admin_access.services.roles.refresh_staff_projection`: true when the account is eligible and has a live role, or is a break-glass superuser |
+| Implicit-lock classes (doc 12 §5.5) | `AdminUserRole.user`, `AdminTotpDevice.user`, `AdminMfaEnrollment.user`: P (the target User is locked FOR UPDATE first). `assigned_by`, `issued_by`: B2. Role and permission FKs: N (reference data, catalogue sync) |

@@ -803,3 +803,22 @@ Each stream has its own `seq` and hash chain. One chain with mixed retention wou
 ### 22.9 Closed-connection history (DCR-59, DCR-83)
 
 Entering CLOSED ends connection-derived access and new communication, but keeps conversation history readable read-only for both participants under the existing access and retention rules (doc 15 §7, doc 05 §25.10). A block in either direction makes history unreadable.
+
+### 22.10 G5 Phase 2 implementation record (2026-11-19)
+
+Editorial record (CC-R63). It adds no requirement. Details are in ADR-033 and `docs/implementation/progress.md`.
+
+- **§22.1–22.2 flows (Phases 2b–2e-1):** registration, phone OTP, login, logout, web sessions with CSRF, mobile tokens with refresh rotation, session listing and revocation, password-only step-up (OD-04c OPEN), password forgot/reset/change, and endpoint rate limits, as specified in §22.1–22.2.
+- **Administrative authorization (TR-07, §15):**
+  - The only Django authentication backend is `AdminRoleBackend`. It checks passwords like ModelBackend and reads permissions only from the AdminRole tables, deny by default.
+  - Groups, `user_permissions` and object permissions always yield nothing. Expired or revoked assignments, retired roles and permissions, and inactive or deactivated accounts grant nothing.
+  - Assignment and revocation require `admin_access.manage_roles`, are never for oneself (also a database CHECK), and allow no escalation: a role can be granted only by someone holding all its permissions.
+  - Every change and every refusal is audited (`ADMINISTRATIVE`). Losing all access ends the account's admin sessions.
+  - Role definitions are code (`apps/admin_access/catalogue.py`), applied with `manage.py admin_access sync-catalogue`. Only `system_admin` exists until later phases add their permissions.
+- **Break-glass superusers:** at most two (database trigger, race-safe). Granted or revoked only by the CLI operator or another superuser, audited, and still subject to MFA and the admin session.
+- **Admin MFA and the admin session (§22.2 row "Web (Django Admin)"):** implemented as ADR-033:
+  - TOTP through django-otp with encrypted seeds;
+  - enrollment with password plus an out-of-band single-use code;
+  - administrator-assisted recovery, no backup codes;
+  - separate cookie and `ADMIN` AuthSession, 30 min idle and 12 h absolute, checked on every admin request;
+  - admin password-change pages disabled.

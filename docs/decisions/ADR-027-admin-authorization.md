@@ -12,6 +12,16 @@ Doc 03 defines AdminRole tables, while an earlier proposal used Django Groups. T
 
 Django Admin with MFA (django-otp). The `AdminRole` / `AdminPermission` / `AdminRolePermission` / `AdminUserRole` tables are the only source of administrative authorization, read by a custom authentication backend. Django Groups and `user_permissions` aren't used. `is_staff` is a projection; `is_superuser` is break-glass only.
 
+## Implementation (G5 Phase 2e, 2026-11-19)
+
+Implemented in `backend/apps/admin_access/`:
+- `AdminRoleBackend` is the only authentication backend; permissions come only from these tables, deny by default.
+- `services.roles` handles assignment, revocation and the `is_staff` projection, all audited, with no self-assignment and no escalation.
+- The two-superuser limit is a database trigger; `services.superusers` handles grants and revocations.
+- MFA and the admin session follow ADR-033.
+
+Records: doc 03 §22.18, doc 06 §22.10.
+
 ## Consequences
 
 - No SQLAdmin.

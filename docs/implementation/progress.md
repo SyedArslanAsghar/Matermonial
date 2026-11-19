@@ -1,6 +1,6 @@
 # Progress
 
-**Last updated:** 2026-11-18 (G4 implemented, DR-2026-11-18-G4)
+**Last updated:** 2026-11-19 (G5 Phase 2 implemented and tested)
 
 ## Governance status
 
@@ -11,12 +11,12 @@
 | G2 Repository governance | **ACCEPTED** by the project owner with carried-forward items (DR-2026-11-17-G2A). Baseline commit `38f491dea79fb9bb10fd2010b1c2cb8a68d545f9`. Exit criterion "CI runs on the baseline" (carried forward under DR-2026-11-17-G2X): **satisfied by owner acceptance** (DR-2026-11-18-G2C, 2026-11-18) on the integrated run `44294474904` on commit `c5fc346` (success, 6/6 jobs). The baseline commit `38f491d` itself did not run independently. |
 | G3 Backend foundation | **ACCEPTED** by the project owner on 2026-11-18, with an accepted exception and a carried-forward item (DR-2026-11-18-G3A). Exit criterion "tests green on PostgreSQL" is **not fully met**: the PostgreSQL foundation tests pass, but the 3 KI-14 User-model database tests are **OPEN** and must pass as part of G4. The G3 changes were committed and pushed by the owner as `c5fc346` (DR-2026-11-18-GH). |
 | G4 First migration | **ACCEPTED by the project owner** (DR-2026-11-18-G4A, 2026-11-18). |
-| G5 Features | **IN PROGRESS** (authorized DR-2026-11-18-G4): Phase 2 authentication on `feature/g5-phase2-auth`. |
+| G5 Features | **IN PROGRESS** (authorized DR-2026-11-18-G4). Phase 2 (auth flows + Django Admin MFA) **IMPLEMENTED and TESTED** on `feature/g5-phase2-auth` (not pushed; owner review pending). Phase 3 next. |
 | Current delivery scope | **CI/CD implementation and validation** (DR-2026-11-18-CI, 2026-11-18). AWS deployment and production infrastructure are **deferred** and out of current scope. CD execution stays disabled until a target and an authorization exist. This doesn't authorize a remote, a push, a commit, G4 or a deployment. |
 
 ## Implementation status
 
-No implementation work has been authorized or started. Doc 18 lists 126 requirements: 124 NOT_STARTED and 2 BLOCKED (FR-ACC-009 by OD-02a/b, FR-PRO-005 by OD-04a). Nothing is PLANNED or beyond.
+*Current (2026-11-19):* G5 Phase 2 is TESTED (FR-ACC-001, FR-ACC-005 TESTED; FR-ACC-002 and FR-ADM-002 IN_PROGRESS); see the G5 Phase 2 section below and doc 18. *Historical (G3):* No implementation work has been authorized or started. Doc 18 lists 126 requirements: 124 NOT_STARTED and 2 BLOCKED (FR-ACC-009 by OD-02a/b, FR-PRO-005 by OD-04a). Nothing is PLANNED or beyond.
 
 The `backend/` scaffold predates the baseline. G3 rebuilt it into the backend foundation, which has been **executed and verified**: system checks, `check --deploy`, WSGI/ASGI loading, and the test suite on Python 3.12 and 3.13. The PostgreSQL foundation tests pass on PostgreSQL 16 and 18. It has no migrations, so the 3 KI-14 User-model database tests stay deferred to G4. GitHub Actions ran for the first time on the owner-pushed commit `c5fc346` (run `44294474904`, success, 6/6 jobs; DR-2026-11-18-GH). The owner accepted this run as satisfying the G2 prerequisite "CI runs on the baseline" (DR-2026-11-18-G2C). The baseline commit `38f491d` itself did not run independently.
 
@@ -286,4 +286,85 @@ Branch `feature/g4-kernel` (from `main` `f9cc3df`). Validation used disposable P
 **G4 exit criteria (doc 10 §0.1):** migration reviewed — met (each stage's diff reviewed; this record); kernel tests pass — met (D-10 list, including KI-14); KI-14 carry-forward (DR-2026-11-18-G3A-2) — **resolved**.
 
 **Open items after G4:** KI-20 (TR-07 roles/backend/MFA, Phase 2), KI-21 (CI workflow step stale — owner), KI-22 (Stream R and operator approvals, Phases 15–16), KI-23 (production keys and registry store, deferred with AWS), KI-24 (bootstrap partitions, documented).
+
+## G5 Phase 2 — Authentication and admin access (2026-11-18 to 2026-11-19, DR-2026-11-18-G4)
+
+Branch `feature/g5-phase2-auth` (from G4). Validation used disposable PostgreSQL 16.16 and 18.7 containers on ports 55432 / 55418. The owner's server on 5432 was never used. Nothing was pushed.
+
+| Stage | Scope | Commit | Tests after |
+|---|---|---|---|
+| 2a | Phone OTP service: HMAC-stored codes, cooldown and hourly limits, attempts, single use, async SMS (FR-ACC-002) | `056a8bc` | 230 |
+| 2b | Registration, OTP endpoints, login, logout, web sessions with CSRF, mobile tokens, `/auth/me` (FR-ACC-001/002/005, TR-01) | `b53d1bd` | 252 |
+| 2c | Refresh rotation with reuse detection, session listing and revocation, password-only step-up (OD-04c OPEN) | `f8183b9` | 270 |
+| 2d | Password forgot, reset and change | `ccbc1d4` | 280 |
+| 2e-1 | Authentication endpoint rate limits | `f82df2a` | 287 |
+| deps | django-otp 1.7.5 (compatibility verified; lockfiles recompiled, only django-otp added) | `bccfcae` | 287 |
+| 2e-2 / 2e-3 | Admin roles and permissions, deny-by-default backend, audited assignment and revocation, `is_staff` projection, two-superuser limit; admin MFA (TOTP, encrypted seeds, enrollment codes, admin-assisted recovery); separate admin session 30 min / 12 h (TR-07, ADR-027, ADR-033) | `eb5a7c7` | 347 |
+
+2e-2 and 2e-3 share one commit. The role tables, the MFA device and the admin session are wired through the same models, settings, middleware and site, and splitting them would have meant writing intermediate code that never ran.
+
+### 2e-2 / 2e-3 summary
+
+- **Authorization source:**
+  - `AdminRoleBackend` is the only authentication backend. Permissions come only from AdminRole tables, deny by default.
+  - Groups and `user_permissions` stay empty (G4 trigger), and object permissions yield nothing.
+  - `is_staff` alone never grants access (tested with a forged projection).
+- **Role changes** (`services/roles.py`):
+  - require `admin_access.manage_roles`;
+  - are never for oneself (service check plus a database CHECK);
+  - allow no escalation: the assigner must hold all of the role's permissions;
+  - lock the target User FOR UPDATE first;
+  - are audited (`ADMINISTRATIVE`), refusals included;
+  - end the account's admin sessions when the last access goes.
+
+  Expired assignments grant nothing immediately; a 5-minute job tidies the projection.
+- **Catalogue:** code-defined, synced with `manage.py admin_access sync-catalogue`. Only `system_admin` exists; later phases add their roles.
+- **Superusers:** at most two, enforced by a database trigger with an advisory lock. Five concurrent grants produce exactly two. `createsuperuser` uses the audited service.
+- **MFA (ADR-033):**
+  - TOTP through django-otp, seed encrypted with AES-GCM (ADMIN_MFA key ring);
+  - a code is accepted once, with exponential throttling;
+  - enrollment needs the password plus a single-use out-of-band code;
+  - recovery is administrator-assisted (no backup codes).
+- **Admin session:** own cookie and an `ADMIN` AuthSession (30 min idle, 12 h absolute). Every admin request re-checks the session, the role and MFA. The API rejects ADMIN sessions; the admin rejects user sessions.
+- **Other hardening:**
+  - admin password-change pages disabled;
+  - staff can't set account passwords;
+  - admin-created accounts go through `create_user` (pseudonym and data key);
+  - admin login and enrollment are rate limited.
+
+### Final validation (2026-11-19)
+
+Fresh throwaway containers (`python:3.12-slim` / `python:3.13-slim`, host network), source mounted read-only:
+
+| Check | Python 3.12.16 | Python 3.13.18 |
+|---|---|---|
+| Hash-checked `local.txt` install, `pip check` | pass | pass |
+| Hash-checked `production.txt` install, `pip check` | pass | pass |
+| Lockfiles match inputs (recompiled with 3.12) | base, local, production consistent | n/a (by design) |
+| Ruff lint, Ruff format | pass (151 files) | (same source) |
+| Tests on PostgreSQL 16.16 | **347 passed, 0 skipped, 0 failed** | **347 passed, 0 skipped, 0 failed** |
+| Tests on PostgreSQL 18.7 | **347 passed, 0 skipped, 0 failed** | **347 passed, 0 skipped, 0 failed** |
+
+The 9 PostgreSQL foundation tests run in every combination (`MATERMONIAL_TEST_POSTGRES_URL` set).
+
+**Migrations** (fresh database `migcheck` on 16.16 and 18.7): migrate from empty OK; `makemigrations --check` reports no changes; `admin_access` → zero and `accounts` → 0001 reverse cleanly (no `admin_*` table, function or trigger left); re-migrate OK. New migrations: `accounts.0002_alter_authsession_client_type`, `admin_access.0001_initial` (including the superuser-limit trigger).
+
+**Diff review:**
+- No secrets, keys or credentials. Test passwords are fixed test strings; the dev keys are the existing public-label dev rings.
+- No unrelated changes; CI workflow and infrastructure untouched.
+
+### Phase 2 completion criteria
+
+| Criterion | Status |
+|---|---|
+| Admin roles and permissions implemented | Met |
+| Deny-by-default authorization tested | Met (`TestDenyByDefault`) |
+| Audited role assignment and revocation | Met |
+| Two-superuser limit enforced | Met (database trigger; concurrency test) |
+| Admin MFA enforced | Met (superusers included) |
+| Admin session limits implemented and tested | Met (`TestSessionLimits`) |
+| Documentation updated | Met (doc 03 §22.18, doc 06 §22.10, doc 16 §12, doc 18, doc 20, ADR-027, ADR-033, README) |
+| Final validation across the matrix | Met (table above) |
+
+Implementation status: **TESTED**. REVIEWED and ACCEPTED are set by the reviewer and the owner (CC-R70). Open items: KI-21 (owner, CI step), KI-25…KI-28.
 
