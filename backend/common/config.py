@@ -70,7 +70,7 @@ def deployed_settings_errors(settings: Mapping, environ: Mapping) -> list[str]:
             "CELERY_BROKER_URL or REDIS_URL must be set explicitly "
             "(no default message broker in deployment)."
         )
-    for name in ("SMS_PROVIDER", "PUSH_PROVIDER"):
+    for name in ("SMS_PROVIDER", "PUSH_PROVIDER", "MALWARE_SCANNER"):
         if settings.get(name) in NON_PRODUCTION_PROVIDERS:
             errors.append(f"{name} must not be a mock provider in a deployed environment.")
     if settings.get("EMAIL_BACKEND") in NON_PRODUCTION_EMAIL_BACKENDS:

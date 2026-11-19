@@ -60,6 +60,8 @@ FK_LOCK_CLASSES: dict[str, str] = {
     "profiles.ProfileLifestyle.profile": "P",
     "profiles.ProfileLanguage.profile": "P",
     "profiles.PartnerPreference.profile": "P",
+    "profiles.ProfilePhoto.profile": "P",
+    "profiles.ProfilePhoto.uploaded_by": "P",
     "profiles.PartnerPreferenceLocation.preference": "P",
     "profiles.PartnerPreferenceEducation.preference": "P",
     "profiles.PartnerPreferenceLanguage.preference": "P",

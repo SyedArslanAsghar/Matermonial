@@ -95,3 +95,42 @@ def get_sms_provider() -> SMSProvider:
 
 def get_push_provider() -> PushProvider:
     return _select("PUSH_PROVIDER", "push", MockPushProvider)
+
+
+# --- Malware scanning (TR-10, DR-2026-11-19-P3-1) -----------------------------------------
+# ``mock`` (local and tests) flags only the EICAR test signature. ``disabled`` refuses every
+# scan, so uploads are refused rather than accepted unscanned. Deployed settings refuse
+# ``mock``; a real scanner needs owner approval before production.
+
+EICAR_MARKER = b"EICAR-STANDARD-ANTIVIRUS-TEST-FILE"
+
+
+@dataclass(frozen=True)
+class ScanResult:
+    clean: bool
+    provider: str
+
+
+class MockScanner:
+    name = "mock"
+
+    def scan(self, data: bytes) -> ScanResult:
+        return ScanResult(clean=EICAR_MARKER not in data, provider=self.name)
+
+
+class DisabledScanner:
+    name = "disabled"
+
+    def scan(self, data: bytes) -> ScanResult:
+        raise ProviderDisabledError("Malware scanning is disabled in this environment.")
+
+
+def get_malware_scanner():
+    choice = getattr(settings, "MALWARE_SCANNER", "disabled")
+    if choice == "mock":
+        return MockScanner()
+    if choice == "disabled":
+        return DisabledScanner()
+    raise ImproperlyConfigured(
+        f"Unknown MALWARE_SCANNER {choice!r}; expected 'mock' or 'disabled'."
+    )

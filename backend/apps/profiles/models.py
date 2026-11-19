@@ -446,3 +446,88 @@ class PartnerPreferenceReligion(models.Model):
             models.UniqueConstraint(fields=["preference", "religion"], name="pref_religion_unique"),
             code_check("religion", "pref_religion_code"),
         ]
+
+
+# --- Profile photos (doc 03 §3.9, §22.3; FR-PRO-008; TR-10, DR-2026-11-19-P3-1) -------------
+
+
+class ProfilePhoto(models.Model):
+    """One uploaded photo. Only re-encoded output is ever stored (originals are discarded), under
+    a private storage key that is never a URL. Rows are soft-deleted and kept (FR-017).
+    Moderation is Phase 14; controlled delivery to viewers is Module 10 (Phase 6)."""
+
+    class Processing(models.TextChoices):
+        QUARANTINED = "QUARANTINED"
+        READY = "READY"
+        REJECTED = "REJECTED"
+
+    class Moderation(models.TextChoices):
+        PENDING = "PENDING"
+        APPROVED = "APPROVED"
+        REJECTED = "REJECTED"
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    profile = models.ForeignKey(MatrimonialProfile, on_delete=models.PROTECT, related_name="photos")
+    uploaded_by = models.ForeignKey(
+        "accounts.User", on_delete=models.PROTECT, related_name="photos_uploaded"
+    )
+    storage_key = models.CharField(max_length=200, null=True, blank=True)
+    photo_type = code_field()
+    is_primary = models.BooleanField(default=False)
+    processing_status = models.CharField(
+        max_length=11, choices=Processing.choices, default=Processing.QUARANTINED
+    )
+    rejection_reason = models.CharField(max_length=40, null=True, blank=True)
+    moderation_status = models.CharField(
+        max_length=8, choices=Moderation.choices, default=Moderation.PENDING
+    )
+    mime_type = models.CharField(max_length=40, null=True, blank=True)
+    size = models.PositiveIntegerField(null=True, blank=True)
+    checksum = models.CharField(max_length=64, null=True, blank=True)  # SHA-256 of stored bytes
+    width = models.PositiveIntegerField(null=True, blank=True)
+    height = models.PositiveIntegerField(null=True, blank=True)
+    uploaded_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    deleted_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        db_table = "profiles_photo"
+        ordering = ["uploaded_at"]
+        indexes = [models.Index(fields=["profile", "deleted_at"], name="photo_profile_live")]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["profile"],
+                condition=Q(is_primary=True, deleted_at__isnull=True),
+                name="photo_one_primary_per_profile",
+            ),
+            # A primary photo is a processed, live one.
+            models.CheckConstraint(
+                condition=Q(is_primary=False)
+                | Q(processing_status="READY", deleted_at__isnull=True),
+                name="photo_primary_is_ready",
+            ),
+            # READY rows carry their stored-file facts; others never point at a stored file.
+            models.CheckConstraint(
+                condition=Q(
+                    processing_status="READY",
+                    storage_key__isnull=False,
+                    checksum__regex=r"^[0-9a-f]{64}$",
+                    mime_type__isnull=False,
+                    width__isnull=False,
+                    height__isnull=False,
+                    size__isnull=False,
+                )
+                | (~Q(processing_status="READY") & Q(storage_key__isnull=True)),
+                name="photo_ready_consistent",
+            ),
+            models.CheckConstraint(
+                condition=Q(processing_status="REJECTED", rejection_reason__isnull=False)
+                | (~Q(processing_status="REJECTED") & Q(rejection_reason__isnull=True)),
+                name="photo_rejection_reason_consistent",
+            ),
+            models.CheckConstraint(
+                condition=Q(storage_key__isnull=True) | ~Q(storage_key__contains="://"),
+                name="photo_storage_key_not_url",
+            ),
+            code_check("photo_type", "photo_type_code"),
+        ]

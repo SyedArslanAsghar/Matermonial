@@ -16,5 +16,6 @@ LOCK_TRACKER_ENABLED = True
 EMAIL_BACKEND = "django.core.mail.backends.locmem.EmailBackend"
 SMS_PROVIDER = "mock"
 PUSH_PROVIDER = "mock"
+MALWARE_SCANNER = "mock"
 CELERY_TASK_ALWAYS_EAGER = True
 CELERY_BROKER_URL = "memory://localhost/"

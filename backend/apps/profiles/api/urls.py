@@ -1,6 +1,7 @@
 from django.urls import path
 
 from . import views
+from .photos import PhotoDetailView, PhotoListView
 from .preferences import PartnerPreferenceView
 
 urlpatterns = [
@@ -16,5 +17,11 @@ urlpatterns = [
         "<uuid:profile_id>/submit-review/",
         views.SubmitForReviewView.as_view(),
         name="profile-submit-review",
+    ),
+    path("<uuid:profile_id>/photos/", PhotoListView.as_view(), name="profile-photos"),
+    path(
+        "<uuid:profile_id>/photos/<uuid:photo_id>/",
+        PhotoDetailView.as_view(),
+        name="profile-photo",
     ),
 ]

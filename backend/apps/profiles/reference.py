@@ -41,6 +41,7 @@ NEUTRAL: dict[str, tuple[str, ...]] = {
     "drinking_status": ("NO", "OCCASIONALLY", "YES"),
     "exercise_habit": ("NEVER", "SOMETIMES", "REGULARLY"),
     "proficiency": ("BASIC", "CONVERSATIONAL", "FLUENT", "NATIVE"),
+    "photo_type": ("PORTRAIT", "FULL_LENGTH", "OTHER"),
 }
 
 LISTS = {**SENSITIVE, **NEUTRAL}

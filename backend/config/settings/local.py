@@ -11,6 +11,7 @@ API_DOCS_ENABLED = env.bool("API_DOCS_ENABLED", default=True)
 LOCK_TRACKER_ENABLED = env.bool("LOCK_TRACKER_ENABLED", default=True)
 SMS_PROVIDER = env("SMS_PROVIDER", default="mock")
 PUSH_PROVIDER = env("PUSH_PROVIDER", default="mock")
+MALWARE_SCANNER = env("MALWARE_SCANNER", default="mock")
 # Redis and a Celery worker are optional locally: tasks run inline unless disabled.
 CELERY_TASK_ALWAYS_EAGER = env.bool("CELERY_TASK_ALWAYS_EAGER", default=True)
 

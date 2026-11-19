@@ -172,6 +172,9 @@ CSRF_COOKIE_HTTPONLY = False
 EMAIL_BACKEND = env("EMAIL_BACKEND", default="django.core.mail.backends.console.EmailBackend")
 SMS_PROVIDER = env("SMS_PROVIDER", default="disabled")
 PUSH_PROVIDER = env("PUSH_PROVIDER", default="disabled")
+# Upload malware scanner (TR-10): "mock" locally and in tests, "disabled" (uploads refused)
+# until a real scanner is approved.
+MALWARE_SCANNER = env("MALWARE_SCANNER", default="disabled")
 
 # --- Encryption, pseudonymisation and registry keys (TR-23, TR-11, TR-24; doc 16 §10) ---
 # Each ring is "<version>:<base64 32-byte key>,..." plus its active version. The defaults are
@@ -260,6 +263,13 @@ PROFILE_OPTIONAL_FIELDS = [
     "lifestyle.height_cm",
     "lifestyle.diet",
 ]
+
+# Photo pipeline (TR-10; DR-2026-11-19-P3-1). Defaults are documented assumptions.
+PHOTO_MAX_UPLOAD_BYTES = env.int("PHOTO_MAX_UPLOAD_BYTES", default=10 * 1024 * 1024)
+PHOTO_MAX_PIXELS = env.int("PHOTO_MAX_PIXELS", default=40_000_000)  # decompression-bomb guard
+PHOTO_MAX_EDGE = env.int("PHOTO_MAX_EDGE", default=2048)  # stored long edge, pixels
+PHOTO_MIN_EDGE = env.int("PHOTO_MIN_EDGE", default=200)
+PHOTO_MAX_PER_PROFILE = env.int("PHOTO_MAX_PER_PROFILE", default=6)
 
 # --- Celery and Redis (DR-2026-11-17-G3-4; CC-R53, CC-R54) ---
 REDIS_URL = env("REDIS_URL", default="redis://127.0.0.1:6379/0")
