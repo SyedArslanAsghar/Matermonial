@@ -31,6 +31,7 @@ GOOD_DEPLOYED = {
     "ALLOWED_HOSTS": ["api.example.test"],
     "SMS_PROVIDER": "disabled",
     "PUSH_PROVIDER": "disabled",
+    "MALWARE_SCANNER": "disabled",
     "EMAIL_BACKEND": "django.core.mail.backends.smtp.EmailBackend",
     "STORAGE_BACKEND": "local",
     **KEY_SETTINGS,
@@ -90,6 +91,7 @@ def test_valid_deployed_configuration_passes():
         ({}, {}, "DATABASE_URL"),
         ({"SMS_PROVIDER": "mock"}, GOOD_ENV, "SMS_PROVIDER"),
         ({"PUSH_PROVIDER": "mock"}, GOOD_ENV, "PUSH_PROVIDER"),
+        ({"MALWARE_SCANNER": "mock"}, GOOD_ENV, "MALWARE_SCANNER"),
         (
             {"EMAIL_BACKEND": "django.core.mail.backends.console.EmailBackend"},
             GOOD_ENV,
