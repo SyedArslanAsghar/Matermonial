@@ -218,3 +218,88 @@ class AdminMfaEnrollment(models.Model):
                 name="admin_mfa_enrollment_not_self_issued",
             ),
         ]
+
+
+class AdminActionApproval(models.Model):
+    """A sensitive administrative action that needs a second administrator (doc 03 §16.7).
+    Used for admin MFA recovery (ADR-033 Amendment 1, DR-2026-11-19-O-8). Rows are kept as
+    history; the requester can never approve or reject (CHECKs)."""
+
+    class ActionType(models.TextChoices):
+        ADMIN_MFA_RECOVERY = "ADMIN_MFA_RECOVERY"
+
+    class Status(models.TextChoices):
+        PENDING = "PENDING"
+        APPROVED = "APPROVED"
+        REJECTED = "REJECTED"
+        EXPIRED = "EXPIRED"
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    requested_by = models.ForeignKey(
+        "accounts.User", on_delete=models.PROTECT, related_name="admin_approvals_requested"
+    )
+    approved_by = models.ForeignKey(
+        "accounts.User",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="admin_approvals_approved",
+    )
+    rejected_by = models.ForeignKey(
+        "accounts.User",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="admin_approvals_rejected",
+    )
+    action_type = models.CharField(max_length=40, choices=ActionType.choices)
+    resource_type = models.CharField(max_length=60)
+    resource_id = models.UUIDField()
+    status = models.CharField(max_length=8, choices=Status.choices, default=Status.PENDING)
+    reason = models.CharField(max_length=40)  # reason code, never free text
+    outcome = models.CharField(max_length=20, null=True, blank=True)  # e.g. DELIVERY_FAILED
+    requested_at = models.DateTimeField()
+    expires_at = models.DateTimeField()
+    approved_at = models.DateTimeField(null=True, blank=True)
+    rejected_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        db_table = "admin_action_approval"
+        ordering = ["-requested_at"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["action_type", "resource_id"],
+                condition=Q(status="PENDING"),
+                name="admin_approval_one_pending",
+            ),
+            models.CheckConstraint(
+                condition=Q(reason__regex=r"^[A-Z0-9_]{3,40}$"), name="admin_approval_reason_code"
+            ),
+            models.CheckConstraint(
+                condition=Q(expires_at__gt=F("requested_at")), name="admin_approval_expiry"
+            ),
+            # Separation of duties: the requester never decides.
+            models.CheckConstraint(
+                condition=Q(approved_by__isnull=True) | ~Q(approved_by=F("requested_by")),
+                name="admin_approval_not_self_approved",
+            ),
+            models.CheckConstraint(
+                condition=Q(rejected_by__isnull=True) | ~Q(rejected_by=F("requested_by")),
+                name="admin_approval_not_self_rejected",
+            ),
+            models.CheckConstraint(
+                condition=(
+                    Q(status="APPROVED", approved_by__isnull=False, approved_at__isnull=False)
+                    & Q(rejected_by__isnull=True, rejected_at__isnull=True)
+                )
+                | (
+                    Q(status="REJECTED", rejected_by__isnull=False, rejected_at__isnull=False)
+                    & Q(approved_by__isnull=True, approved_at__isnull=True)
+                )
+                | (
+                    Q(status__in=["PENDING", "EXPIRED"])
+                    & Q(approved_by__isnull=True, rejected_by__isnull=True)
+                ),
+                name="admin_approval_decision_consistent",
+            ),
+        ]

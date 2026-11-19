@@ -47,6 +47,10 @@ FK_LOCK_CLASSES: dict[str, str] = {
     "admin_access.AdminTotpDevice.user": "P",
     "admin_access.AdminMfaEnrollment.user": "P",
     "admin_access.AdminMfaEnrollment.issued_by": "B2",
+    # Recovery approvals: the target User is locked first; the people are staff actors (B2).
+    "admin_access.AdminActionApproval.requested_by": "B2",
+    "admin_access.AdminActionApproval.approved_by": "B2",
+    "admin_access.AdminActionApproval.rejected_by": "B2",
     # Profiles (Phase 3): the owner/actor User is locked FOR SHARE first and the profile FOR
     # UPDATE before any section write, so every FK below is prior-locked.
     "profiles.MatrimonialProfile.owner": "P",

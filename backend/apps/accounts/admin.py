@@ -43,7 +43,7 @@ class UserAdmin(BaseUserAdmin):
         ("Audit", {"fields": ("created_at", "created_by", "updated_at", "updated_by")}),
         ("Dates", {"fields": ("last_login", "date_joined")}),
     )
-    actions = ["issue_mfa_enrollment", "reset_admin_mfa"]
+    actions = ["issue_mfa_enrollment", "request_mfa_recovery"]
 
     def user_change_password(self, request, id, form_url=""):
         # Staff never set an account's password (raw state editing; doc 06 §15). Recovery is
@@ -66,7 +66,7 @@ class UserAdmin(BaseUserAdmin):
         actions = super().get_actions(request)
         if not request.user.has_perm("admin_access.reset_admin_mfa"):
             actions.pop("issue_mfa_enrollment", None)
-            actions.pop("reset_admin_mfa", None)
+            actions.pop("request_mfa_recovery", None)
         return actions
 
     def _mfa_action(self, request, queryset, operation, title):
@@ -91,17 +91,38 @@ class UserAdmin(BaseUserAdmin):
         response["Cache-Control"] = "no-store"
         return response
 
-    @admin.action(description="Issue an MFA enrollment code")
+    @admin.action(description="Issue a first MFA enrollment code")
     def issue_mfa_enrollment(self, request, queryset):
         from apps.admin_access.services.mfa import issue_enrollment
 
         return self._mfa_action(request, queryset, issue_enrollment, "MFA enrollment codes")
 
-    @admin.action(description="Reset admin MFA and issue a new enrollment code")
-    def reset_admin_mfa(self, request, queryset):
-        from apps.admin_access.services.mfa import reset_mfa
+    @admin.action(description="Request MFA recovery (a second administrator must approve)")
+    def request_mfa_recovery(self, request, queryset):
+        """ADR-033 Amendment 1: creates a PENDING request; nothing is reset and no code is shown.
+        An intermediate page asks for the reason code."""
+        from apps.admin_access.services.recovery import request_recovery
+        from apps.admin_access.services.roles import Actor, AdminAccessError
 
-        return self._mfa_action(request, queryset, reset_mfa, "MFA reset")
+        reason = (request.POST.get("reason_code") or "").strip().upper()
+        if "apply" not in request.POST:
+            context = {
+                **self.admin_site.each_context(request),
+                "title": "Request MFA recovery",
+                "queryset": queryset,
+                "action_name": "request_mfa_recovery",
+            }
+            return TemplateResponse(request, "admin_access/request_recovery.html", context)
+        actor = Actor(user=request.user, request_id=getattr(request, "request_id", None))
+        for user in queryset:
+            try:
+                request_recovery(actor, user, reason)
+                self.message_user(
+                    request, f"{user}: recovery requested; awaiting a second administrator."
+                )
+            except AdminAccessError as exc:
+                self.message_user(request, f"{user}: {exc or exc.code}", messages.ERROR)
+        return None
 
     add_fieldsets = (
         (

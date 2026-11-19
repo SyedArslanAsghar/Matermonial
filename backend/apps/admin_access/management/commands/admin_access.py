@@ -6,10 +6,12 @@ privileged, so these run as the CLI operator (audit ``channel=cli``, actor SYSTE
     manage.py admin_access revoke-role --phone +92... --role system_admin
     manage.py admin_access grant-superuser --phone +92... --reason INCIDENT_123
     manage.py admin_access revoke-superuser --phone +92... --reason INCIDENT_123
-    manage.py admin_access issue-mfa-enrollment --phone +92...
-    manage.py admin_access reset-mfa --phone +92...
+    manage.py admin_access issue-mfa-enrollment --phone +92...      (first enrollment only)
+    manage.py admin_access emergency-mfa-recovery --phone +92... --emergency --reason CODE
 
-Enrollment codes are printed once to this terminal and never logged.
+First-enrollment codes are printed once to this terminal and never logged. Emergency recovery
+(ADR-033 Amendment 1, A1-4) never prints the replacement code: it goes only by SMS to the
+account holder; the account holder and every superuser are notified.
 """
 
 from datetime import timedelta
@@ -40,8 +42,13 @@ class Command(BaseCommand):
             p = sub.add_parser(name)
             p.add_argument("--phone", required=True)
             p.add_argument("--reason", required=True, help="Code such as INCIDENT_2026_11_19")
-        for name in ("issue-mfa-enrollment", "reset-mfa"):
-            sub.add_parser(name).add_argument("--phone", required=True)
+        sub.add_parser("issue-mfa-enrollment").add_argument("--phone", required=True)
+        p = sub.add_parser("emergency-mfa-recovery")
+        p.add_argument("--phone", required=True)
+        p.add_argument(
+            "--emergency", action="store_true", help="Required: confirms break-glass use"
+        )
+        p.add_argument("--reason", required=True, help="Code such as INCIDENT_2026_11_19")
 
     def _user(self, phone) -> User:
         try:
@@ -77,11 +84,21 @@ class Command(BaseCommand):
                 self.stdout.write(
                     f"Enrollment code (single use): {mfa.issue_enrollment(roles.CLI, user)}"
                 )
-            elif action == "reset-mfa":
-                code = mfa.reset_mfa(roles.CLI, user)
-                self.stdout.write("MFA reset; admin sessions ended.")
-                if code:
-                    self.stdout.write(f"Enrollment code (single use): {code}")
+            elif action == "emergency-mfa-recovery":
+                if not opts["emergency"]:
+                    raise CommandError("Emergency recovery needs --emergency (break-glass only).")
+                if not re.fullmatch(REASON, opts["reason"]):
+                    raise CommandError("--reason must be an upper-case code (A-Z, 0-9, _).")
+                from apps.admin_access.services.recovery import emergency_recovery
+
+                delivered = emergency_recovery(user, opts["reason"])
+                self.stdout.write("Emergency recovery done: authenticator removed, sessions ended.")
+                if not delivered:
+                    raise CommandError(
+                        "SMS delivery failed: the replacement code was revoked and not revealed. "
+                        "Retry when SMS works."
+                    )
+                self.stdout.write("The replacement code was sent by SMS to the account holder.")
         except roles.AdminAccessError as exc:
             raise CommandError(str(exc) or exc.code) from None
         self.stdout.write("Done.")

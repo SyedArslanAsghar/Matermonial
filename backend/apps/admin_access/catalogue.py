@@ -31,6 +31,7 @@ class RoleSpec:
 
 MANAGE_ROLES = "admin_access.manage_roles"
 RESET_ADMIN_MFA = "admin_access.reset_admin_mfa"
+APPROVE_ADMIN_MFA_RECOVERY = "admin_access.approve_admin_mfa_recovery"
 
 PERMISSIONS: tuple[PermissionSpec, ...] = (
     PermissionSpec(
@@ -41,9 +42,15 @@ PERMISSIONS: tuple[PermissionSpec, ...] = (
     ),
     PermissionSpec(
         RESET_ADMIN_MFA,
-        "Reset another administrator's MFA and issue enrollment codes",
+        "Request MFA recovery for another administrator; issue first-enrollment codes",
         is_sensitive=True,
     ),
+    PermissionSpec(
+        APPROVE_ADMIN_MFA_RECOVERY,
+        "Approve or reject another administrator's MFA recovery request (never one's own)",
+        is_sensitive=True,
+    ),
+    PermissionSpec("admin_access.view_adminactionapproval", "View approval requests"),
     PermissionSpec("admin_access.view_adminrole", "View administrative roles"),
     PermissionSpec("admin_access.view_adminpermission", "View administrative permissions"),
     PermissionSpec("admin_access.view_adminuserrole", "View role assignments"),

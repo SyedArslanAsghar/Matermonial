@@ -12,9 +12,9 @@ Design (documented in docs/decisions/ADR-033-admin-mfa.md):
 - **Verification:** the device row is locked, the token must be exactly ``digits`` digits, a
   time step is accepted at most once (replay), django-otp's exponential throttling applies, and
   failures are security events.
-- **Recovery** is administrator-assisted: ``reset_mfa`` removes the device, revokes open codes and
-  every admin session, and issues a new enrollment code. No backup codes exist: the approved
-  documents don't specify them and django-otp's static tokens are stored in plaintext.
+- **Recovery** follows ADR-033 Amendment 1 (approved): two-person request/approval or the CLI
+  emergency procedure, with the replacement code sent only by SMS (``services/recovery.py``).
+  No recovery codes (A1-3 not approved).
 """
 
 import base64
@@ -47,7 +47,6 @@ from .roles import (
     _lock_target,
     audit,
     require_permission,
-    revoke_admin_sessions,
 )
 
 SEED_BYTES = 20  # RFC 4226 recommends 160 bits for HMAC-SHA1
@@ -166,8 +165,30 @@ def _code_hash(code: str) -> str:
     return keyed_hash(ring("ADMIN_MFA").active_key, f"enroll:{normalised}")
 
 
+def new_enrollment_code(user: User, *, issued_by, now) -> tuple[AdminMfaEnrollment, str]:
+    """Create a single-use enrollment code (stored as HMAC only) and return it with the row.
+    Caller holds the target's lock and has revoked any open code."""
+    raw = base64.b32encode(secrets.token_bytes(ENROLLMENT_CODE_BYTES)).decode()
+    code = "-".join(raw[i : i + 4] for i in range(0, len(raw), 4))
+    enrollment = AdminMfaEnrollment.objects.create(
+        user=user,
+        issued_by=issued_by,
+        code_hash=_code_hash(code),
+        created_at=now,
+        expires_at=now + timedelta(seconds=settings.ADMIN_MFA_ENROLLMENT_TTL_SECONDS),
+    )
+    return enrollment, code
+
+
+def has_enrolled_before(user: User) -> bool:
+    return AdminMfaEnrollment.objects.filter(user=user, used_at__isnull=False).exists()
+
+
 def issue_enrollment(actor: Actor, target: User) -> str:
-    """Issue a single-use enrollment code for ``target`` (returned once, never stored)."""
+    """**First** enrollment only: a single-use code for an administrator who has never enrolled
+    (returned once, never stored). Anyone who has enrolled before recovers only through the
+    two-person recovery or the emergency procedure (ADR-033 Amendment 1), whose replacement code
+    goes by SMS and is never shown to an administrator."""
     try:
         require_permission(actor, RESET_ADMIN_MFA)
         if actor.user is not None and actor.user.pk == target.pk:
@@ -183,8 +204,6 @@ def issue_enrollment(actor: Actor, target: User) -> str:
         )
         raise
     now = timezone.now()
-    raw = base64.b32encode(secrets.token_bytes(ENROLLMENT_CODE_BYTES)).decode()
-    code = "-".join(raw[i : i + 4] for i in range(0, len(raw), 4))
     with (
         transaction.atomic(),
         lock_plan(
@@ -195,7 +214,9 @@ def issue_enrollment(actor: Actor, target: User) -> str:
         if not has_admin_access(user):
             raise InvalidTarget("Only accounts with administrative access can enroll MFA.")
         if AdminTotpDevice.objects.filter(user=user, confirmed=True).exists():
-            raise AlreadyEnrolled("Reset the existing device first.")
+            raise AlreadyEnrolled("This account already has an authenticator.")
+        if has_enrolled_before(user):
+            raise AlreadyEnrolled("This account enrolled before: use MFA recovery.")
         open_codes = lock_rows_for_update(
             AdminMfaEnrollment.objects.filter(
                 user=user, used_at__isnull=True, revoked_at__isnull=True
@@ -205,13 +226,7 @@ def issue_enrollment(actor: Actor, target: User) -> str:
         for row in open_codes:
             row.revoked_at = now
             row.save(update_fields=["revoked_at"])
-        AdminMfaEnrollment.objects.create(
-            user=user,
-            issued_by=actor.user,
-            code_hash=_code_hash(code),
-            created_at=now,
-            expires_at=now + timedelta(seconds=settings.ADMIN_MFA_ENROLLMENT_TTL_SECONDS),
-        )
+        _, code = new_enrollment_code(user, issued_by=actor.user, now=now)
         audit(actor, "admin.mfa_enrollment_issue", "SUCCESS", target_id=user.pk, resource=RESOURCE)
     return code
 
@@ -322,61 +337,3 @@ def confirm_enrollment(
             request_id=request_id,
         )
     return ok
-
-
-# --- Recovery ------------------------------------------------------------------------------
-
-
-def reset_mfa(actor: Actor, target: User) -> str | None:
-    """Administrator-assisted recovery. Removes the device, revokes open enrollment codes and
-    every admin session of ``target``, then issues a new enrollment code (returned once; None
-    when the account no longer has administrative access)."""
-    try:
-        require_permission(actor, RESET_ADMIN_MFA)
-        if actor.user is not None and actor.user.pk == target.pk:
-            raise NotAuthorized("You can't reset your own MFA.")
-    except NotAuthorized as exc:
-        audit(
-            actor,
-            "admin.mfa_reset",
-            "DENIED",
-            target_id=target.pk,
-            resource=RESOURCE,
-            reason=exc.code,
-        )
-        raise
-    now = timezone.now()
-    with (
-        transaction.atomic(),
-        lock_plan("admin_access.mfa.reset", [LockLevel.ACCOUNT, LockLevel.DOMAIN]),
-    ):
-        user = _lock_target(target.pk)
-        devices = lock_rows_for_update(AdminTotpDevice.objects.filter(user=user), LockLevel.DOMAIN)
-        had_device = any(d.confirmed for d in devices)
-        for device in devices:
-            device.delete()
-        AdminMfaEnrollment.objects.filter(
-            user=user, used_at__isnull=True, revoked_at__isnull=True
-        ).update(revoked_at=now)
-        revoked = revoke_admin_sessions(user, actor)
-        if had_device:
-            record_security_event(
-                "ADMIN_MFA_REMOVED",
-                "SUCCESS",
-                actor_type="ADMIN" if actor.user else "SYSTEM",
-                subject_user_id=user.pk,
-                actor_user_id=actor.user_id,
-                reason_code="RESET",
-                request_id=actor.request_id,
-            )
-        audit(
-            actor,
-            "admin.mfa_reset",
-            "SUCCESS",
-            target_id=user.pk,
-            resource=RESOURCE,
-            had_device=had_device,
-            sessions_revoked=revoked,
-        )
-        access = has_admin_access(user)
-    return issue_enrollment(actor, target) if access else None

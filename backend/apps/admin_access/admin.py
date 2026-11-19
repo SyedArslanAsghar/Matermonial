@@ -14,7 +14,7 @@ from django.core.exceptions import ValidationError
 
 from apps.accounts.models import User
 
-from .models import AdminPermission, AdminRole, AdminUserRole
+from .models import AdminActionApproval, AdminPermission, AdminRole, AdminUserRole
 from .services.roles import Actor, AdminAccessError, assign_role, assignment_problem, revoke_role
 
 
@@ -128,3 +128,66 @@ class AdminUserRoleAdmin(admin.ModelAdmin):
             except AdminAccessError as exc:
                 self.message_user(request, f"{row}: {exc or exc.code}", messages.ERROR)
         self.message_user(request, f"Revoked {done} assignment(s).", messages.SUCCESS)
+
+
+@admin.register(AdminActionApproval)
+class AdminActionApprovalAdmin(ReadOnlyAdmin):
+    """Approval requests (ADR-033 Amendment 1). Read-only rows; decisions go through the
+    recovery service, which enforces separation of duties and never reveals codes."""
+
+    list_display = (
+        "action_type",
+        "resource_id",
+        "status",
+        "outcome",
+        "requested_by",
+        "requested_at",
+        "approved_by",
+        "rejected_by",
+        "expires_at",
+    )
+    list_filter = ("action_type", "status")
+    actions = ["approve_selected", "reject_selected"]
+
+    def get_actions(self, request):
+        actions = super().get_actions(request)
+        if not request.user.has_perm("admin_access.approve_admin_mfa_recovery"):
+            actions.pop("approve_selected", None)
+            actions.pop("reject_selected", None)
+        return actions
+
+    def _decide(self, request, queryset, operation, done_message):
+        from .services.recovery import RecoveryNotPending
+
+        actor = Actor(user=request.user, request_id=getattr(request, "request_id", None))
+        for approval in queryset:
+            try:
+                result = operation(actor, approval.pk)
+                if result.outcome == "DELIVERY_FAILED":
+                    self.message_user(
+                        request,
+                        "Approved, but SMS delivery failed: the code was revoked and not "
+                        "revealed. Start a new request or use the emergency procedure.",
+                        messages.WARNING,
+                    )
+                else:
+                    self.message_user(request, done_message, messages.SUCCESS)
+            except (AdminAccessError, RecoveryNotPending) as exc:
+                self.message_user(request, f"{approval.pk}: {exc or exc.code}", messages.ERROR)
+
+    @admin.action(description="Approve selected recovery requests")
+    def approve_selected(self, request, queryset):
+        from .services.recovery import approve_recovery
+
+        self._decide(
+            request,
+            queryset,
+            approve_recovery,
+            "Approved. The replacement code is sent by SMS to the account holder only.",
+        )
+
+    @admin.action(description="Reject selected recovery requests")
+    def reject_selected(self, request, queryset):
+        from .services.recovery import reject_recovery
+
+        self._decide(request, queryset, reject_recovery, "Rejected.")

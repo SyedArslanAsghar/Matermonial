@@ -1,0 +1,14 @@
+{% extends "admin/base_site.html" %}
+{% block content %}
+<div id="content-main">
+  <p>A recovery request needs approval by a <strong>different</strong> administrator. On approval the account's authenticator is removed, its admin sessions end, and a replacement enrollment code is sent <strong>only by SMS</strong> to the account holder's verified phone. Nobody else sees the code.</p>
+  <form method="post">{% csrf_token %}
+    {% for obj in queryset %}<input type="hidden" name="_selected_action" value="{{ obj.pk }}">{% endfor %}
+    <input type="hidden" name="action" value="{{ action_name }}">
+    <input type="hidden" name="apply" value="1">
+    <p><label for="reason_code">Reason code (A-Z, 0-9, _):</label>
+       <input id="reason_code" name="reason_code" required pattern="[A-Za-z0-9_]{3,40}"></p>
+    <div class="submit-row"><input type="submit" value="Request recovery"></div>
+  </form>
+</div>
+{% endblock %}

@@ -373,57 +373,6 @@ class TestSessionLimits:
         assert api.get(INDEX).status_code == 302  # a user session is not an admin session
 
 
-class TestRecovery:
-    def test_reset_removes_device_ends_sessions_and_issues_a_new_code(self, enrolled):
-        admin, device = enrolled
-        client = Client()
-        admin_login(client, admin, device)
-        code = mfa.reset_mfa(CLI, admin)
-        assert code and not AdminTotpDevice.objects.filter(user=admin).exists()
-        assert AuthSession.objects.get(client_type="ADMIN").status == "REVOKED"
-        assert client.get(INDEX).status_code == 302
-        assert events("ADMIN_MFA_REMOVED").count() == 1
-        new_device = mfa.begin_enrollment(admin, code)
-        assert mfa.confirm_enrollment(
-            admin, new_device.device.pk, new_device.enrollment_id, code_for(new_device.device)
-        )
-
-    def test_reset_needs_the_permission_and_is_never_self_service(self, enrolled):
-        admin, _ = enrolled
-        with pytest.raises(NotAuthorized):
-            mfa.reset_mfa(Actor(user=admin), admin)
-        with pytest.raises(NotAuthorized):
-            mfa.reset_mfa(Actor(user=make_user(20)), admin)
-        assert AdminTotpDevice.objects.filter(user=admin).exists()
-
-    def test_another_admin_can_reset_through_the_service(self, enrolled):
-        admin, _ = enrolled
-        helper = make_user(21)
-        assign_role(CLI, helper, "system_admin")
-        assert mfa.reset_mfa(Actor(user=User.objects.get(pk=helper.pk)), admin)
-
-    def test_admin_actions_issue_codes_once_without_storing_them(self, enrolled):
-        admin, device = enrolled
-        helper = make_user(22)
-        assign_role(CLI, helper, "system_admin")
-        helper_device = enroll(User.objects.get(pk=helper.pk))
-        client = Client()
-        assert admin_login(client, User.objects.get(pk=helper.pk), helper_device).status_code == 302
-        response = client.post(
-            "/admin/accounts/user/",
-            {"action": "reset_admin_mfa", "_selected_action": [str(admin.pk)]},
-        )
-        assert response.status_code == 200
-        assert "no-store" in response["Cache-Control"]
-        assert not AdminTotpDevice.objects.filter(user=admin).exists()
-        assert (
-            AdminMfaEnrollment.objects.filter(
-                user=admin, used_at__isnull=True, revoked_at__isnull=True
-            ).count()
-            == 1
-        )
-
-
 @pytest.mark.django_db(transaction=True)
 def test_concurrent_logins_with_one_code_succeed_once():
     import threading

@@ -209,6 +209,7 @@ ADMIN_SESSION_COOKIE_NAME = env("ADMIN_SESSION_COOKIE_NAME", default="mat_admin_
 ADMIN_SESSION_IDLE_SECONDS = env.int("ADMIN_SESSION_IDLE_SECONDS", default=30 * 60)
 ADMIN_SESSION_ABSOLUTE_SECONDS = env.int("ADMIN_SESSION_ABSOLUTE_SECONDS", default=12 * 3600)
 ADMIN_MFA_ENROLLMENT_TTL_SECONDS = env.int("ADMIN_MFA_ENROLLMENT_TTL_SECONDS", default=86400)
+ADMIN_MFA_RECOVERY_TTL_SECONDS = env.int("ADMIN_MFA_RECOVERY_TTL_SECONDS", default=86400)
 ADMIN_MFA_THROTTLE_FACTOR = env.int("ADMIN_MFA_THROTTLE_FACTOR", default=1)  # 1, 2, 4, 8 … s
 OTP_TOTP_ISSUER = env("OTP_TOTP_ISSUER", default="Matermonial")
 # Authentication rate limits, "<count>/<seconds>" (doc 06 §22.1 §8.4; common/api/throttles.py).
@@ -239,6 +240,10 @@ CELERY_BEAT_SCHEDULE = {
     "ensure-log-partitions": {"task": "platform_ops.ensure_log_partitions", "schedule": 86400.0},
     "registry-checkpoint": {"task": "platform_ops.write_registry_checkpoint", "schedule": 86400.0},
     "admin-role-expiry": {"task": "admin_access.sync_expired_assignments", "schedule": 300.0},
+    "admin-mfa-recovery-expiry": {
+        "task": "admin_access.expire_recovery_requests",
+        "schedule": 300.0,
+    },
 }
 
 # --- Profiles (FR-008; doc 15 §2). Required fields gate DRAFT -> PENDING_REVIEW; the default
