@@ -35,7 +35,7 @@ SCALAR_FIELDS = (
     "preferred_gender",
     "preferred_marital_status",
     "community",
-    "caste_or_subcast",
+    "caste",
     "nationality",
     "own_house",
     "job",
@@ -51,7 +51,7 @@ CODE_LISTS = {
     "preferred_gender": "gender",
     "preferred_marital_status": "marital_status",
     "community": "community",
-    "caste_or_subcast": "caste",
+    "caste": "caste",
     "earning_frequency": "income_frequency",
     "residence_type": "residence_type",
 }

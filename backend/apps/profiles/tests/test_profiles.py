@@ -163,10 +163,11 @@ class TestEditing:
         assert response.status_code == 200
         assert response.json()["age"] == 18
 
-    def test_sensitive_fields_accept_nothing_until_lists_are_supplied(self, owner):
+    def test_sensitive_fields_accept_nothing_while_their_list_is_inactive(self, owner):
         _, client = owner
-        # Community has no approved list (DR-2026-11-19-O-5).
-        response = client.patch(ME, {"basic_info": {"community": "C9"}}, format="json")
+        # An administrator can switch a whole list off; the field then accepts no value.
+        VocabularyOption.objects.filter(vocabulary="community").update(is_active=False)
+        response = client.patch(ME, {"basic_info": {"community": "PUNJABI"}}, format="json")
         assert response.status_code == 400
         assert "hasn't been configured" in str(response.json())
 
@@ -372,8 +373,22 @@ def test_proposals_are_seeded_inactive_and_invent_no_religion_community_or_caste
     assert migration.PROPOSED == reference.PROPOSED
     migration.seed_inactive(django_apps, None)  # get_or_create: never activates anything
     assert VocabularyOption.objects.filter(vocabulary="gender").count() == 2
-    # Religion values come only from the owner's approval (0005); community and caste have none.
-    assert not VocabularyOption.objects.filter(vocabulary__in=["community", "caste"]).exists()
+    # Religion values come only from the owner's approval (0005); community, caste and
+    # sub-caste values only from the owner's decision DR-2026-11-20-O-5 (0007).
+    seeded = importlib.import_module("apps.profiles.migrations.0007_caste_sub_caste_vocabularies")
+    allowed = {
+        "community": {c for c, _ in seeded.COMMUNITIES},
+        "caste": {c for c, _ in seeded.CASTES},
+    }
+    for vocabulary, codes in allowed.items():
+        assert (
+            set(
+                VocabularyOption.objects.filter(vocabulary=vocabulary).values_list(
+                    "code", flat=True
+                )
+            )
+            == codes
+        )
 
 
 def test_vocabulary_admin_changes_are_audited():
@@ -428,9 +443,12 @@ class TestApprovedVocabulariesAndPrivacyChoices:
         )
         assert len(active) == 2 + 4 + 12
         assert not {"SUNNI", "SHIA", "PREFER_NOT_TO_SAY"} & set(active)
-        assert not VocabularyOption.objects.filter(
-            vocabulary__in=["community", "caste", "denomination"]
-        ).exists()
+        # Denominations are separate from religion (0007 seeds them as their own list).
+        assert set(
+            VocabularyOption.objects.filter(code__in=["SUNNI", "SHIA"]).values_list(
+                "vocabulary", flat=True
+            )
+        ) == {"denomination"}
 
     def test_prefer_not_to_say_is_a_flag_not_a_value_and_answers_religion(
         self, owner, sensitive_lists
@@ -459,8 +477,8 @@ class TestApprovedVocabulariesAndPrivacyChoices:
         with pytest.raises(IntegrityError), transaction.atomic():
             ProfileBasicInfo.objects.create(
                 profile=MatrimonialProfile.objects.first(),
-                caste_or_subcast="K1",
-                caste_or_subcast_prefer_not_to_say=True,
+                caste="K1",
+                caste_prefer_not_to_say=True,
             )
 
     def test_denomination_is_optional_separate_and_scoped_to_its_religion(
@@ -505,7 +523,7 @@ class TestApprovedVocabulariesAndPrivacyChoices:
         required = set(settings.PROFILE_REQUIRED_FIELDS)
         assert not required & {
             "basic_info.community",
-            "basic_info.caste_or_subcast",
+            "basic_info.caste",
             "basic_info.denomination",
         }
         assert required == {

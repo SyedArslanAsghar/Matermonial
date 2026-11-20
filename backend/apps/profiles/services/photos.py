@@ -4,6 +4,13 @@ Pipeline (TR-10): quarantine → byte-level type detection → malware scan → 
 re-encode (EXIF/GPS and every other metadata stripped, orientation applied, size bounded) →
 store the re-encoded image only → discard the original.
 
+Owner-approved limits (DR-2026-11-20-O-6): originals up to 5 MB; JPEG, PNG and WebP only,
+judged by their bytes (SVG and anything else is refused at upload); animated images refused;
+at most 4096 × 4096 px; 6 active photos; one primary. Scan outcomes (DR-2026-11-20-O-8):
+PENDING → CLEAN / INFECTED / FAILED. FAILED (scanner unavailable) is retried a bounded number
+of times and is never treated as clean; the file stays quarantined meanwhile and is rejected
+(``SCAN_FAILED``) after the last attempt. Infected files are rejected and discarded.
+
 - Uploads are refused up front (503 ``uploads_unavailable``) when no scanner is available, so
   nothing is ever accepted unscanned. Deployed settings refuse the mock scanner.
 - Only JPEG, PNG and WebP are accepted, judged by their bytes, never by name or header. HEIC
@@ -34,7 +41,12 @@ from rest_framework.exceptions import APIException, NotFound, ValidationError
 from apps.accounts.services.pseudonyms import pseudonym_for
 from apps.audit.services import record_audit
 from common.db.locking import LockLevel, lock_plan, lock_rows_for_update
-from common.providers import DisabledScanner, ProviderDisabledError, get_malware_scanner
+from common.providers import (
+    DisabledScanner,
+    ProviderDisabledError,
+    ScannerUnavailable,
+    get_malware_scanner,
+)
 
 from .. import reference
 from ..models import MatrimonialProfile, ProfilePhoto
@@ -42,6 +54,7 @@ from .profiles import InvalidProfileState
 
 logger = logging.getLogger(__name__)
 ACCEPTED_MIME = {"image/jpeg", "image/png", "image/webp"}
+PIL_FORMATS = {"image/jpeg": "JPEG", "image/png": "PNG", "image/webp": "WEBP"}
 OUTPUT_MIME = "image/jpeg"
 
 
@@ -114,6 +127,11 @@ def upload_photo(ctx, upload, photo_type: str | None) -> ProfilePhoto:
     data = upload.read(settings.PHOTO_MAX_UPLOAD_BYTES + 1)
     if len(data) > settings.PHOTO_MAX_UPLOAD_BYTES:
         raise ValidationError({"image": ["The file is too large."]})
+    # Judged by the file's bytes (signature), never its name or declared type. Nothing is
+    # decoded before the malware scan; full validation follows in the pipeline.
+    kind = filetype.guess(data)
+    if kind is None or kind.mime not in ACCEPTED_MIME:
+        raise ValidationError({"image": ["Upload a JPEG, PNG or WebP image."]})
 
     stored_key = None
     try:
@@ -146,11 +164,17 @@ def upload_photo(ctx, upload, photo_type: str | None) -> ProfilePhoto:
 # --- Processing (Celery task body) ---------------------------------------------------------
 
 
-def _reencode(data: bytes) -> tuple[bytes, int, int]:
+def _reencode(data: bytes, mime: str) -> tuple[bytes, int, int]:
     """Decode, verify, orient, bound and re-encode. Raises ValueError for unusable input."""
     Image.MAX_IMAGE_PIXELS = settings.PHOTO_MAX_PIXELS
     try:
         with Image.open(io.BytesIO(data)) as probe:  # header only: no pixels decoded yet
+            if probe.format != PIL_FORMATS.get(mime):
+                raise ValueError("TYPE_MISMATCH")  # the bytes claim one format, decode another
+            if getattr(probe, "is_animated", False) or getattr(probe, "n_frames", 1) > 1:
+                raise ValueError("ANIMATED_IMAGE")
+            if max(probe.width, probe.height) > settings.PHOTO_MAX_DIMENSION:
+                raise ValueError("DIMENSIONS_TOO_LARGE")
             if probe.width * probe.height > settings.PHOTO_MAX_PIXELS:
                 raise ValueError("TOO_LARGE")
             probe.verify()
@@ -188,6 +212,7 @@ def process_photo(photo_id) -> str:
     if photo is None or photo.processing_status != ProfilePhoto.Processing.QUARANTINED:
         return "skipped"  # idempotent: already processed or rejected
     quarantine = _quarantine_key(photo)
+    keep_quarantine = False
     try:
         if photo.deleted_at is not None:
             _reject(photo.id, "DELETED_BEFORE_PROCESSING")
@@ -203,15 +228,30 @@ def process_photo(photo_id) -> str:
             return "rejected"
         try:
             scan = get_malware_scanner().scan(data)
-        except ProviderDisabledError:
-            _reject(photo.id, "SCAN_UNAVAILABLE")
+        except (ScannerUnavailable, ProviderDisabledError) as exc:
+            attempts = photo.scan_attempts + 1
+            ProfilePhoto.objects.filter(pk=photo.id).update(
+                scan_status=ProfilePhoto.Scan.FAILED, scan_attempts=attempts
+            )
+            logger.warning(
+                "Malware scan unavailable",
+                extra={"photo": str(photo.id), "code": getattr(exc, "code", "disabled")},
+            )
+            if attempts < settings.PHOTO_SCAN_MAX_ATTEMPTS and isinstance(exc, ScannerUnavailable):
+                keep_quarantine = True  # retried later; never treated as clean
+                return "retry"
+            _reject(photo.id, "SCAN_FAILED")
             return "rejected"
+        ProfilePhoto.objects.filter(pk=photo.id).update(
+            scan_status=ProfilePhoto.Scan.CLEAN if scan.clean else ProfilePhoto.Scan.INFECTED,
+            scan_attempts=photo.scan_attempts + 1,
+        )
         if not scan.clean:
             _reject(photo.id, "MALWARE_DETECTED")
             logger.warning("Upload rejected by the malware scanner", extra={"photo": str(photo.id)})
             return "rejected"
         try:
-            output, width, height = _reencode(data)
+            output, width, height = _reencode(data, kind.mime)
         except ValueError as exc:
             _reject(photo.id, str(exc))
             return "rejected"
@@ -235,6 +275,9 @@ def process_photo(photo_id) -> str:
                 _reject(photo.id, "DELETED_BEFORE_PROCESSING")
                 return "rejected"
             row = rows[0]
+            if row.scan_status != ProfilePhoto.Scan.CLEAN:  # defence in depth (also a CHECK)
+                _reject(photo.id, "SCAN_FAILED")
+                return "rejected"
             row.processing_status = ProfilePhoto.Processing.READY
             row.storage_key = final_key
             row.mime_type = OUTPUT_MIME
@@ -246,7 +289,8 @@ def process_photo(photo_id) -> str:
             row.save()
         return "ready"
     finally:
-        default_storage.delete(quarantine)  # the original is always discarded
+        if not keep_quarantine:
+            default_storage.delete(quarantine)  # the original is always discarded
 
 
 # --- Owner management ----------------------------------------------------------------------

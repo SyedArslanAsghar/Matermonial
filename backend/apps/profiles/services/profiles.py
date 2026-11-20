@@ -69,7 +69,8 @@ CODE_FIELDS = {
         "marital_status": "marital_status",
         "religion": "religion",
         "community": "community",
-        "caste_or_subcast": "caste",
+        "caste": "caste",
+        "sub_caste": "sub_caste",
         "denomination": "denomination",
     },
     "location": {"residence_type": "residence_type"},
@@ -232,11 +233,24 @@ def _check_denomination(values: dict, current, errors: dict) -> None:
         errors["denomination"] = ["This denomination or tradition doesn't belong to the religion."]
 
 
+def _check_sub_caste(values: dict, current, errors: dict) -> None:
+    """A sub-caste is never required. If its option names a caste and a caste is given, they
+    must match (DR-2026-11-20-O-5)."""
+    sub_caste = values.get("sub_caste", getattr(current, "sub_caste", None))
+    caste = values.get("caste", getattr(current, "caste", None))
+    if sub_caste is None or caste is None:
+        return
+    parent = reference.parent_code("sub_caste", sub_caste)
+    if parent is not None and parent != caste:
+        errors["sub_caste"] = ["This sub-caste belongs to a different caste."]
+
+
 def _check_section(section: str, values: dict, current, today: date) -> dict:
     errors: dict = {}
     if section == "basic_info":
         _normalise_privacy_choices(values, errors)
         _check_denomination(values, current, errors)
+        _check_sub_caste(values, current, errors)
     _check_codes(section, values, errors, current=current)
     if section == "basic_info" and values.get("date_of_birth") is not None:
         dob = values["date_of_birth"]
@@ -353,21 +367,8 @@ def update_profile(ctx, data: dict, request_id=None) -> MatrimonialProfile:
             )
         if "visibility_status" in data:
             profile.visibility_status = data["visibility_status"]
-            if not ctx.is_owner:  # a Sensitive permission was used: tell the owner (doc 14 §6)
-                from common.events.services import emit
-
-                emit(
-                    "family.sensitive_action",
-                    event_class="NOTIFICATION",
-                    category="ACCOUNT",
-                    aggregate_type="MatrimonialProfile",
-                    recipient_pseudonym=pseudonym_for("ACCOUNT", profile.owner_id),
-                    payload={
-                        "action": "visibility_changed",
-                        "authorization_id": str(ctx.authorization_id),
-                    },
-                    dedupe_identity=f"family:visibility:{profile.pk}:{timezone.now().isoformat()}",
-                )
+            # A manager's change needed a consumed step-up verification, which already
+            # notified the owner (TR-16, family.services.step_up.consume).
         profile.completion_percentage = completion_percentage(profile)
         profile.updated_by = user
         profile.save(

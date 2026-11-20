@@ -1,5 +1,6 @@
 """``/profiles/me/partner-preferences/`` (doc 04 §4): GET, PUT (replace), PATCH (partial)."""
 
+from drf_spectacular.utils import extend_schema
 from rest_framework import serializers
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -36,7 +37,7 @@ class PreferenceWriteSerializer(serializers.Serializer):
     preferred_gender = _opt_code()
     preferred_marital_status = _opt_code()
     community = _opt_code()
-    caste_or_subcast = _opt_code()
+    caste = _opt_code()
     nationality = serializers.CharField(max_length=2, allow_null=True, required=False)
     # Three-state booleans: true, false or null (no preference). Never coerced (FR-019).
     own_house = serializers.BooleanField(allow_null=True, required=False)
@@ -71,15 +72,22 @@ def represent(preference: PartnerPreference | None) -> dict:
 
 
 class PartnerPreferenceView(APIView):
+    @extend_schema(tags=["profiles"], responses=PreferenceWriteSerializer)
     def get(self, request):
         from apps.family.context import resolve
 
         ctx = resolve(request, permission="view_partner_preferences")
         return Response(represent(service.get_preferences(ctx)))
 
+    @extend_schema(
+        tags=["profiles"], request=PreferenceWriteSerializer, responses=PreferenceWriteSerializer
+    )
     def put(self, request):
         return self._save(request, replace=True)
 
+    @extend_schema(
+        tags=["profiles"], request=PreferenceWriteSerializer, responses=PreferenceWriteSerializer
+    )
     def patch(self, request):
         return self._save(request, replace=False)
 

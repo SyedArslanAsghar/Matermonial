@@ -128,13 +128,17 @@ class ProfileBasicInfo(models.Model):
     marital_status = code_field()
     religion = code_field()
     community = code_field()
-    caste_or_subcast = code_field()
+    # Caste and sub-caste are separate, optional, and not tied to any religion
+    # (DR-2026-11-20-O-5). A sub-caste option may name a parent caste.
+    caste = code_field()
+    sub_caste = code_field()
     denomination = code_field()  # optional, belongs to the chosen religion (DR-2026-11-19-O-4)
     # "Prefer not to say" is a privacy response, never a value (DR-2026-11-19-O-6).
     religion_prefer_not_to_say = models.BooleanField(default=False)
     denomination_prefer_not_to_say = models.BooleanField(default=False)
     community_prefer_not_to_say = models.BooleanField(default=False)
-    caste_or_subcast_prefer_not_to_say = models.BooleanField(default=False)
+    caste_prefer_not_to_say = models.BooleanField(default=False)
+    sub_caste_prefer_not_to_say = models.BooleanField(default=False)
     nationality = models.CharField(max_length=2, null=True, blank=True)
 
     class Meta:
@@ -145,7 +149,7 @@ class ProfileBasicInfo(models.Model):
                     condition=Q(**{f"{f}_prefer_not_to_say": False}) | Q(**{f"{f}__isnull": True}),
                     name=f"basic_{f}_undisclosed_has_no_value",
                 )
-                for f in ("religion", "denomination", "community", "caste_or_subcast")
+                for f in ("religion", "denomination", "community", "caste", "sub_caste")
             ],
             # A denomination reveals the religion, so it needs a disclosed religion.
             models.CheckConstraint(
@@ -157,7 +161,8 @@ class ProfileBasicInfo(models.Model):
             code_check("marital_status", "basic_marital_code"),
             code_check("religion", "basic_religion_code"),
             code_check("community", "basic_community_code"),
-            code_check("caste_or_subcast", "basic_caste_code"),
+            code_check("caste", "basic_caste_code"),
+            code_check("sub_caste", "basic_sub_caste_code"),
             country_check("nationality", "basic_nationality_iso"),
             models.CheckConstraint(
                 condition=Q(date_of_birth__isnull=True) | Q(date_of_birth__gte="1900-01-01"),
@@ -341,7 +346,7 @@ class PartnerPreference(models.Model):
     preferred_gender = code_field()
     preferred_marital_status = code_field()
     community = code_field()
-    caste_or_subcast = code_field()
+    caste = code_field()
     nationality = models.CharField(max_length=2, null=True, blank=True)
     # NULL = no preference; never treated as False (FR-019).
     own_house = models.BooleanField(null=True, blank=True)
@@ -394,7 +399,7 @@ class PartnerPreference(models.Model):
             code_check("preferred_gender", "pref_gender_code"),
             code_check("preferred_marital_status", "pref_marital_code"),
             code_check("community", "pref_community_code"),
-            code_check("caste_or_subcast", "pref_caste_code"),
+            code_check("caste", "pref_caste_code"),
             code_check("earning_frequency", "pref_frequency_code"),
             code_check("residence_type", "pref_residence_code"),
         ]
@@ -487,6 +492,12 @@ class ProfilePhoto(models.Model):
         APPROVED = "APPROVED"
         REJECTED = "REJECTED"
 
+    class Scan(models.TextChoices):  # DR-2026-11-20-O-8: explicit malware-scan outcomes
+        PENDING = "PENDING"
+        CLEAN = "CLEAN"
+        INFECTED = "INFECTED"
+        FAILED = "FAILED"  # scanner unavailable or errored: never treated as clean
+
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     profile = models.ForeignKey(MatrimonialProfile, on_delete=models.PROTECT, related_name="photos")
     uploaded_by = models.ForeignKey(
@@ -499,6 +510,8 @@ class ProfilePhoto(models.Model):
         max_length=11, choices=Processing.choices, default=Processing.QUARANTINED
     )
     rejection_reason = models.CharField(max_length=40, null=True, blank=True)
+    scan_status = models.CharField(max_length=8, choices=Scan.choices, default=Scan.PENDING)
+    scan_attempts = models.PositiveSmallIntegerField(default=0)
     moderation_status = models.CharField(
         max_length=8, choices=Moderation.choices, default=Moderation.PENDING
     )
@@ -526,6 +539,11 @@ class ProfilePhoto(models.Model):
                 condition=Q(is_primary=False)
                 | Q(processing_status="READY", deleted_at__isnull=True),
                 name="photo_primary_is_ready",
+            ),
+            # Nothing becomes READY without a clean scan; an infected file is never READY.
+            models.CheckConstraint(
+                condition=~Q(processing_status="READY") | Q(scan_status="CLEAN"),
+                name="photo_ready_was_scanned_clean",
             ),
             # READY rows carry their stored-file facts; others never point at a stored file.
             models.CheckConstraint(
@@ -586,10 +604,13 @@ class VocabularyOption(models.Model):
             models.CheckConstraint(
                 condition=Q(vocabulary__in=sorted(VOCABULARIES)), name="vocab_known_vocabulary"
             ),
+            # A denomination always belongs to a religion; a sub-caste may name its caste;
+            # nothing else has a parent (DR-2026-11-20-O-5). The trigger checks the parent's list.
             models.CheckConstraint(
                 condition=Q(vocabulary="denomination", parent__isnull=False)
-                | (~Q(vocabulary="denomination") & Q(parent__isnull=True)),
-                name="vocab_parent_only_for_denomination",
+                | Q(vocabulary="sub_caste")
+                | (~Q(vocabulary__in=["denomination", "sub_caste"]) & Q(parent__isnull=True)),
+                name="vocab_parent_rules",
             ),
         ]
 

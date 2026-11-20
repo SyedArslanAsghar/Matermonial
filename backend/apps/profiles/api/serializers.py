@@ -44,8 +44,10 @@ class BasicInfoSerializer(serializers.ModelSerializer):
             "denomination_prefer_not_to_say",
             "community",
             "community_prefer_not_to_say",
-            "caste_or_subcast",
-            "caste_or_subcast_prefer_not_to_say",
+            "caste",
+            "caste_prefer_not_to_say",
+            "sub_caste",
+            "sub_caste_prefer_not_to_say",
             "nationality",
         ]
         extra_kwargs = {f: {"required": False} for f in fields}
@@ -180,7 +182,30 @@ def _section(profile, name, serializer):
 
 
 class OwnProfileSerializer(serializers.Serializer):
-    """The owner's view of their own profile (allowlisted)."""
+    """The owner's view of their own profile (allowlisted). The declared fields document the
+    output for OpenAPI (KI-40); ``to_representation`` builds it (``basic_info.date_of_birth`` is
+    omitted for managers without ``edit_basic_info``)."""
+
+    id = serializers.UUIDField(read_only=True)
+    profile_code = serializers.CharField(read_only=True)
+    profile_status = serializers.ChoiceField(MatrimonialProfile.Status.choices, read_only=True)
+    visibility_status = serializers.ChoiceField(
+        MatrimonialProfile.Visibility.choices, read_only=True
+    )
+    verification_status = serializers.ChoiceField(
+        MatrimonialProfile.VerificationStatus.choices, read_only=True
+    )
+    completion_percentage = serializers.IntegerField(read_only=True)
+    age = serializers.IntegerField(read_only=True, allow_null=True)
+    basic_info = BasicInfoSerializer(read_only=True, allow_null=True)
+    location = LocationSerializer(read_only=True, allow_null=True)
+    family = FamilySerializer(read_only=True, allow_null=True)
+    profession = ProfessionSerializer(read_only=True, allow_null=True)
+    lifestyle = LifestyleSerializer(read_only=True, allow_null=True)
+    languages = LanguageSerializer(many=True, read_only=True)
+    education = EducationSerializer(many=True, read_only=True)
+    created_at = serializers.DateTimeField(read_only=True)
+    updated_at = serializers.DateTimeField(read_only=True)
 
     def to_representation(self, profile):
         today = timezone.now().date()

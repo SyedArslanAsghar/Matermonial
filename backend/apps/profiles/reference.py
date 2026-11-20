@@ -26,6 +26,8 @@ VOCABULARIES: dict[str, bool] = {
     "religion": True,
     "community": True,
     "caste": True,
+    # Optional sub-caste (DR-2026-11-20-O-5); an option may name a parent caste.
+    "sub_caste": True,
     # Optional, per-religion tradition or denomination (DR-2026-11-19-O-4). Each option has a
     # religion option as its parent; no common structure is assumed across religions.
     "denomination": True,
@@ -76,7 +78,8 @@ FIELD_VOCABULARY = {
     "basic_info.marital_status": "marital_status",
     "basic_info.religion": "religion",
     "basic_info.community": "community",
-    "basic_info.caste_or_subcast": "caste",
+    "basic_info.caste": "caste",
+    "basic_info.sub_caste": "sub_caste",
     "basic_info.denomination": "denomination",
     "profession.employment_status": "employment_status",
 }
@@ -106,7 +109,18 @@ def is_allowed(vocabulary: str, value: str | None, current: str | None = None) -
 
 # Fields whose answer may be the privacy response "prefer not to say" (DR-2026-11-19-O-6).
 # It is stored as ``<field>_prefer_not_to_say = True`` with the value NULL, never as a code.
-PRIVACY_CHOICE_FIELDS = ("religion", "denomination", "community", "caste_or_subcast")
+PRIVACY_CHOICE_FIELDS = ("religion", "denomination", "community", "caste", "sub_caste")
+
+
+def parent_code(vocabulary: str, code: str) -> str | None:
+    """The parent option's code (a sub-caste's caste), or None."""
+    from .models import VocabularyOption
+
+    return (
+        VocabularyOption.objects.filter(vocabulary=vocabulary, code=code)
+        .values_list("parent__code", flat=True)
+        .first()
+    )
 
 
 def denomination_parent(code: str) -> str | None:
