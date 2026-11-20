@@ -18,9 +18,13 @@ request is resolved fresh (never cached):
 7. The endpoint's permission must be granted and active: else 403 ``permission_not_granted``.
    Owner-only permissions are never delegated.
 
-Not implemented here: manager step-up at use (TR-16, PROPOSED), H-tier single-use verification
-(OD-05), restrictions and eligibility (Phase 6), billing (later phases; ``billing_account`` is
-already the owner).
+Step 10 (manager step-up at use) waits for TR-16 (PROPOSED). Until it is decided, a manager's
+*use* of a Sensitive permission fails closed with 403 ``sensitive_use_unavailable`` (TR-02 review,
+2026-11-20): Sensitive permissions can be granted (owner confirmation + owner step-up) but not
+exercised, because the approved rule requires extra security at use (FR-FAM-005, doc 14) and its
+mechanism is not decided. Also not implemented: H-tier single-use verification (OD-05),
+restrictions and eligibility (Phase 6), billing (later phases; ``billing_account`` is already
+the owner).
 
 Writes re-verify inside their transaction with ``lock_authorization_for_write`` (doc 04 §24.1
 step 13): the authorization row FOR SHARE (lock level 1), then the same checks.
@@ -66,6 +70,15 @@ class ActingProfileUnavailable(APIException):
     default_detail = "The selected profile can't be managed right now."
 
 
+class SensitiveUseUnavailable(APIException):
+    status_code = status.HTTP_403_FORBIDDEN
+    default_code = "sensitive_use_unavailable"
+    default_detail = (
+        "Sensitive actions on behalf of a profile aren't available to managers yet; "
+        "the profile owner can do this."
+    )
+
+
 class PermissionNotGranted(APIException):
     status_code = status.HTTP_403_FORBIDDEN
     default_code = "permission_not_granted"
@@ -79,6 +92,8 @@ class ActorContext:
     is_owner: bool
     authorization_id: uuid.UUID | None
     granted: frozenset[str] = field(default_factory=frozenset)
+    # Granted Sensitive permissions: not usable until TR-16 decides step-up at use.
+    sensitive: frozenset[str] = field(default_factory=frozenset)
     request_id: str | None = None
     ip: str | None = None
     user_agent: str = ""
@@ -97,7 +112,7 @@ class ActorContext:
         return "USER" if self.is_owner else "MANAGER"
 
     def has(self, permission: str) -> bool:
-        return self.is_owner or permission in self.granted
+        return self.is_owner or (permission in self.granted and permission not in self.sensitive)
 
     def require(self, *permissions: str, any_of: bool = False) -> None:
         if self.is_owner:
@@ -105,6 +120,9 @@ class ActorContext:
         held = [p in self.granted for p in permissions]
         if not (any(held) if any_of else all(held)):
             raise PermissionNotGranted()
+        usable = [p in self.granted and p not in self.sensitive for p in permissions]
+        if not (any(usable) if any_of else all(usable)):
+            raise SensitiveUseUnavailable()
 
 
 def reject_header(request) -> None:
@@ -141,6 +159,17 @@ def granted_codes(authorization_id) -> frozenset[str]:
         )
         .exclude(permission__sensitivity="OWNER_ONLY")
         .values_list("permission__code", flat=True)
+    )
+
+
+def sensitive_codes(authorization_id) -> frozenset[str]:
+    return frozenset(
+        AuthorizationPermission.objects.filter(
+            authorization_id=authorization_id,
+            is_granted=True,
+            permission__is_active=True,
+            permission__sensitivity="SENSITIVE",
+        ).values_list("permission__code", flat=True)
     )
 
 
@@ -182,7 +211,13 @@ def resolve(
     if not owner.is_active or owner.deactivated:
         raise ActingProfileUnavailable()
     context = ActorContext(
-        user, profile, False, authorization.pk, granted_codes(authorization.pk), **meta
+        user,
+        profile,
+        False,
+        authorization.pk,
+        granted_codes(authorization.pk),
+        sensitive_codes(authorization.pk),
+        **meta,
     )
     if permission:
         context.require(permission)
@@ -213,3 +248,5 @@ def lock_authorization_for_write(context: ActorContext, *permissions: str) -> No
     current = granted_codes(context.authorization_id)
     if any(p not in current for p in permissions):
         raise PermissionNotGranted()
+    if set(permissions) & sensitive_codes(context.authorization_id):
+        raise SensitiveUseUnavailable()

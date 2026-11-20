@@ -582,6 +582,51 @@ class TestOwnerControls:
             auth_session=None,
         )
 
+    def test_granted_sensitive_permissions_cannot_be_used_until_tr16(self, owner, manager, rf):
+        """TR-02 step 10 waits for TR-16: a granted Sensitive permission fails closed at use."""
+        a = active(owner, manager)
+        session = AuthSession.objects.create(
+            user=owner,
+            client_type="WEB",
+            last_seen_at=timezone.now(),
+            idle_expires_at=timezone.now() + timedelta(hours=1),
+            absolute_expires_at=timezone.now() + timedelta(hours=2),
+            reauthenticated_at=timezone.now(),
+        )
+        svc.set_permissions(
+            owner,
+            a.pk,
+            permission_group=None,
+            permissions=["view_profile", "manage_privacy_settings"],
+            confirm_sensitive=True,
+            auth_session=session,
+        )
+        client = client_for(manager, profile_of(owner).pk)
+        before = profile_of(owner).visibility_status
+        target = "VISIBLE_IN_MATCH_SEARCH" if before == "HIDDEN" else "HIDDEN"
+        response = client.patch(ME, {"visibility_status": target}, format="json")
+        assert response.status_code == 403 and error(response) == "sensitive_use_unavailable"
+        assert profile_of(owner).visibility_status == before
+        assert not OutboxEvent.objects.filter(event_type="family.sensitive_action").exists()
+        assert client.get(ME).status_code == 200  # Normal permissions still work
+        # The transactional re-check refuses it too.
+        from apps.family.context import SensitiveUseUnavailable, lock_authorization_for_write
+
+        request = rf.get("/")
+        request.user = manager
+        request.META["HTTP_X_ACTING_PROFILE"] = str(profile_of(owner).pk)
+        ctx = resolve(request, permission="view_profile")
+        assert not ctx.has("manage_privacy_settings")
+        with pytest.raises(SensitiveUseUnavailable), transaction.atomic():
+            from common.db.locking import LockLevel, lock_plan
+
+            with lock_plan("t", [LockLevel.AUTHORIZATION]):
+                lock_authorization_for_write(ctx, "manage_privacy_settings")
+        # The owner can still do it.
+        owner_response = client_for(owner).patch(ME, {"visibility_status": target}, format="json")
+        assert owner_response.status_code == 200
+        assert profile_of(owner).visibility_status == target
+
     def test_owner_only_permissions_are_never_delegated(self, owner, manager):
         a = active(owner, manager)
         response = client_for(owner).put(
