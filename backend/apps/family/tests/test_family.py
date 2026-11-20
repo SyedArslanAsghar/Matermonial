@@ -7,6 +7,7 @@ from datetime import timedelta
 
 import pytest
 from django.db import DatabaseError, connection, transaction
+from django.test import TestCase
 from django.utils import timezone
 from rest_framework.test import APIClient
 
@@ -17,6 +18,7 @@ from apps.family.models import (
     AuthorizationPermission,
     ManagerActionLog,
     ManagerAuthorizationHistory,
+    ManagerInvitation,
     ProfileAccessHistory,
     ProfileManagerAuthorization,
 )
@@ -67,14 +69,20 @@ def profile_of(user):
     return MatrimonialProfile.objects.get(owner=user)
 
 
+def send_invitation(owner, phone, **body):
+    """POST an invitation and run the on-commit resolution task (eager Celery)."""
+    with TestCase.captureOnCommitCallbacks(execute=True):
+        return client_for(owner).post(
+            f"{FAM}authorizations/", {"phone_number": phone, **body}, format="json"
+        )
+
+
 def invite(owner, manager, group="standard", **extra):
-    response = client_for(owner).post(
-        f"{FAM}authorizations/",
-        {"phone_number": manager.phone_number, "permission_group": group, **extra},
-        format="json",
-    )
-    assert response.status_code == 201, response.json()
-    return ProfileManagerAuthorization.objects.get(pk=response.json()["id"])
+    response = send_invitation(owner, manager.phone_number, permission_group=group, **extra)
+    assert response.status_code == 202, response.json()
+    invitation = ManagerInvitation.objects.get(pk=response.json()["invitation"]["id"])
+    assert invitation.authorization_id is not None
+    return invitation.authorization
 
 
 def active(owner, manager, group="standard"):
@@ -109,24 +117,6 @@ class TestInvitation:
         assert AuditLog.objects.filter(action="family.invited").exists()
         assert OutboxEvent.objects.filter(event_type="family.invitation_received").count() == 1
 
-    @pytest.mark.parametrize("case", ["self", "unknown", "unverified", "inactive", "duplicate"])
-    def test_ineligible_invitees_get_one_generic_answer(self, owner, manager, case):
-        phone = manager.phone_number
-        if case == "self":
-            phone = owner.phone_number
-        elif case == "unknown":
-            phone = "+923009999999"
-        elif case == "unverified":
-            phone = make_user(3, verified=False).phone_number
-        elif case == "inactive":
-            User.objects.filter(pk=manager.pk).update(is_active=False, deactivated=True)
-        elif case == "duplicate":
-            invite(owner, manager)
-        response = client_for(owner).post(
-            f"{FAM}authorizations/", {"phone_number": phone}, format="json"
-        )
-        assert response.status_code == 400 and error(response) == "invitee_not_available"
-
     def test_sensitive_or_owner_only_permissions_cannot_be_set_at_invitation(self, owner, manager):
         for code in (
             "send_messages",
@@ -154,10 +144,10 @@ class TestInvitation:
             "family_invite_account": "1/86400",
         }
         invite(owner, manager)
-        response = client_for(owner).post(
-            f"{FAM}authorizations/", {"phone_number": make_user(5).phone_number}, format="json"
-        )
+        response = send_invitation(owner, make_user(5).phone_number)
         assert response.status_code == 429
+        # The limit applies to unregistered numbers too (no free probing).
+        assert send_invitation(owner, "+923009999999").status_code == 429
 
     def test_manager_must_accept_and_only_the_invitee_can(self, owner, manager):
         a = invite(owner, manager)
@@ -176,8 +166,183 @@ class TestInvitation:
             client_for(manager).post(f"{FAM}authorizations/{a.pk}/reject/").json()["status"]
             == "REJECTED"
         )
-        assert client_for(owner).post(f"{FAM}authorizations/{a.pk}/resume/").status_code == 409
+        # Never accepted: the owner has no authorization to act on, only a declined invitation.
+        assert client_for(owner).post(f"{FAM}authorizations/{a.pk}/resume/").status_code == 404
+        assert ManagerInvitation.objects.get(authorization=a).status == "DECLINED"
         invite(owner, manager)  # a new invitation is possible
+
+
+class TestInvitationPrivacy:
+    """KI-34: an invitation never reveals whether a number belongs to an (eligible) account."""
+
+    CASES = ["eligible", "unregistered", "unverified", "inactive", "deactivated", "pending_other"]
+
+    def number_for(self, case, owner, manager):
+        if case == "eligible":
+            return manager.phone_number
+        if case == "unregistered":
+            return "+923009999999"
+        if case == "unverified":
+            return make_user(3, verified=False).phone_number
+        if case == "inactive":
+            User.objects.filter(pk=manager.pk).update(is_active=False)
+            return manager.phone_number
+        if case == "deactivated":
+            User.objects.filter(pk=manager.pk).update(is_active=False, deactivated=True)
+            return manager.phone_number
+        # An account with a live authorization for another owner's profile: still eligible here.
+        other_owner = make_user(40, with_profile=True)
+        invite(other_owner, manager)
+        return manager.phone_number
+
+    @staticmethod
+    def shape(body):
+        invitation = dict(body["invitation"])
+        for volatile in ("id", "invited_at", "phone_hint"):
+            invitation.pop(volatile)
+        return {**body, "invitation": invitation}
+
+    @pytest.mark.parametrize("case", CASES)
+    def test_every_case_gets_the_same_answer_and_list_entry(self, owner, manager, case):
+        phone = self.number_for(case, owner, manager)
+        response = send_invitation(owner, phone, permission_group="standard")
+        assert response.status_code == 202
+        reference = send_invitation(owner, "+923008888888", permission_group="standard")
+        assert self.shape(response.json()) == self.shape(reference.json())
+        body = response.json()
+        assert body["invitation"]["status"] == "PENDING"
+        assert body["invitation"]["authorization_id"] is None
+        assert (
+            body["invitation"]["phone_hint"] == f"{phone[:4]}{'•' * (len(phone) - 6)}{phone[-2:]}"
+        )
+        listing = client_for(owner).get(f"{FAM}authorizations/").json()
+        assert listing["as_owner"] == []  # nothing accepted yet, in every case
+        entries = {i["id"]: i for i in listing["invitations"]}
+        mine, ref = entries[body["invitation"]["id"]], entries[reference.json()["invitation"]["id"]]
+        for key in ("id", "invited_at", "phone_hint"):
+            mine.pop(key), ref.pop(key)
+        assert mine == ref
+        text = str(body) + str(listing)
+        assert "U2" not in text and "U3" not in text  # no invitee names
+        assert manager.phone_number not in text
+
+    def test_request_does_the_same_database_work_either_way(self, owner, manager):
+        from django.db import connection as conn
+        from django.test.utils import CaptureQueriesContext
+
+        counts = []
+        for phone in (manager.phone_number, "+923007777777"):
+            with CaptureQueriesContext(conn) as queries, TestCase.captureOnCommitCallbacks():
+                assert (
+                    client_for(owner)
+                    .post(f"{FAM}authorizations/", {"phone_number": phone}, format="json")
+                    .status_code
+                    == 202
+                )
+            counts.append(len(queries))
+        assert counts[0] == counts[1]
+
+    def test_only_eligible_numbers_reach_an_account(self, owner, manager):
+        unverified = make_user(3, verified=False)
+        for phone in (manager.phone_number, unverified.phone_number, "+923009999999"):
+            send_invitation(owner, phone)
+        assert set(ProfileManagerAuthorization.objects.values_list("manager", flat=True)) == {
+            manager.pk
+        }
+        received = OutboxEvent.objects.filter(event_type="family.invitation_received")
+        assert received.count() == 1
+        assert ManagerInvitation.objects.filter(status="PENDING").count() == 3
+        unresolved = AuditLog.objects.filter(action="family.invitation_unresolved")
+        assert unresolved.count() == 2
+
+    def test_refusals_depend_only_on_the_owners_own_data(self, owner, manager):
+        assert send_invitation(owner, owner.phone_number).status_code == 400  # own number
+        assert send_invitation(owner, "not a phone").status_code == 400
+        for phone in (manager.phone_number, "+923009999999"):
+            assert send_invitation(owner, phone).status_code == 202
+            again = send_invitation(owner, phone)
+            assert again.status_code == 409 and error(again) == "already_invited"
+        a = ProfileManagerAuthorization.objects.get(manager=manager)
+        client_for(manager).post(f"{FAM}authorizations/{a.pk}/accept/")
+        known = send_invitation(owner, manager.phone_number)
+        assert known.status_code == 409 and error(known) == "already_managing"
+
+    def test_pending_authorizations_are_invisible_to_the_owner(self, owner, manager):
+        a = invite(owner, manager)
+        client = client_for(owner)
+        for action in ("pause", "resume", "revoke", "renew"):
+            response = client.post(
+                f"{FAM}authorizations/{a.pk}/{action}/", {"expires_at": None}, format="json"
+            )
+            assert response.status_code == 404, action
+        assert client.get(f"{FAM}authorizations/{a.pk}/history/").status_code == 404
+        assert (
+            client.put(
+                f"{FAM}authorizations/{a.pk}/permissions/", {"permissions": []}, format="json"
+            ).status_code
+            == 404
+        )
+        # The invitee still sees and answers it.
+        assert client_for(manager).get(f"{FAM}authorizations/{a.pk}/history/").status_code == 200
+
+    def test_acceptance_reveals_the_authorization_to_the_owner(self, owner, manager):
+        a = active(owner, manager)
+        listing = client_for(owner).get(f"{FAM}authorizations/").json()
+        assert [x["id"] for x in listing["as_owner"]] == [str(a.pk)]
+        assert listing["invitations"][0]["status"] == "ACCEPTED"
+        assert listing["invitations"][0]["authorization_id"] == str(a.pk)
+
+    def test_nothing_sensitive_in_audit_or_logs(self, owner, manager, caplog):
+        import logging
+
+        caplog.set_level(logging.DEBUG)
+        for phone in (manager.phone_number, "+923009999999"):
+            send_invitation(owner, phone)
+        rows = AuditLog.objects.filter(action__startswith="family.invitation")
+        assert rows.exists()
+        for row in rows:
+            assert "+92300" not in str(row.safe_metadata)
+        assert "+92300" not in caplog.text
+        assert all(len(i.phone_digest) == 64 for i in ManagerInvitation.objects.all())
+        assert not ManagerInvitation.objects.filter(phone_digest__contains="9230").exists()
+
+    def test_owner_cancels_resolved_and_unresolved_invitations(self, owner, manager):
+        a = invite(owner, manager)
+        ghost = send_invitation(owner, "+923009999999").json()["invitation"]["id"]
+        linked = ManagerInvitation.objects.get(authorization=a).pk
+        client, stranger = client_for(owner), make_user(8)
+        for invitation_id in (linked, ghost):
+            for user in (manager, stranger):
+                assert (
+                    client_for(user).post(f"{FAM}invitations/{invitation_id}/cancel/").status_code
+                    == 404
+                )
+            body = client.post(f"{FAM}invitations/{invitation_id}/cancel/").json()
+            assert body["status"] == "CANCELLED"
+            assert client.post(f"{FAM}invitations/{invitation_id}/cancel/").status_code == 409
+        a.refresh_from_db()
+        assert a.status == "REVOKED"
+        assert client_for(manager).post(f"{FAM}authorizations/{a.pk}/accept/").status_code == 409
+        # The number can be invited again.
+        assert send_invitation(owner, "+923009999999").status_code == 202
+
+    def test_cancel_before_resolution_stops_the_task(self, owner, manager):
+        with TestCase.captureOnCommitCallbacks(execute=False) as callbacks:
+            response = client_for(owner).post(
+                f"{FAM}authorizations/", {"phone_number": manager.phone_number}, format="json"
+            )
+        invitation_id = response.json()["invitation"]["id"]
+        client_for(owner).post(f"{FAM}invitations/{invitation_id}/cancel/")
+        for callback in callbacks:
+            callback()
+        assert not ProfileManagerAuthorization.objects.exists()
+        assert not OutboxEvent.objects.filter(event_type="family.invitation_received").exists()
+
+    def test_resolution_is_idempotent(self, owner, manager):
+        a = invite(owner, manager)
+        invitation = ManagerInvitation.objects.get(authorization=a)
+        assert svc.resolve_invitation(invitation.pk) is None
+        assert ProfileManagerAuthorization.objects.count() == 1
 
 
 class TestManagerAccess:
@@ -520,7 +685,7 @@ def test_concurrent_invitations_create_one_live_authorization():
                 ctx, phone_number=manager.phone_number, permission_group=None, permissions=[]
             )
             outcomes.append("ok")
-        except svc.InviteeNotAvailable:
+        except svc.AlreadyInvited:
             outcomes.append("taken")
         finally:
             connection.close()
@@ -531,4 +696,6 @@ def test_concurrent_invitations_create_one_live_authorization():
     for t in threads:
         t.join()
     assert sorted(outcomes) == ["ok", "taken", "taken", "taken"]
+    assert ManagerInvitation.objects.filter(profile=profile, status="PENDING").count() == 1
+    # (transaction=True: on-commit callbacks ran, so the eager task resolved it)
     assert ProfileManagerAuthorization.objects.filter(profile=profile, manager=manager).count() == 1

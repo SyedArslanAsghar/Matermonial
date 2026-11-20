@@ -2,6 +2,8 @@
 refused (doc 04 §24.1 step 2). Owners act on their own personal profile's authorizations;
 managers see and answer their own invitations. Anything else gets the same 404."""
 
+from drf_spectacular.types import OpenApiTypes
+from drf_spectacular.utils import extend_schema
 from rest_framework import serializers, status
 from rest_framework.exceptions import NotFound
 from rest_framework.response import Response
@@ -12,6 +14,7 @@ from apps.profiles.models import MatrimonialProfile
 from ..context import ActorContext, reject_header
 from ..models import (
     ManagerActionLog,
+    ManagerInvitation,
     ManagerPermission,
     ManagerPermissionGroup,
     ProfileAccessHistory,
@@ -45,6 +48,32 @@ def _as_owner(a) -> dict:
         "paused_at": a.paused_at,
         "revoked_at": a.revoked_at,
     }
+
+
+def _as_invitation(i: ManagerInvitation) -> dict:
+    """The owner's view of an invitation: only what the owner typed or chose, plus the status.
+    Never the invitee's name or any account detail (KI-34)."""
+    return {
+        "id": str(i.pk),
+        "phone_hint": i.phone_hint,
+        "status": i.status,
+        "permission_group": i.permission_group.code if i.permission_group_id else None,
+        "requested_permissions": list(i.requested_permissions),
+        "requested_expires_at": i.requested_expires_at,
+        "invited_at": i.invited_at,
+        "responded_at": i.responded_at,
+        "cancelled_at": i.cancelled_at,
+        # Shown once the invitee accepted: the authorization is then visible to the owner.
+        "authorization_id": (
+            str(i.authorization_id) if i.status == ManagerInvitation.Status.ACCEPTED else None
+        ),
+    }
+
+
+INVITATION_SENT = (
+    "If this number belongs to an account that can be invited, its holder will receive the "
+    "invitation."
+)
 
 
 def _as_manager(a) -> dict:
@@ -94,10 +123,18 @@ class PermissionsSerializer(serializers.Serializer):
 class AuthorizationListView(APIView):
     def get(self, request):
         reject_header(request)
+        # Owners see authorizations once accepted; before that, only their invitations (KI-34).
         owned = (
-            ProfileManagerAuthorization.objects.filter(profile__owner_id=request.user.pk)
+            ProfileManagerAuthorization.objects.filter(
+                profile__owner_id=request.user.pk, accepted_at__isnull=False
+            )
             .select_related("manager", "permission_group")
             .order_by("-invited_at")
+        )
+        invitations = (
+            ManagerInvitation.objects.filter(profile__owner_id=request.user.pk)
+            .select_related("permission_group")
+            .order_by("-invited_at")[:200]
         )
         managed = (
             ProfileManagerAuthorization.objects.filter(manager_id=request.user.pk)
@@ -107,6 +144,7 @@ class AuthorizationListView(APIView):
         return Response(
             {
                 "as_owner": [_as_owner(a) for a in owned],
+                "invitations": [_as_invitation(i) for i in invitations],
                 "as_manager": [_as_manager(a) for a in managed],
             }
         )
@@ -115,14 +153,30 @@ class AuthorizationListView(APIView):
         ctx = _owner_context(request)
         data = InviteSerializer(data=request.data)
         data.is_valid(raise_exception=True)
-        a = service.invite(
+        invitation = service.invite(
             ctx,
             phone_number=data.validated_data["phone_number"],
             permission_group=data.validated_data.get("permission_group"),
             permissions=data.validated_data.get("permissions"),
             expires_at=data.validated_data.get("expires_at"),
         )
-        return Response(_as_owner(a), status=status.HTTP_201_CREATED)
+        # 202 and the same body for every number (KI-34): built from the owner's input only.
+        return Response(
+            {"detail": INVITATION_SENT, "invitation": _as_invitation(invitation)},
+            status=status.HTTP_202_ACCEPTED,
+        )
+
+
+class InvitationCancelView(APIView):
+    @extend_schema(request=ReasonSerializer, responses={200: OpenApiTypes.OBJECT})
+    def post(self, request, invitation_id):
+        reject_header(request)
+        data = ReasonSerializer(data=request.data)
+        data.is_valid(raise_exception=True)
+        invitation = service.cancel_invitation(
+            request.user, invitation_id, data.validated_data.get("reason")
+        )
+        return Response(_as_invitation(invitation))
 
 
 class ManagerResponseView(APIView):
@@ -193,7 +247,10 @@ class AuthorizationHistoryView(APIView):
             .select_related("profile")
             .first()
         )
-        if a is None or request.user.pk not in (a.profile.owner_id, a.manager_id):
+        is_owner = a is not None and a.profile.owner_id == request.user.pk
+        if a is None or not (
+            (is_owner and a.accepted_at is not None) or a.manager_id == request.user.pk
+        ):
             raise NotFound()
         return Response(
             [

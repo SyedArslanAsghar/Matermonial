@@ -90,6 +90,15 @@ FK_LOCK_CLASSES: dict[str, str] = {
     "family.ProfileAccessHistory.profile": "N",
     "family.ProfileAccessHistory.authorization": "N",
     "family.ProfileAccessHistory.manager": "N",
+    # Invitations (KI-34): the invite request locks the owner and any matched invitee account
+    # FOR SHARE (level 2) and the profile FOR UPDATE (level 3) before the insert; the
+    # resolution task does the same and links an authorization it created in that transaction;
+    # the template is reference data (N).
+    "family.ManagerInvitation.profile": "P",
+    "family.ManagerInvitation.invited_by": "P",
+    "family.ManagerInvitation.invitee": "P",
+    "family.ManagerInvitation.authorization": "P",
+    "family.ManagerInvitation.permission_group": "N",
     "family.ManagerPermissionGroupPermission.group": "N",
     "family.ManagerPermissionGroupPermission.permission": "N",
     # OTP verify locks the account (level 2) before the verification row; send runs with no

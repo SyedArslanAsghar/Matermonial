@@ -44,6 +44,11 @@ urlpatterns = [
         views.AuthorizationHistoryView.as_view(),
         name="family-history",
     ),
+    path(
+        "invitations/<uuid:invitation_id>/cancel/",
+        views.InvitationCancelView.as_view(),
+        name="family-invitation-cancel",
+    ),
     path("permissions/", views.PermissionCatalogueView.as_view(), name="family-catalogue"),
     path("permission-groups/", views.PermissionGroupView.as_view(), name="family-groups"),
     path(

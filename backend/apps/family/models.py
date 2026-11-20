@@ -250,3 +250,80 @@ class ProfileAccessHistory(models.Model):
         db_table = "family_profile_access_history"
         ordering = ["-accessed_at"]
         indexes = [models.Index(fields=["profile", "accessed_at"], name="family_access_profile")]
+
+
+class ManagerInvitation(models.Model):
+    """The owner's record of one invitation, created for **every** accepted invite request
+    whether or not the phone number belongs to an eligible account (KI-34). The owner sees only
+    what they typed (a masked hint) and this record's status, so an invitation never reveals
+    whether an account exists, is verified or is eligible. A background task links a real
+    ``ProfileManagerAuthorization`` when the number resolves to an eligible account; the owner
+    learns about the account only when the invitee accepts or declines.
+
+    - The phone number is not stored: ``phone_digest`` is a keyed hash (SUBJECT_HASH ring) used
+      to refuse duplicate pending invitations, ``phone_hint`` is the masked display.
+    - ``invitee`` is internal only (never serialized to the owner).
+    - Invitation TTL is OD-05e (OPEN): pending invitations stay pending until answered or
+      cancelled.
+    """
+
+    class Status(models.TextChoices):
+        PENDING = "PENDING"
+        ACCEPTED = "ACCEPTED"
+        DECLINED = "DECLINED"
+        CANCELLED = "CANCELLED"
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    profile = models.ForeignKey(
+        "profiles.MatrimonialProfile", on_delete=models.PROTECT, related_name="manager_invitations"
+    )
+    invited_by = models.ForeignKey("accounts.User", on_delete=models.PROTECT, related_name="+")
+    phone_digest = models.CharField(max_length=64)
+    phone_hint = models.CharField(max_length=24)
+    invitee = models.ForeignKey(
+        "accounts.User", on_delete=models.PROTECT, null=True, blank=True, related_name="+"
+    )
+    permission_group = models.ForeignKey(
+        ManagerPermissionGroup, on_delete=models.PROTECT, null=True, blank=True
+    )
+    requested_permissions = models.JSONField(default=list, blank=True)
+    requested_expires_at = models.DateTimeField(null=True, blank=True)
+    authorization = models.OneToOneField(
+        ProfileManagerAuthorization,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="invitation",
+    )
+    status = models.CharField(max_length=9, choices=Status.choices, default=Status.PENDING)
+    invited_at = models.DateTimeField()
+    responded_at = models.DateTimeField(null=True, blank=True)
+    cancelled_at = models.DateTimeField(null=True, blank=True)
+    reason = models.CharField(max_length=40, null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = "family_invitation"
+        indexes = [
+            models.Index(fields=["profile", "status"], name="family_invitation_profile"),
+        ]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["profile", "phone_digest"],
+                condition=Q(status="PENDING"),
+                name="family_invitation_one_pending_per_number",
+            ),
+            models.CheckConstraint(
+                condition=~Q(invitee=F("invited_by")), name="family_invitation_not_self"
+            ),
+            models.CheckConstraint(
+                condition=Q(status__in=["PENDING", "CANCELLED"])
+                | Q(authorization__isnull=False, responded_at__isnull=False),
+                name="family_invitation_response_consistent",
+            ),
+            models.CheckConstraint(
+                condition=~Q(status="CANCELLED") | Q(cancelled_at__isnull=False),
+                name="family_invitation_cancelled_has_time",
+            ),
+        ]

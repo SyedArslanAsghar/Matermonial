@@ -4,11 +4,13 @@ doc 15 §4).
 Rules implemented (all approved):
 - Only the profile owner invites, pauses, resumes, renews, revokes and sets permissions; the
   invited account accepts or rejects [DECIDED]. Nobody manages their own profile.
-- The invitee must be another registered, active, phone-verified account (FR-FAM-001). Every
-  ineligible case answers with the same error, and invitations are rate limited per owner.
+- The invitee must be another registered, active, phone-verified account (FR-FAM-001).
+  Invitations are enumeration-safe (KI-34): every invite request records a ``ManagerInvitation``
+  and gets the same answer; eligibility is decided in a background task, and the owner sees an
+  authorization only after the invitee accepts. Invitations are rate limited per owner.
 - At most one PENDING/ACTIVE/PAUSED authorization per (profile, manager).
 - Transitions (doc 15 §4): PENDING→ACTIVE (accept), PENDING→REJECTED (reject), PENDING→REVOKED
-  (owner cancels), ACTIVE↔PAUSED (owner), ACTIVE/PAUSED→REVOKED (owner), ACTIVE→EXPIRED (job and
+  (owner cancels the invitation), ACTIVE↔PAUSED (owner), ACTIVE/PAUSED→REVOKED (owner), ACTIVE→EXPIRED (job and
   runtime). Revoked, expired and rejected authorizations are never reactivated.
 - Expiry is optional and absent by default; the owner may set, extend or clear it ("renew") on
   ACTIVE or PAUSED authorizations. A PAUSED authorization whose expiry has passed can't resume.
@@ -38,6 +40,7 @@ from common.events.services import emit
 from ..models import (
     AuthorizationPermission,
     ManagerAuthorizationHistory,
+    ManagerInvitation,
     ManagerPermission,
     ManagerPermissionGroup,
     ProfileManagerAuthorization,
@@ -46,10 +49,16 @@ from ..models import (
 Status = ProfileManagerAuthorization.Status
 
 
-class InviteeNotAvailable(APIException):
-    status_code = status.HTTP_400_BAD_REQUEST
-    default_code = "invitee_not_available"
-    default_detail = "This account can't be invited."
+class AlreadyInvited(APIException):
+    status_code = status.HTTP_409_CONFLICT
+    default_code = "already_invited"
+    default_detail = "You already have a pending invitation for this number."
+
+
+class AlreadyManaging(APIException):
+    status_code = status.HTTP_409_CONFLICT
+    default_code = "already_managing"
+    default_detail = "This number already belongs to one of your managers."
 
 
 class InvalidAuthorizationState(APIException):
@@ -122,7 +131,9 @@ def _lock(authorization_id, *, owner=None, manager=None) -> ProfileManagerAuthor
     """Lock the authorization (level 1). Anything that isn't the caller's gets the same 404."""
     query = ProfileManagerAuthorization.objects.filter(pk=authorization_id)
     if owner is not None:
-        query = query.filter(profile__owner_id=owner.pk)
+        # Owners act on invitations until the manager accepts (KI-34): a never-accepted
+        # authorization is invisible to them, like a number without an account.
+        query = query.filter(profile__owner_id=owner.pk, accepted_at__isnull=False)
     if manager is not None:
         query = query.filter(manager_id=manager.pk)
     rows = lock_rows_for_update(query, LockLevel.AUTHORIZATION, anchor=True)
@@ -210,6 +221,19 @@ def _normal_codes(group: ManagerPermissionGroup | None) -> set[str]:
 # --- Invitation ----------------------------------------------------------------------------
 
 
+def phone_digest(normalized_phone: str) -> str:
+    """Keyed hash of a normalized phone number (the number itself is never stored)."""
+    from common.crypto.aead import keyed_hash
+    from common.crypto.keys import ring
+
+    return keyed_hash(ring("SUBJECT_HASH").active_key, f"family-invitation:{normalized_phone}")
+
+
+def phone_hint(normalized_phone: str) -> str:
+    p = normalized_phone
+    return f"{p[:4]}{'•' * max(len(p) - 6, 0)}{p[-2:]}"
+
+
 def invite(
     owner_context,
     *,
@@ -217,9 +241,18 @@ def invite(
     permission_group: str | None,
     permissions: list[str] | None,
     expires_at=None,
-) -> ProfileManagerAuthorization:
-    """The owner invites another registered account. Only Normal permissions can be set here;
-    Sensitive ones are granted afterwards with ``set_permissions`` (confirmation + step-up)."""
+) -> ManagerInvitation:
+    """The owner invites another registered account (FR-FAM-001). Only Normal permissions can
+    be set here; Sensitive ones are granted afterwards with ``set_permissions`` (confirmation +
+    step-up).
+
+    Enumeration-safe (KI-34): the request records a ``ManagerInvitation`` and answers the same
+    way whether or not the number belongs to an account, and whether that account is verified,
+    active or already linked to this profile. The only refusals depend on the owner's own data
+    (rate limit, input validation, their own number, a number they already invited and that is
+    still pending, or a number of a manager they already have). Eligibility is decided later by
+    ``resolve_invitation`` in a background task, so the request does the same work either way.
+    """
     if not owner_context.is_owner:
         from ..context import PermissionNotGranted
 
@@ -240,47 +273,250 @@ def invite(
     try:
         phone = normalize_phone_number(phone_number)
     except Exception:
-        raise InviteeNotAvailable() from None
-    invitee = User.objects.filter(phone_number=phone).first()
-    if (
-        invitee is None
-        or invitee.pk == owner.pk
-        or not invitee.is_active
-        or invitee.deactivated
-        or not invitee.is_phone_verified
-    ):
-        raise InviteeNotAvailable()  # one answer for every case (no account enumeration detail)
+        raise ValidationError({"phone_number": ["Enter a valid phone number."]}) from None
+    if phone == owner.phone_number:
+        raise ValidationError({"phone_number": ["You can't invite yourself."]})
+    digest = phone_digest(phone)
+    # The owner already knows their current managers' numbers (they invited them).
+    if ProfileManagerAuthorization.objects.filter(
+        profile_id=owner_context.profile_id,
+        status__in=[Status.ACTIVE, Status.PAUSED],
+        invitation__phone_digest=digest,
+    ).exists():
+        raise AlreadyManaging()
+    # Looked up for every request (same query either way); stored internally only.
+    invitee_id = (
+        User.objects.filter(phone_number=phone).exclude(pk=owner.pk).values_list("pk", flat=True)
+    ).first()
     try:
         with (
             transaction.atomic(),
             lock_plan("family.invite", [LockLevel.ACCOUNT, LockLevel.PROFILE, LockLevel.INSERT]),
         ):
+            # One query either way (the invitee FK is then prior-locked, TR-22).
             lock_rows_for_share(
-                User.objects.filter(pk__in=[owner.pk, invitee.pk]), LockLevel.ACCOUNT
+                User.objects.filter(pk__in=[pk for pk in (owner.pk, invitee_id) if pk]),
+                LockLevel.ACCOUNT,
             )
             from apps.profiles.models import MatrimonialProfile
 
             lock_rows_for_update(
                 MatrimonialProfile.objects.filter(pk=owner_context.profile_id), LockLevel.PROFILE
             )
-            a = ProfileManagerAuthorization.objects.create(
+            invitation = ManagerInvitation.objects.create(
                 profile_id=owner_context.profile_id,
+                invited_by=owner,
+                phone_digest=digest,
+                phone_hint=phone_hint(phone),
+                invitee_id=invitee_id,
+                permission_group=group,
+                requested_permissions=sorted(explicit),
+                requested_expires_at=expires_at,
+                invited_at=now,
+            )
+            record_audit(
+                action="family.invitation_created",
+                resource_type="family.invitation",
+                actor_type="USER",
+                result="SUCCESS",
+                category="STATE_CHANGE",
+                actor_user_id=owner.pk,
+                subject_user_id=owner.pk,
+                represented_profile_pseudonym=pseudonym_for("PROFILE", owner_context.profile_id),
+                metadata={
+                    "invitation_id": str(invitation.pk),
+                    "permission_group": permission_group,
+                },
+            )
+            invitation_id = str(invitation.pk)
+            transaction.on_commit(lambda: _enqueue_resolution(invitation_id))
+    except IntegrityError:
+        raise AlreadyInvited() from None
+    return invitation
+
+
+def _enqueue_resolution(invitation_id: str) -> None:
+    from ..tasks import resolve_manager_invitation
+
+    resolve_manager_invitation.delay(invitation_id)
+
+
+def _eligible(invitee: User | None, invitation: ManagerInvitation) -> bool:
+    """FR-FAM-001: another registered, active, phone-verified account, still holding the
+    invited number."""
+    return (
+        invitee is not None
+        and invitee.pk != invitation.invited_by_id
+        and invitee.is_active
+        and not invitee.deactivated
+        and invitee.is_phone_verified
+        and phone_digest(invitee.phone_number) == invitation.phone_digest
+    )
+
+
+def resolve_invitation(invitation_id) -> ProfileManagerAuthorization | None:
+    """Background step of ``invite``: when the invitation's number belongs to an eligible
+    account, create the PENDING authorization with the requested Normal permissions and notify
+    the invitee. Otherwise nothing visible happens (the owner's invitation simply stays pending).
+    Idempotent: a cancelled, answered or already linked invitation is left alone."""
+    from apps.profiles.models import MatrimonialProfile
+
+    invitation = ManagerInvitation.objects.filter(pk=invitation_id).first()
+    if invitation is None or invitation.status != ManagerInvitation.Status.PENDING:
+        return None
+    if invitation.authorization_id is not None:
+        return None
+    accounts = [invitation.invited_by_id] + (
+        [invitation.invitee_id] if invitation.invitee_id else []
+    )
+    try:
+        with (
+            transaction.atomic(),
+            lock_plan(
+                "family.resolve_invitation",
+                [LockLevel.ACCOUNT, LockLevel.PROFILE, LockLevel.DOMAIN, LockLevel.INSERT],
+            ),
+        ):
+            lock_rows_for_share(User.objects.filter(pk__in=accounts), LockLevel.ACCOUNT)
+            profile = lock_rows_for_update(
+                MatrimonialProfile.objects.filter(pk=invitation.profile_id), LockLevel.PROFILE
+            )[0]
+            invitation = lock_rows_for_update(
+                ManagerInvitation.objects.filter(pk=invitation_id), LockLevel.DOMAIN
+            )[0]
+            if (
+                invitation.status != ManagerInvitation.Status.PENDING
+                or invitation.authorization_id is not None
+            ):
+                return None
+            invitee = User.objects.filter(pk=invitation.invitee_id).first()
+            if (
+                not _eligible(invitee, invitation)
+                or profile.profile_status == MatrimonialProfile.Status.CLOSED
+            ):
+                # Internal record only; the owner sees no difference.
+                record_audit(
+                    action="family.invitation_unresolved",
+                    resource_type="family.invitation",
+                    actor_type="SYSTEM",
+                    result="FAILURE",
+                    category="STATE_CHANGE",
+                    subject_user_id=invitation.invited_by_id,
+                    represented_profile_pseudonym=pseudonym_for("PROFILE", invitation.profile_id),
+                    metadata={"invitation_id": str(invitation.pk)},
+                )
+                return None
+            owner = invitation.invited_by
+            group = invitation.permission_group
+            now = timezone.now()
+            a = ProfileManagerAuthorization.objects.create(
+                profile_id=invitation.profile_id,
                 manager=invitee,
                 invited_by=owner,
                 permission_group=group,
-                invited_at=now,
-                expires_at=expires_at,
+                invited_at=invitation.invited_at,
+                expires_at=invitation.requested_expires_at,
             )
             a = ProfileManagerAuthorization.objects.select_related(
                 "profile", "permission_group"
             ).get(pk=a.pk)
-            change = _apply_grants(a, _normal_codes(group) | explicit, owner, now)
+            # Re-validated: the catalogue may have changed since the request (Normal only).
+            codes = {
+                p.code
+                for p in ManagerPermission.objects.filter(
+                    code__in=invitation.requested_permissions,
+                    is_active=True,
+                    sensitivity=ManagerPermission.Sensitivity.NORMAL,
+                )
+            }
+            change = _apply_grants(a, _normal_codes(group) | codes, owner, now)
             _history(a, "INVITED", owner, {}, {**_snapshot(a), **change})
-            _audit("invited", owner, a, permission_group=permission_group)
+            _audit(
+                "invited",
+                owner,
+                a,
+                permission_group=group.code if group else None,
+                invitation_id=str(invitation.pk),
+            )
+            invitation.authorization = a
+            invitation.save(update_fields=["authorization", "updated_at"])
             _notify(invitee.pk, "invitation_received", a)
             return a
     except IntegrityError:
-        raise InviteeNotAvailable() from None  # already invited or managing this profile
+        # Already linked to this profile through another live authorization: nothing to do.
+        return None
+
+
+def _cancel_attempt(owner: User, invitation_id, reason) -> ManagerInvitation | None:
+    row = (
+        ManagerInvitation.objects.filter(pk=invitation_id, profile__owner_id=owner.pk)
+        .values("authorization_id")
+        .first()
+    )
+    if row is None:
+        raise NotFound()
+    seen = row["authorization_id"]
+    with (
+        transaction.atomic(),
+        lock_plan(
+            "family.cancel_invitation",
+            [LockLevel.AUTHORIZATION, LockLevel.ACCOUNT, LockLevel.DOMAIN],
+        ),
+    ):
+        a = None
+        if seen is not None:
+            a = lock_rows_for_update(
+                ProfileManagerAuthorization.objects.filter(pk=seen),
+                LockLevel.AUTHORIZATION,
+                anchor=True,
+            )[0]
+        lock_rows_for_share(User.objects.filter(pk=owner.pk), LockLevel.ACCOUNT)
+        invitation = lock_rows_for_update(
+            ManagerInvitation.objects.filter(pk=invitation_id), LockLevel.DOMAIN
+        )[0]
+        if invitation.authorization_id != seen:
+            return None  # linked meanwhile by the resolution task: retry in lock order
+        if invitation.status != ManagerInvitation.Status.PENDING:
+            raise InvalidAuthorizationState("This invitation is no longer pending.")
+        now = timezone.now()
+        if a is not None and a.status == Status.PENDING:
+            a = ProfileManagerAuthorization.objects.select_related(
+                "profile", "permission_group"
+            ).get(pk=a.pk)
+            previous = _snapshot(a)
+            a.status, a.revoked_at, a.reason = Status.REVOKED, now, reason
+            a.save()
+            _history(a, "REVOKED", owner, previous, _snapshot(a), reason)
+            _audit("revoked", owner, a)
+            _notify(a.manager_id, "authorization_revoked", a)
+        invitation.status, invitation.cancelled_at, invitation.reason = (
+            ManagerInvitation.Status.CANCELLED,
+            now,
+            reason,
+        )
+        invitation.save(update_fields=["status", "cancelled_at", "reason", "updated_at"])
+        record_audit(
+            action="family.invitation_cancelled",
+            resource_type="family.invitation",
+            actor_type="USER",
+            result="SUCCESS",
+            category="STATE_CHANGE",
+            actor_user_id=owner.pk,
+            subject_user_id=owner.pk,
+            represented_profile_pseudonym=pseudonym_for("PROFILE", invitation.profile_id),
+            metadata={"invitation_id": str(invitation.pk)},
+        )
+        return invitation
+
+
+def cancel_invitation(owner: User, invitation_id, reason=None) -> ManagerInvitation:
+    """The owner cancels a pending invitation (doc 15 §4 PENDING → REVOKED for a linked
+    authorization). Locks follow the global order: authorization (1) before the invitation."""
+    for _ in range(3):
+        invitation = _cancel_attempt(owner, invitation_id, reason)
+        if invitation is not None:
+            return invitation
+    raise InvalidAuthorizationState("Try again.")
 
 
 # --- Manager responses ---------------------------------------------------------------------
@@ -289,7 +525,7 @@ def invite(
 def _respond(manager: User, authorization_id, accept: bool) -> ProfileManagerAuthorization:
     with (
         transaction.atomic(),
-        lock_plan("family.respond", [LockLevel.AUTHORIZATION, LockLevel.ACCOUNT]),
+        lock_plan("family.respond", [LockLevel.AUTHORIZATION, LockLevel.ACCOUNT, LockLevel.DOMAIN]),
     ):
         a = _lock(authorization_id, manager=manager)
         if a.status != Status.PENDING:
@@ -303,7 +539,17 @@ def _respond(manager: User, authorization_id, accept: bool) -> ProfileManagerAut
         action = "ACCEPTED" if accept else "REJECTED"
         _history(a, action, manager, previous, _snapshot(a))
         _audit(action.lower(), manager, a)
-        _notify(a.profile.owner_id, "invitation_" + action.lower(), a)
+        invitations = lock_rows_for_update(
+            ManagerInvitation.objects.filter(authorization=a), LockLevel.DOMAIN
+        )
+        for invitation in invitations:
+            invitation.status = (
+                ManagerInvitation.Status.ACCEPTED if accept else ManagerInvitation.Status.DECLINED
+            )
+            invitation.responded_at = now
+            invitation.save(update_fields=["status", "responded_at", "updated_at"])
+        invitation_id = str(invitations[0].pk) if invitations else None
+        _notify(a.profile.owner_id, "invitation_" + action.lower(), a, invitation_id=invitation_id)
         return a
 
 
