@@ -32,7 +32,7 @@ The ten bundles below follow the ten-question limit. Each sub-item can be approv
 | OD-02 | Participation and account lifecycle | OPEN | Phases 2–3, 6, 12, 15 |
 | OD-03 | Visibility | OPEN | Phases 3, 6 |
 | OD-04 | Identity rules | OPEN | Phases 3–5, 15 |
-| OD-05 | Manager arrangement | OPEN | Phase 4 |
+| OD-05 | Manager arrangement | OPEN (owner-decision report 2026-11-20: `docs/implementation/od05_tr16_decision_report.md`) | Phase 4 |
 | OD-06 | Interest, request and connection interaction | OPEN | Phases 9–10 |
 | OD-07 | Request cancellation, refunds, credit disposition | OPEN | Phases 9, 12, 15 |
 | OD-08 | View exemptions and zero credit | OPEN | Phase 8 |
@@ -105,7 +105,7 @@ Doc 13 §4 lists **OD-001…OD-007** (commercial structure, credit packages, Jaz
 | TR | Topic | Status | Approval due | Main source |
 |---|---|---|---|---|
 | TR-01 | Authentication lifecycle (sessions, tokens, rotation, K_rot, cookies, lifetimes, lock order) | **APPROVED** (DR-2026-11-18-G4, 2026-11-18) | G4 | v4 §10; v4.2; v4.3 §1 |
-| TR-02 | Acting-profile authorization algorithm | PROPOSED (direction of ADR-026 adopted, DR-2026-11-18-G4; TR-02 decided at Phase 4) | Phase 4 | A4 §9 |
+| TR-02 | Acting-profile authorization algorithm | **APPROVED** (DR-2026-11-20-C-5, 2026-11-20, after review of the G5 Phase 4 implementation against doc 04 §24.1) for steps 1–9, 11 and 13–17. **Step 10 (step-up at use) is not covered: it stays with TR-16 (PROPOSED).** Until TR-16 is decided, a manager's use of a Sensitive permission fails closed (`403 sensitive_use_unavailable`). *History:* PROPOSED; direction of ADR-026 adopted (DR-2026-11-18-G4); implemented in G5 Phase 4 (2026-11-19) | Phase 4 | A4 §9 |
 | TR-03 | Central eligibility service, including `get_account_standing` | PROPOSED | Phase 6 | v4.6 §5; F §C |
 | TR-04 | Calendar arithmetic in UTC | PROPOSED | Phase 9 | v4 §13 |
 | TR-05 | Subscription vocabulary | **APPROVED** (DR-2026-11-16-4) | — | v4 §16 |
@@ -119,7 +119,7 @@ Doc 13 §4 lists **OD-001…OD-007** (commercial structure, credit packages, Jaz
 | TR-13 | PostgreSQL tests and concurrency harness (CI on PostgreSQL 16 and 18) | **APPROVED** (DR-2026-11-17-G2D-2, 2026-11-17) | — | v4.5 §6; v4.6 §4 |
 | TR-14 | Status model | **APPROVED** (DR-2026-11-16-2) | — | v4 §6 |
 | TR-15 | Ledger projections, refund integrity, wallet closure, financial events | PROPOSED | Phase 7 / 9 | v4.4; v4.5; F1; F2; F3 |
-| TR-16 | Step-up windows | PROPOSED | Phase 4 | A4 §3 |
+| TR-16 | Step-up windows | PROPOSED. Owner-decision report: `docs/implementation/od05_tr16_decision_report.md` (2026-11-20). Meanwhile Sensitive manager use fails closed (DR-2026-11-20-C-5) | Phase 4 | A4 §3 |
 | TR-17 | Security-event model | **APPROVED** (DR-2026-11-18-G4, 2026-11-18) | G4 | v4 §10.5 |
 | TR-18 | Lazy expiry | PROPOSED | Phase 9 | v4 §7 C |
 | TR-19 | Profile-detail revalidation, GET snapshot and deadline | PROPOSED | Phase 8 | v4 §8; v4.4 §5 |

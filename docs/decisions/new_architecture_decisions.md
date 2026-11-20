@@ -530,6 +530,27 @@ No speculative infrastructure tasks are added.
 
 ---
 
+## Decision record DR-2026-11-20-C: G5 Phases 2–4 final corrections, TR-02 approval, OD-05/TR-16 review
+
+- **Decision ID:** DR-2026-11-20-C
+- **Date:** 2026-11-20
+- **Decided by:** Project owner (instruction "G5 Phases 2–4: Final Corrections, Documentation Reconciliation and Validation")
+- **Decision status:** APPROVED (items 1–5); item 6 keeps OD-05 and TR-16 open
+- **Branch:** `feature/g5-phase2-auth` (local only)
+
+| # | ID | Item | Decision | Implementation |
+|---|---|---|---|---|
+| 1 | DR-2026-11-20-C-1 | KI-37 employment status | **APPROVED:** activate `EMPLOYED`, `SELF_EMPLOYED`, `BUSINESS_OWNER`, `UNEMPLOYED`, `STUDENT`, `RETIRED`, `HOMEMAKER`, `OTHER` in the admin-managed vocabulary. "Prefer not to say" is not an employment status. No unnecessary schema change | `profiles.0006` (data only). The earlier proposal `NOT_EMPLOYED` stays inactive (codes are permanent). No Urdu labels approved: `label_ur` left for administrators |
+| 2 | DR-2026-11-20-C-2 | KI-34 invitation enumeration | **APPROVED:** fix with security best practice; no distinguishable outcome for account existence, verification, eligibility or authorization state; keep rate limits and authorization; no change to the invitation business rules | `ManagerInvitation` (`family.0003`), uniform `202`, background resolution, owner sees an authorization only after acceptance. ADR-034 |
+| 3 | DR-2026-11-20-C-3 | KI-39 first admin MFA enrollment | **APPROVED:** the first enrollment code is never shown to the issuing administrator or the operator; it goes by SMS only to the account holder's verified phone (A1-2 direction); fail safe with an audited recovery path | `issue_enrollment` sends after commit; failure revokes the code; reissuing (audited) is the recovery path. ADR-033 note |
+| 4 | DR-2026-11-20-C-4 | KI-38 test database safety | **APPROVED:** tests require an explicit, approved disposable test database; refuse a missing configuration and port 5432; no silent substitution | `common/test_database.py`, called by `config.settings.test` before anything else |
+| 5 | DR-2026-11-20-C-5 | TR-02 acting-profile rules | **APPROVED** after review against doc 04 §24.1 (the owner authorized recording approval if the implementation matched the adopted direction). **Scope:** steps 1–9, 11 and 13–17. **Step 10 (step-up at use) is not approved here:** it stays with TR-16 (PROPOSED). The review found that a manager with a granted Sensitive permission could use it without extra security, contrary to FR-FAM-005 and doc 14. The affected behaviour now **fails closed** (`403 sensitive_use_unavailable`) until TR-16 is decided; nothing else was redesigned | `apps/family/context.py` |
+| 6 | DR-2026-11-20-C-6 | OD-05 and TR-16 (KI-35) | **Stay OPEN / PROPOSED.** Review and owner-decision report prepared; no dependent behaviour implemented | `docs/implementation/od05_tr16_decision_report.md` |
+
+**Not authorized (unchanged):** push, PR, merge, remote branch changes, CI/CD changes, AWS or production infrastructure, production database access, G5 Phase 5. Phases 2–4 are not accepted by this record. The owner reviews and accepts them separately.
+
+---
+
 ## OD-01 approved functional-domain catalogue
 
 **Source key:**

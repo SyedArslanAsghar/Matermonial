@@ -114,3 +114,12 @@ Implementation, when approved: the `AdminActionApproval` table (§16.7), the ser
 | A1-3 | **NOT APPROVED** for the MVP: no recovery codes |
 | A1-4 | **APPROVED.** CLI recovery only with `--emergency` and `--reason CODE`; fully audited; notifies the account holder and all superusers; delivers the secret by SMS only and never prints it |
 | A1-5 | **APPROVED.** Security-event types `ADMIN_MFA_RECOVERY_REQUESTED`, `ADMIN_MFA_RECOVERY_DECIDED` and `ADMIN_MFA_EMERGENCY_RECOVERY` added, with the CHECK widened |
+
+## Amendment 2 (2026-11-20, DR-2026-11-20-C-3): first-enrollment codes by SMS only (KI-39)
+
+The first enrollment code was shown once to the issuing administrator (admin action page) or printed by the CLI. Following the approved A1-2 direction, it now goes **only by SMS** to the account holder's verified phone:
+
+- `issue_enrollment` requires a verified phone, creates the code (HMAC only) and sends it directly after commit, never through the broker. It returns only whether the SMS provider accepted it.
+- The admin action ("Send a first MFA enrollment code by SMS") and `manage.py admin_access issue-mfa-enrollment` show only the outcome. The template that displayed codes was removed.
+- On SMS failure, the code is revoked and the audit row `admin.mfa_enrollment_delivery` records FAILURE. The account holder is notified (`security.admin_mfa_enrollment`), and issuing again (audited) is the recovery path. The flow stays separate from two-person recovery (Amendment 1) and is still limited to accounts that have never enrolled.
+- **Local development:** `SMS_PROVIDER=console`, allowed only when `ENVIRONMENT=local` (deployed settings refuse it), writes SMS bodies to the process's standard output as a simulated handset. It never writes to the logging system. In tests, the mock provider keeps messages in memory.
