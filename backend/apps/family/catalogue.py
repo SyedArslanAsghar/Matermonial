@@ -4,8 +4,10 @@ Doc 14 §9 (tiers N/S/H/O, new codes, pre-selection) is OD-05 (OPEN) and isn't i
 The catalogue is seeded by migration ``family.0002`` from a frozen copy of these tuples and is
 then data: administrators can deactivate entries or edit templates in the Django Admin.
 
-``manage_family_authorizations`` is seeded **inactive**: inviting and managing managers is
-owner-only by a decided rule (doc 05 §2.1, doc 15 §4), and its reclassification is OD-05c.
+``manage_family_authorizations`` and ``manage_verification_submission`` are **Owner-only**
+(owner decision DR-2026-11-20-O-4, OD-05c; migration ``family.0004``): a manager never manages
+other managers and never submits identity verification for the owner. The first is also seeded
+inactive. Owner-only permissions are never granted, and a stored grant is ignored at use.
 """
 
 NORMAL, SENSITIVE, OWNER_ONLY = "NORMAL", "SENSITIVE", "OWNER_ONLY"
@@ -43,9 +45,9 @@ PERMISSIONS: tuple[tuple[str, str, str], ...] = (
     ("manage_hidden_profiles", "Hide/unhide profiles", SENSITIVE),
     ("view_visitor_history", "View profile visitors", SENSITIVE),
     ("manage_visitor_history", "Remove/clear visible visitor records", SENSITIVE),
-    ("manage_family_authorizations", "Invite and manage other managers", SENSITIVE),
+    ("manage_family_authorizations", "Invite and manage other managers", OWNER_ONLY),
     ("view_verification_status", "View verification status", SENSITIVE),
-    ("manage_verification_submission", "Submit/resubmit verification", SENSITIVE),
+    ("manage_verification_submission", "Submit/resubmit verification", OWNER_ONLY),
     ("view_financial_summary", "View subscription and credit summary", SENSITIVE),
     ("manage_subscription", "Purchase or cancel subscription", SENSITIVE),
     ("manage_account_security", "Change account security settings", OWNER_ONLY),

@@ -49,6 +49,32 @@ urlpatterns = [
         views.InvitationCancelView.as_view(),
         name="family-invitation-cancel",
     ),
+    path(
+        "invitations/<uuid:invitation_id>/history/",
+        views.InvitationHistoryView.as_view(),
+        name="family-invitation-history",
+    ),
+    path("requests/", views.RequestListView.as_view(), name="family-requests"),
+    path(
+        "requests/<uuid:request_id>/accept/",
+        views.RequestAcceptView.as_view(),
+        name="family-request-accept",
+    ),
+    path(
+        "requests/<uuid:request_id>/decline/",
+        views.RequestDeclineView.as_view(),
+        name="family-request-decline",
+    ),
+    path(
+        "requests/<uuid:request_id>/cancel/",
+        views.RequestCancelView.as_view(),
+        name="family-request-cancel",
+    ),
+    path(
+        "requests/<uuid:request_id>/history/",
+        views.RequestHistoryView.as_view(),
+        name="family-request-history",
+    ),
     path("permissions/", views.PermissionCatalogueView.as_view(), name="family-catalogue"),
     path("permission-groups/", views.PermissionGroupView.as_view(), name="family-groups"),
     path(

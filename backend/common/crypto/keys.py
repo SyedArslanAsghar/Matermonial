@@ -22,7 +22,17 @@ DEV_LABEL = "matermonial-dev-only-not-secret"
 # REGISTRY signs compliance-registry entries; OTP keys the one-time-code hash (doc 06 §3);
 # ROT is K_rot, which derives child tokens in refresh rotation (TR-01, doc 06 §22.1);
 # ADMIN_MFA encrypts admin TOTP seeds and keys the enrollment-code hash (TR-07).
-PURPOSES = ("KEK", "QUEUE", "DEDUPE", "SUBJECT_HASH", "REGISTRY", "OTP", "ROT", "ADMIN_MFA")
+PURPOSES = (
+    "KEK",
+    "QUEUE",
+    "DEDUPE",
+    "SUBJECT_HASH",
+    "REGISTRY",
+    "OTP",
+    "ROT",
+    "ADMIN_MFA",
+    "ACCOUNT_MFA",  # account authenticator seeds (TR-16, DR-2026-11-20-O-3)
+)
 
 
 class KeyConfigurationError(Exception):

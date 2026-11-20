@@ -99,11 +99,33 @@ FK_LOCK_CLASSES: dict[str, str] = {
     "family.ManagerInvitation.invitee": "P",
     "family.ManagerInvitation.authorization": "P",
     "family.ManagerInvitation.permission_group": "N",
+    # Owner decisions DR-2026-11-20-O-1..3: history rows are written after their invitation,
+    # request or authorization is locked or inserted in the same transaction; requests lock the
+    # requester and owner accounts (2) and the profile (3) first; step-up locks the
+    # authorization (1), the manager account (2) and the profile (3) before inserting.
+    "family.ManagerAuthorizationHistory.invitation": "P",
+    "family.ManagerAuthorizationHistory.request": "P",
+    "family.ManagerRequest.requester": "P",
+    "family.ManagerRequest.owner": "P",
+    "family.ManagerRequest.profile": "P",
+    "family.ManagerRequest.authorization": "P",
+    "family.SensitiveActionVerification.manager": "P",
+    "family.SensitiveActionVerification.profile": "P",
+    "family.SensitiveActionVerification.authorization": "P",
     "family.ManagerPermissionGroupPermission.group": "N",
     "family.ManagerPermissionGroupPermission.permission": "N",
     # OTP verify locks the account (level 2) before the verification row; send runs with no
     # other business locks.
     "verification.PhoneVerification.user": "P",
+    # Notifications (DR-2026-11-20-O-7): the handler locks the recipient account (2) and their
+    # active devices (domain) FOR SHARE before inserting; the delivery's notification is
+    # inserted in the same transaction; device registration locks the account first.
+    "notifications.InAppNotification.recipient": "P",
+    "notifications.PushDevice.user": "P",
+    "notifications.NotificationDelivery.notification": "P",
+    "notifications.NotificationDelivery.device": "P",
+    # Account authenticator (TR-16): every write locks the account FOR SHARE first.
+    "accounts.AccountTotpDevice.user": "P",
 }
 
 

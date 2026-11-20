@@ -18,13 +18,16 @@ request is resolved fresh (never cached):
 7. The endpoint's permission must be granted and active: else 403 ``permission_not_granted``.
    Owner-only permissions are never delegated.
 
-Step 10 (manager step-up at use) waits for TR-16 (PROPOSED). Until it is decided, a manager's
-*use* of a Sensitive permission fails closed with 403 ``sensitive_use_unavailable`` (TR-02 review,
-2026-11-20): Sensitive permissions can be granted (owner confirmation + owner step-up) but not
-exercised, because the approved rule requires extra security at use (FR-FAM-005, doc 14) and its
-mechanism is not decided. Also not implemented: H-tier single-use verification (OD-05),
-restrictions and eligibility (Phase 6), billing (later phases; ``billing_account`` is already
-the owner).
+Step 10 (TR-16, owner decision DR-2026-11-20-O-3): a manager's use of a granted Sensitive
+permission needs a fresh step-up with the manager's **own authenticator** for that exact action
+(``services/step_up.py``). The request carries ``X-Step-Up-Verification: <id>``; the
+verification must belong to this manager, profile, authorization and action, be at most 5
+minutes old and unused, and it is consumed atomically inside the business transaction (single
+use). Missing, expired, reused or mismatched verifications fail with 403 ``step_up_required``;
+a manager without an enrolled authenticator can't obtain one. A grant never bypasses this. The
+owner is notified after each Sensitive action. One Sensitive action per request. Not
+implemented: H tier and per-share approval (OD-05d), restrictions and eligibility (Phase 6),
+billing (later phases; ``billing_account`` is already the owner).
 
 Writes re-verify inside their transaction with ``lock_authorization_for_write`` (doc 04 §24.1
 step 13): the authorization row FOR SHARE (lock level 1), then the same checks.
@@ -70,13 +73,16 @@ class ActingProfileUnavailable(APIException):
     default_detail = "The selected profile can't be managed right now."
 
 
-class SensitiveUseUnavailable(APIException):
+class StepUpVerificationRequired(APIException):
     status_code = status.HTTP_403_FORBIDDEN
-    default_code = "sensitive_use_unavailable"
-    default_detail = (
-        "Sensitive actions on behalf of a profile aren't available to managers yet; "
-        "the profile owner can do this."
-    )
+    default_code = "step_up_required"
+    default_detail = "This sensitive action needs a fresh verification with your authenticator app."
+
+
+class OneSensitiveActionPerRequest(APIException):
+    status_code = status.HTTP_400_BAD_REQUEST
+    default_code = "one_sensitive_action_per_request"
+    default_detail = "Send one sensitive change per request, each with its own verification."
 
 
 class PermissionNotGranted(APIException):
@@ -92,8 +98,9 @@ class ActorContext:
     is_owner: bool
     authorization_id: uuid.UUID | None
     granted: frozenset[str] = field(default_factory=frozenset)
-    # Granted Sensitive permissions: not usable until TR-16 decides step-up at use.
+    # Granted Sensitive permissions: usable only with a step-up verification (TR-16).
     sensitive: frozenset[str] = field(default_factory=frozenset)
+    step_up_id: uuid.UUID | None = None
     request_id: str | None = None
     ip: str | None = None
     user_agent: str = ""
@@ -112,6 +119,8 @@ class ActorContext:
         return "USER" if self.is_owner else "MANAGER"
 
     def has(self, permission: str) -> bool:
+        """Read-side check (e.g. field visibility). Sensitive permissions are never implied
+        without a step-up, so they count as not held here."""
         return self.is_owner or (permission in self.granted and permission not in self.sensitive)
 
     def require(self, *permissions: str, any_of: bool = False) -> None:
@@ -120,9 +129,11 @@ class ActorContext:
         held = [p in self.granted for p in permissions]
         if not (any(held) if any_of else all(held)):
             raise PermissionNotGranted()
-        usable = [p in self.granted and p not in self.sensitive for p in permissions]
-        if not (any(usable) if any_of else all(usable)):
-            raise SensitiveUseUnavailable()
+        needed = sensitive_needed(self, permissions, any_of=any_of)
+        if len(needed) > 1:
+            raise OneSensitiveActionPerRequest()
+        if needed and self.step_up_id is None:
+            raise StepUpVerificationRequired()
 
 
 def reject_header(request) -> None:
@@ -173,8 +184,39 @@ def sensitive_codes(authorization_id) -> frozenset[str]:
     )
 
 
+def sensitive_needed(context, permissions, *, any_of: bool = False) -> list[str]:
+    """The Sensitive permissions this call relies on (none for owners). With ``any_of``, a
+    Normal permission that satisfies the call means no Sensitive one is needed."""
+    if context.is_owner:
+        return []
+    granted = [p for p in permissions if p in context.granted]
+    if any_of and any(p not in context.sensitive for p in granted):
+        return []
+    return sorted(p for p in granted if p in context.sensitive)
+
+
+STEP_UP_HEADER = "HTTP_X_STEP_UP_VERIFICATION"
+
+
+def _step_up_id(request) -> uuid.UUID | None:
+    value = request.META.get(STEP_UP_HEADER)
+    if not value:
+        return None
+    try:
+        return uuid.UUID(value)
+    except (TypeError, ValueError):
+        raise ValidationError(
+            {"X-Step-Up-Verification": ["Must be a verification UUID."]}
+        ) from None
+
+
 def resolve(
-    request, *, permission: str | None = None, path_profile_id=None, any_of: tuple[str, ...] = ()
+    request,
+    *,
+    permission: str | None = None,
+    path_profile_id=None,
+    any_of: tuple[str, ...] = (),
+    access_type: str | None = None,
 ) -> ActorContext:
     user = request.user
     header = request.META.get(HEADER)
@@ -217,6 +259,7 @@ def resolve(
         authorization.pk,
         granted_codes(authorization.pk),
         sensitive_codes(authorization.pk),
+        _step_up_id(request),
         **meta,
     )
     if permission:
@@ -229,7 +272,7 @@ def resolve(
         manager=user,
         ip_address=context.ip,
         browser=context.user_agent[:200],
-        access_type=permission or (any_of[0] if any_of else "view_profile"),
+        access_type=access_type or permission or (any_of[0] if any_of else "view_profile"),
     )
     return context
 
@@ -248,5 +291,3 @@ def lock_authorization_for_write(context: ActorContext, *permissions: str) -> No
     current = granted_codes(context.authorization_id)
     if any(p not in current for p in permissions):
         raise PermissionNotGranted()
-    if set(permissions) & sensitive_codes(context.authorization_id):
-        raise SensitiveUseUnavailable()

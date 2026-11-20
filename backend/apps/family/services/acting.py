@@ -2,7 +2,8 @@
 
 Lock order (doc 12 §5, doc 04 §24.1 step 13): the manager's authorization FOR SHARE (level 1;
 re-checked: still ACTIVE, not expired, permissions still granted), the acting User FOR SHARE
-(level 2), then the represented profile FOR UPDATE (level 3, the state anchor).
+(level 2), the represented profile FOR UPDATE (level 3, the state anchor), then, for a Sensitive
+permission, the manager's step-up verification (domain level; consumed once, TR-16).
 """
 
 from rest_framework.exceptions import NotFound
@@ -16,10 +17,11 @@ from ..context import (
     PermissionNotGranted,
     granted_codes,
     lock_authorization_for_write,
+    sensitive_needed,
 )
 from ..models import ManagerActionLog
 
-LEVELS = (LockLevel.AUTHORIZATION, LockLevel.ACCOUNT, LockLevel.PROFILE)
+LEVELS = (LockLevel.AUTHORIZATION, LockLevel.ACCOUNT, LockLevel.PROFILE, LockLevel.DOMAIN)
 
 
 def lock_represented_profile(
@@ -34,6 +36,13 @@ def lock_represented_profile(
     )
     if not rows:
         raise NotFound()
+    needed = sensitive_needed(ctx, permissions) if permissions else []
+    if any_of:
+        needed += sensitive_needed(ctx, any_of, any_of=True)
+    for action in sorted(set(needed)):
+        from .step_up import consume
+
+        consume(ctx, action)
     return rows[0]
 
 

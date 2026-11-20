@@ -187,11 +187,33 @@ class AuthorizationPermission(models.Model):
 
 
 class ManagerAuthorizationHistory(models.Model):
-    """Append-only (trigger, migration family.0001)."""
+    """Append-only (trigger, migration family.0001). One row per change to an authorization,
+    an invitation or a request (doc 05 §2; owner decision DR-2026-11-20-O-1). Rows linked to an
+    invitation or a request record only what its sender may see (created, cancelled, expired,
+    answered); the background resolution of an invitation is recorded on the authorization
+    only, so invitation history never reveals whether a number has an account (ADR-034)."""
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     authorization = models.ForeignKey(
-        ProfileManagerAuthorization, on_delete=models.PROTECT, related_name="history"
+        ProfileManagerAuthorization,
+        on_delete=models.PROTECT,
+        related_name="history",
+        null=True,
+        blank=True,
+    )
+    invitation = models.ForeignKey(
+        "ManagerInvitation",
+        on_delete=models.PROTECT,
+        related_name="history",
+        null=True,
+        blank=True,
+    )
+    request = models.ForeignKey(
+        "ManagerRequest",
+        on_delete=models.PROTECT,
+        related_name="history",
+        null=True,
+        blank=True,
     )
     action = models.CharField(max_length=40)
     performed_by = models.ForeignKey(
@@ -208,6 +230,14 @@ class ManagerAuthorizationHistory(models.Model):
     class Meta:
         db_table = "family_authorization_history"
         ordering = ["created_at"]
+        constraints = [
+            models.CheckConstraint(
+                condition=Q(authorization__isnull=False)
+                | Q(invitation__isnull=False)
+                | Q(request__isnull=False),
+                name="family_history_has_subject",
+            )
+        ]
 
 
 class ManagerActionLog(models.Model):
@@ -263,8 +293,9 @@ class ManagerInvitation(models.Model):
     - The phone number is not stored: ``phone_digest`` is a keyed hash (SUBJECT_HASH ring) used
       to refuse duplicate pending invitations, ``phone_hint`` is the masked display.
     - ``invitee`` is internal only (never serialized to the owner).
-    - Invitation TTL is OD-05e (OPEN): pending invitations stay pending until answered or
-      cancelled.
+    - A pending invitation expires ``FAMILY_INVITATION_TTL_DAYS`` (30) days after it was sent
+      if it isn't accepted (OD-05e, owner decision DR-2026-11-20-O-2), the same way whether or
+      not it was resolved to an account.
     """
 
     class Status(models.TextChoices):
@@ -272,6 +303,7 @@ class ManagerInvitation(models.Model):
         ACCEPTED = "ACCEPTED"
         DECLINED = "DECLINED"
         CANCELLED = "CANCELLED"
+        EXPIRED = "EXPIRED"
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     profile = models.ForeignKey(
@@ -297,8 +329,10 @@ class ManagerInvitation(models.Model):
     )
     status = models.CharField(max_length=9, choices=Status.choices, default=Status.PENDING)
     invited_at = models.DateTimeField()
+    expires_at = models.DateTimeField()
     responded_at = models.DateTimeField(null=True, blank=True)
     cancelled_at = models.DateTimeField(null=True, blank=True)
+    expired_at = models.DateTimeField(null=True, blank=True)
     reason = models.CharField(max_length=40, null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -307,6 +341,7 @@ class ManagerInvitation(models.Model):
         db_table = "family_invitation"
         indexes = [
             models.Index(fields=["profile", "status"], name="family_invitation_profile"),
+            models.Index(fields=["status", "expires_at"], name="family_invitation_expiry"),
         ]
         constraints = [
             models.UniqueConstraint(
@@ -318,12 +353,146 @@ class ManagerInvitation(models.Model):
                 condition=~Q(invitee=F("invited_by")), name="family_invitation_not_self"
             ),
             models.CheckConstraint(
-                condition=Q(status__in=["PENDING", "CANCELLED"])
+                condition=Q(status__in=["PENDING", "CANCELLED", "EXPIRED"])
                 | Q(authorization__isnull=False, responded_at__isnull=False),
                 name="family_invitation_response_consistent",
             ),
             models.CheckConstraint(
                 condition=~Q(status="CANCELLED") | Q(cancelled_at__isnull=False),
                 name="family_invitation_cancelled_has_time",
+            ),
+            models.CheckConstraint(
+                condition=~Q(status="EXPIRED") | Q(expired_at__isnull=False),
+                name="family_invitation_expired_has_time",
+            ),
+            models.CheckConstraint(
+                condition=Q(expires_at__gt=F("invited_at")),
+                name="family_invitation_expiry_after_sending",
+            ),
+        ]
+
+
+class ManagerRequest(models.Model):
+    """Flow B (owner decision DR-2026-11-20-O-1): an account asks to manage another person's
+    profile, identified by the owner's phone number. Enumeration-safe like invitations
+    (ADR-034): every valid request is recorded and answered the same way; a background task
+    resolves the number to an eligible owner's personal profile and notifies that owner. The
+    requester learns about the owner only when the owner accepts or declines. The owner chooses
+    the permissions when accepting; the authorization is then ACTIVE (both sides consented: the
+    requester by asking, the owner by accepting). Expires after 30 days if not answered.
+
+    - The phone number isn't stored: ``owner_phone_digest`` (HMAC) and ``owner_phone_hint``.
+    - ``owner`` and ``profile`` are internal until the owner answers.
+    """
+
+    class Status(models.TextChoices):
+        PENDING = "PENDING"
+        ACCEPTED = "ACCEPTED"
+        DECLINED = "DECLINED"
+        CANCELLED = "CANCELLED"
+        EXPIRED = "EXPIRED"
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    requester = models.ForeignKey("accounts.User", on_delete=models.PROTECT, related_name="+")
+    owner_phone_digest = models.CharField(max_length=64)
+    owner_phone_hint = models.CharField(max_length=24)
+    owner = models.ForeignKey(
+        "accounts.User", on_delete=models.PROTECT, null=True, blank=True, related_name="+"
+    )
+    profile = models.ForeignKey(
+        "profiles.MatrimonialProfile",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="manager_requests",
+    )
+    authorization = models.OneToOneField(
+        ProfileManagerAuthorization,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="request",
+    )
+    status = models.CharField(max_length=9, choices=Status.choices, default=Status.PENDING)
+    requested_at = models.DateTimeField()
+    expires_at = models.DateTimeField()
+    responded_at = models.DateTimeField(null=True, blank=True)
+    cancelled_at = models.DateTimeField(null=True, blank=True)
+    expired_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = "family_manager_request"
+        indexes = [
+            models.Index(fields=["profile", "status"], name="family_request_profile"),
+            models.Index(fields=["requester", "status"], name="family_request_requester"),
+            models.Index(fields=["status", "expires_at"], name="family_request_expiry"),
+        ]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["requester", "owner_phone_digest"],
+                condition=Q(status="PENDING"),
+                name="family_request_one_pending_per_number",
+            ),
+            models.CheckConstraint(
+                condition=~Q(owner=F("requester")), name="family_request_not_self"
+            ),
+            models.CheckConstraint(
+                condition=~Q(status="ACCEPTED")
+                | Q(authorization__isnull=False, responded_at__isnull=False),
+                name="family_request_accepted_consistent",
+            ),
+            models.CheckConstraint(
+                condition=~Q(status="DECLINED") | Q(responded_at__isnull=False),
+                name="family_request_declined_has_time",
+            ),
+            models.CheckConstraint(
+                condition=~Q(status="CANCELLED") | Q(cancelled_at__isnull=False),
+                name="family_request_cancelled_has_time",
+            ),
+            models.CheckConstraint(
+                condition=~Q(status="EXPIRED") | Q(expired_at__isnull=False),
+                name="family_request_expired_has_time",
+            ),
+            models.CheckConstraint(
+                condition=Q(expires_at__gt=F("requested_at")),
+                name="family_request_expiry_after_sending",
+            ),
+        ]
+
+
+class SensitiveActionVerification(models.Model):
+    """TR-16 step-up for a manager's Sensitive action (doc 03 §6.8; owner decision
+    DR-2026-11-20-O-3). Created only after the manager proves their own authenticator (TOTP);
+    bound to that manager, the represented profile, the authorization and one action
+    (the Sensitive permission exercised); valid for ``FAMILY_STEP_UP_TTL_SECONDS`` (300);
+    consumed once, atomically, inside the business transaction of that action."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    manager = models.ForeignKey("accounts.User", on_delete=models.PROTECT, related_name="+")
+    profile = models.ForeignKey(
+        "profiles.MatrimonialProfile", on_delete=models.PROTECT, related_name="+"
+    )
+    authorization = models.ForeignKey(
+        ProfileManagerAuthorization, on_delete=models.PROTECT, related_name="verifications"
+    )
+    action = models.CharField(max_length=60)
+    method = models.CharField(max_length=8, default="TOTP")
+    verified_at = models.DateTimeField()
+    expires_at = models.DateTimeField()
+    consumed_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        db_table = "family_sensitive_action_verification"
+        indexes = [models.Index(fields=["manager", "profile"], name="family_stepup_lookup")]
+        constraints = [
+            models.CheckConstraint(
+                condition=Q(expires_at__gt=F("verified_at")), name="family_stepup_expiry"
+            ),
+            models.CheckConstraint(condition=Q(method="TOTP"), name="family_stepup_method"),
+            models.CheckConstraint(
+                condition=Q(consumed_at__isnull=True) | Q(consumed_at__gte=F("verified_at")),
+                name="family_stepup_consumed_after_verify",
             ),
         ]

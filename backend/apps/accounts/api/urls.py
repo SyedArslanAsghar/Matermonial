@@ -2,7 +2,7 @@
 
 from django.urls import path
 
-from . import views
+from . import mfa, views
 
 urlpatterns = [
     path("csrf/", views.CsrfView.as_view(), name="auth-csrf"),
@@ -20,4 +20,8 @@ urlpatterns = [
     path("password/forgot/", views.PasswordForgotView.as_view(), name="auth-password-forgot"),
     path("password/reset/", views.PasswordResetView.as_view(), name="auth-password-reset"),
     path("password/change/", views.PasswordChangeView.as_view(), name="auth-password-change"),
+    path("mfa/", mfa.MfaStatusView.as_view(), name="auth-mfa"),
+    path("mfa/enroll/", mfa.MfaEnrollView.as_view(), name="auth-mfa-enroll"),
+    path("mfa/confirm/", mfa.MfaConfirmView.as_view(), name="auth-mfa-confirm"),
+    path("mfa/remove/", mfa.MfaRemoveView.as_view(), name="auth-mfa-remove"),
 ]
