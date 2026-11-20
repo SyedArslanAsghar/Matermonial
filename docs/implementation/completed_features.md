@@ -46,4 +46,18 @@ Evidence in `progress.md` (404/404 tests on Python 3.12 and 3.13 × PostgreSQL 1
 | Fail-safe test database configuration | KI-38 | TESTED |
 | Sensitive manager use fails closed until TR-16 | TR-02 review; FR-FAM-005 | TESTED |
 
+## Owner decisions DR-2026-11-20-O (TESTED, 2026-11-20)
+
+| Feature | Requirement / decision | Status |
+|---|---|---|
+| Permission selection at invitation; requests to manage a profile (Flow B) | FR-FAM-001/002/003; O-1 | TESTED |
+| Owner-only grant/revoke of individual permissions; manager restrictions | FR-FAM-003; O-1 | TESTED |
+| 30-day expiry of invitations and requests with history and notices | FR-FAM-006; OD-05e, O-2 | TESTED |
+| Account authenticator and per-action manager step-up | FR-FAM-005; TR-16, O-3 | TESTED |
+| Owner-only identity verification (permissions and guard) | FR-VER-002; OD-05c, O-4 | TESTED (guard; Phase 5 not started) |
+| Separate religion/denomination/caste/sub-caste/community | FR-PRO-002; KI-29, O-5 | TESTED |
+| Photo limits and scan outcomes, ClamAV adapter | FR-PRO-008; O-6, O-8 | TESTED |
+| SMS/email/push adapters, in-app notifications, push delivery | FR-NOT-001/004; O-7 | TESTED (FR rows IN_PROGRESS) |
+| OpenAPI zero errors and warnings | KI-40; O-9 | TESTED |
+
 Documentation work completed under G1 is recorded in `docs/handover/20_DOCUMENTATION_CORRECTION_REGISTER.md`.

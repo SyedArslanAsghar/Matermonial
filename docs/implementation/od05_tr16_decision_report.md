@@ -1,6 +1,6 @@
 # Owner Decision Report: OD-05 and TR-16 (KI-35)
 
-**Prepared:** 2026-11-20, under DR-2026-11-20-C-6. **Status:** for owner decision. Nothing here is approved. OD-05 and TR-16 stay **OPEN / PROPOSED**, and no behaviour that depends on them has been implemented.
+**Prepared:** 2026-11-20, under DR-2026-11-20-C-6. **Status update (DR-2026-11-20-O, same day):** the owner decided **TR-16** (per-action step-up with the manager's own authenticator, 5 minutes, single use — not the 12 h / 10 min proposal below), **OD-05c** (Owner-only, confirmed) and **OD-05e** (**30 days**, not the 14 days proposed below). OD-05a, b, d and f stay OPEN. The report is kept as written for the record.
 
 **Sources:**
 - doc 19 (OD-05a–f, TR-16)

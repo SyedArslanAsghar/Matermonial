@@ -1,6 +1,6 @@
 # Progress
 
-**Last updated:** 2026-11-20 (G5 Phases 2–4 implemented and tested; final corrections DR-2026-11-20-C)
+**Last updated:** 2026-11-20 (owner decisions DR-2026-11-20-O implemented and tested)
 
 ## Governance status
 
@@ -11,7 +11,7 @@
 | G2 Repository governance | **ACCEPTED** by the project owner with carried-forward items (DR-2026-11-17-G2A). Baseline commit `38f491dea79fb9bb10fd2010b1c2cb8a68d545f9`. Exit criterion "CI runs on the baseline" (carried forward under DR-2026-11-17-G2X): **satisfied by owner acceptance** (DR-2026-11-18-G2C, 2026-11-18) on the integrated run `44294474904` on commit `c5fc346` (success, 6/6 jobs). The baseline commit `38f491d` itself did not run independently. |
 | G3 Backend foundation | **ACCEPTED** by the project owner on 2026-11-18, with an accepted exception and a carried-forward item (DR-2026-11-18-G3A). Exit criterion "tests green on PostgreSQL" is **not fully met**: the PostgreSQL foundation tests pass, but the 3 KI-14 User-model database tests are **OPEN** and must pass as part of G4. The G3 changes were committed and pushed by the owner as `c5fc346` (DR-2026-11-18-GH). |
 | G4 First migration | **ACCEPTED by the project owner** (DR-2026-11-18-G4A, 2026-11-18). |
-| G5 Features | **IN PROGRESS** (authorized DR-2026-11-18-G4). Phases 2 (auth + Django Admin MFA), 3 (profiles, preferences, photos) and 4 (family management, authorized DR-2026-11-19-O-10) are **IMPLEMENTED and TESTED** on `feature/g5-phase2-auth`, with the final corrections of DR-2026-11-20-C. The branch is local only (not pushed); owner review and acceptance are pending. **Phase 5 is not authorized.** |
+| G5 Features | **IN PROGRESS** (authorized DR-2026-11-18-G4). Phases 2 (auth + Django Admin MFA), 3 (profiles, preferences, photos) and 4 (family management, authorized DR-2026-11-19-O-10) are **IMPLEMENTED and TESTED** on `feature/g5-phase2-auth`, with the final corrections of DR-2026-11-20-C and the owner decisions of DR-2026-11-20-O. The branch is local only (not pushed); owner review and acceptance are pending. **Phase 5 is not authorized.** |
 | Current delivery scope | **CI/CD implementation and validation** (DR-2026-11-18-CI, 2026-11-18). AWS deployment and production infrastructure are **deferred** and out of current scope. CD execution stays disabled until a target and an authorization exist. This doesn't authorize a remote, a push, a commit, G4 or a deployment. |
 
 ## Implementation status
@@ -484,6 +484,39 @@ Disposable containers `postgres:16` (16.16, port 55432) and `postgres:18` (18.7,
 5. `makemigrations --check` reported no changes.
 
 **Other checks:** `manage.py check` reports no issues. The OpenAPI generation warnings and errors are unchanged from `f0048f4` (158 errors, all pre-existing: APIViews without serializers, KI-40). The new cancel endpoint is annotated.
+
+Implementation status: **TESTED.** REVIEWED and ACCEPTED are set by the reviewer and the owner (CC-R70).
+
+## Owner decisions DR-2026-11-20-O (2026-11-20)
+
+| Decision | Result | Evidence (tests) |
+|---|---|---|
+| O-1 two-way authorization | Flow A invitations with permission selection; Flow B requests by phone number (enumeration-safe), owner accepts choosing permissions or declines, requester cancels; owner-only later grant/revoke with `PERMISSIONS_GRANTED/REVOKED` history; managers can't manage managers or act for others (ADR-035) | `test_owner_decisions.py`: selection 4, requests 9, owner permissions 1, restrictions 4 |
+| O-2 30-day expiry | Invitations and requests expire after 30 days, the same way whether resolved or not; history `NOT_ACCEPTED_WITHIN_30_DAYS`; sender and recipient notified; expired can't be accepted | expiry 4 |
+| O-3 TR-16 | Account authenticator (TOTP) and per-action step-up, ≤ 5 min, single use, bound to manager/profile/action; owner notified; replaces the fail-closed interim (ADR-036) | step-up 5, authenticator 3 |
+| O-4 OD-05c | Both permissions Owner-only (`family.0004`); identity-verification guard for Phase 5 | 2 |
+| O-5 KI-29 | Separate optional religion, denomination, caste, sub-caste, community; `caste_or_subcast` → `caste` + `sub_caste`; initial lists (AS-27) | `test_identity_vocabularies.py` 11 |
+| O-6 photo limits | 5 MB, 4096 px, JPEG/PNG/WebP by signature, no SVG/animation, 6 photos, one primary | `TestOwnerApprovedLimits` 13 |
+| O-7 providers | `common/providers/` package; Twilio, SMTP, Expo adapters; deployed config checks; in-app notifications and push delivery (`apps.notifications`) (ADR-037) | `test_provider_adapters.py` 26, notifications 10 |
+| O-8 scanning | Scan outcomes PENDING/CLEAN/INFECTED/FAILED; bounded retries while quarantined; ClamAV INSTREAM adapter; READY needs CLEAN (CHECK) | in the two groups above |
+| O-9 KI-40 | OpenAPI 158 errors / 66 warnings → 0 / 0, validated | `test_openapi_schema.py` 8 |
+| O-10 | Matrimonial request expiry (3 months, 30-day cooldown) confirmed unchanged; recorded only | — |
+
+Migrations: `accounts.0004`, `family.0004`, `profiles.0007`, `profiles.0008`, `notifications.0001`.
+
+**Validation (2026-11-20):**
+
+| Check | Python 3.12.14 | Python 3.13.7 |
+|---|---|---|
+| Full suite, PostgreSQL 16.16 | **600 passed, 0 skipped, 0 failed** | **600 passed, 0 skipped, 0 failed** |
+| Full suite, PostgreSQL 18.7 | **600 passed, 0 skipped, 0 failed** | **600 passed, 0 skipped, 0 failed** |
+| Ruff lint and format | pass | (same source) |
+| `pip check` (hash-checked lock install) | pass | pass |
+| Lockfiles | unchanged (no new dependency; adapters use the standard library) | — |
+| `manage.py check`, `makemigrations --check` | pass | — |
+| OpenAPI `spectacular --validate --fail-on-warn` | 0 errors, 0 warnings, valid | — |
+
+Upgrade tested from the previous commit's schema and data (seeded with the old code in a temporary worktree): caste value preserved through the rename, deadlines and scan outcomes backfilled, permissions reclassified; all five migrations reverse (old caste value restored, sub-caste options removed) and re-apply; `makemigrations --check` clean; on PostgreSQL 16.16 and 18.7.
 
 Implementation status: **TESTED.** REVIEWED and ACCEPTED are set by the reviewer and the owner (CC-R70).
 

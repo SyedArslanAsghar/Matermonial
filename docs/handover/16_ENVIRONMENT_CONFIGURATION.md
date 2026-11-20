@@ -289,3 +289,26 @@ Implementation record (CC-R63). The names are in `backend/.env.example`; the cod
 | `TEST_DATABASE_ALLOWED_PORTS` | Approved disposable test ports (comma-separated); 5432 is always refused | `55432,55418` |
 | `SMS_PROVIDER=console` | Local development only (`ENVIRONMENT=local`): SMS bodies on standard output, a simulated handset for OTPs and admin enrollment codes. Refused in every other environment | local default stays `mock` |
 
+## 16. Configuration added with DR-2026-11-20-O (2026-11-20)
+
+Development and tests need none of the credentials below (mock/console defaults). Production refuses mock/console and refuses a selected provider whose required variables are missing.
+
+| Variable | Purpose | Default |
+|---|---|---|
+| `ACCOUNT_MFA_KEYS`, `ACCOUNT_MFA_ACTIVE_VERSION` | Key ring sealing account authenticator seeds (TR-16) | dev-only ring locally; required when deployed |
+| `ACCOUNT_MFA_THROTTLE_FACTOR` | Exponential throttle after failed authenticator codes | 1 |
+| `FAMILY_INVITATION_TTL_DAYS` | Acceptance deadline for invitations and requests (owner decision: 30) | 30 |
+| `FAMILY_STEP_UP_TTL_SECONDS` | Step-up verification validity (capped at 300) | 300 |
+| `RATE_FAMILY_REQUEST_ACCOUNT`, `RATE_STEP_UP_ACCOUNT`, `RATE_ACCOUNT_MFA_ACCOUNT` | Rate limits | `10/86400`, `10/900`, `10/900` |
+| `PROVIDER_TIMEOUT_SECONDS` | HTTP timeout for provider calls | 10 |
+| `SMS_PROVIDER` | `mock` \| `console` (local) \| `twilio` \| `disabled` | `disabled` (local `mock`, test `mock`) |
+| `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `SMS_SENDER_ID` | Twilio credentials and sender (E.164 number, alphanumeric ID, or `MG…` Messaging Service SID) | empty; required with `twilio` |
+| `EMAIL_PROVIDER` | `mock` \| `console` \| `smtp` \| `disabled` (maps to `EMAIL_BACKEND`; an explicit `EMAIL_BACKEND` still works) | `disabled` (local `console`, test `mock`) |
+| `EMAIL_HOST`, `EMAIL_PORT`, `EMAIL_HOST_USER`, `EMAIL_HOST_PASSWORD`, `EMAIL_USE_TLS`, `EMAIL_USE_SSL`, `EMAIL_TIMEOUT`, `EMAIL_SENDER` | SMTP submission and From address | empty / 587 / TLS on; host and sender required with `smtp` |
+| `PUSH_PROVIDER` | `mock` \| `console` (local) \| `expo` \| `disabled` | `disabled` (local `mock`, test `mock`) |
+| `EXPO_PUSH_URL`, `EXPO_ACCESS_TOKEN` | Expo Push API endpoint (https) and optional access token | Expo's URL / empty |
+| `NOTIFICATION_PUSH_MAX_ATTEMPTS` | Bounded push retries | 5 |
+| `MALWARE_SCANNER` | `mock` (local/test only) \| `clamav` \| `disabled` | `disabled` (local, test `mock`) |
+| `CLAMAV_HOST`, `CLAMAV_PORT`, `CLAMAV_TIMEOUT_SECONDS` | clamd TCP endpoint | empty / 3310 / 10; host required with `clamav` |
+| `PHOTO_SCAN_MAX_ATTEMPTS`, `PHOTO_SCAN_RETRY_SECONDS` | Scan retries while quarantined | 3 / 60 |
+| `PHOTO_MAX_UPLOAD_BYTES`, `PHOTO_MAX_DIMENSION`, `PHOTO_MAX_PIXELS` | Owner-approved photo limits | 5 MB / 4096 / 4096² |

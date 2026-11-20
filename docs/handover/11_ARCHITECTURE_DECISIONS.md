@@ -375,5 +375,8 @@ All ADR decisions below are due **before G4** (baseline v4.6, approval-by-gate t
 | ADR-032 | Security-event model and log pseudonymisation | PROPOSED (TR-17, TR-23) | `docs/decisions/ADR-032-security-events.md` |
 | ADR-033 | Admin MFA, enrollment, recovery and the admin session | PROPOSED (implementation record within approved TR-07; owner review requested, 2026-11-19). Amendment 1 (two-person recovery) **APPROVED** (DR-2026-11-19-O-8; A1-3 not approved). Amendment 2: first-enrollment codes by SMS only (DR-2026-11-20-C-3, KI-39) | `docs/decisions/ADR-033-admin-mfa.md` |
 | ADR-034 | Enumeration-safe family-manager invitations (KI-34) | ACCEPTED for implementation (DR-2026-11-20-C-2, 2026-11-20); owner review of Phases 2–4 pending | `docs/decisions/ADR-034-enumeration-safe-invitations.md` |
+| ADR-035 | Two-way family-manager authorization, permission selection, 30-day expiry | ACCEPTED for implementation (DR-2026-11-20-O-1, -2, -4); owner review pending | `docs/decisions/ADR-035-two-way-manager-authorization.md` |
+| ADR-036 | Manager step-up for Sensitive actions with the account authenticator (TR-16) | ACCEPTED for implementation (DR-2026-11-20-O-3); owner review pending | `docs/decisions/ADR-036-manager-step-up-with-account-authenticator.md` |
+| ADR-037 | Notification provider adapters, in-app notifications, malware scanning | ACCEPTED for implementation (DR-2026-11-20-O-7, -8); owner review pending | `docs/decisions/ADR-037-notification-providers-and-malware-scanning.md` |
 
 Pending decisions on existing ADRs: ADR-022 and ADR-023 (see the notes under each). ADR-014 is APPROVED for its core decision only (DR-2026-11-17-C2).

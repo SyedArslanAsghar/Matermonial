@@ -551,6 +551,31 @@ No speculative infrastructure tasks are added.
 
 ---
 
+## Decision record DR-2026-11-20-O: family-manager model, TR-16, OD-05c/e, vocabularies, photo limits, KI-40, providers, scanning
+
+- **Decision ID:** DR-2026-11-20-O
+- **Date:** 2026-11-20
+- **Decided by:** Project owner (instruction "Owner Decisions, Family Manager Permission Model and Technical Corrections"). Four points were clarified by the owner during the task (marked *clarified*).
+- **Decision status:** APPROVED
+- **Branch:** `feature/g5-phase2-auth` (local only)
+
+| # | ID | Item | Decision | Supersedes |
+|---|---|---|---|---|
+| 1 | DR-2026-11-20-O-1 | Two-way manager authorization | **Flow A:** the owner invites and selects permissions (checkboxes); the invitee accepts or rejects and gets exactly those. **Flow B:** an account asks to manage another person's profile; the owner accepts (selecting the permissions) or declines. The receiving party must always accept explicitly. *Clarified:* the requester identifies the owner by **phone number**, enumeration-safe like ADR-034. The owner alone grants or revokes individual permissions later, from the managers section, without a new authorization; every change is audited and the manager notified. Managers can never manage other managers, change permissions, send or accept requests or invitations for anyone else, or gain admin control (server-side) | doc 05 §2 rule 1 ("the owner initiates") is amended for Flow B: the owner still decides, but a request may start the process. The rule that nobody becomes a manager without the owner's consent is unchanged |
+| 2 | DR-2026-11-20-O-2 | Invitation and request expiry (OD-05e) | **30 days** if not accepted; fixed default rule; recorded in history (`NOT_ACCEPTED_WITHIN_30_DAYS`); sender and recipient notified; expired items can't be accepted; a new one may be sent; the owner can cancel pending ones and revoke active authorizations at any time. ADR-034 behaviour unchanged | The proposed 14-day TTL (A4 §13, OD-05e) |
+| 3 | DR-2026-11-20-O-3 | TR-16 step-up | Sensitive manager actions need a fresh step-up with the **manager's own authenticator** before each action: bound to manager, profile and action; valid at most 5 minutes; single use; denied on failure, expiry or missing authenticator; owner notified after; audited; permission revocable at once; a grant never bypasses it. *Clarified:* ordinary accounts get **optional authenticator-app (TOTP) enrollment**; a manager without one can't perform Sensitive actions. Fail-closed stays until the flow is tested (now implemented and tested) | The TR-16 proposal (12 h communication / 10 min other windows) |
+| 4 | DR-2026-11-20-O-4 | Identity verification (OD-05c) | Final: only the profile owner submits identity verification, personally; managers can't and aren't required to; no permission overrides this. `manage_verification_submission` becomes Owner-only; `manage_family_authorizations` is Owner-only too (managers never manage managers) | doc 14 §3 Sensitive classification of both codes |
+| 5 | DR-2026-11-20-O-5 | Religion, denomination, caste, sub-caste, community (KI-29) | Separate optional fields; denominations per religion (not only Islam); caste and sub-caste for all religions; sub-caste may depend on caste but is never forced; community independent; "prefer not to say" is a privacy flag; admin-managed, active/inactive, stable codes, non-destructive changes; initial values chosen by professional judgment. *Clarified:* religion keeps DR-2026-11-19-O-7 (in the required set, answered by a value or "prefer not to say") | `caste_or_subcast` (one field) is split into `caste` and `sub_caste` |
+| 6 | DR-2026-11-20-O-6 | Photo limits | Max 6 active photos; 5 MB per original; JPEG, PNG, WebP only; max 4096 × 4096 px; one primary; SVG and animated images rejected; content and signature validation, server-side decode, re-encode, EXIF/GPS stripped, nothing unvalidated or unscanned accessible | AS-24 assumptions (10 MB, 40 MP) |
+| 7 | DR-2026-11-20-O-7 | Notification providers | SMS, email, push and in-app; provider-independent interfaces with real adapters, activated later by configuration only; console/mock in development; mocked clients in tests; production never falls back to console/mock; outbox preserved. *Clarified:* adapters **Twilio (SMS), SMTP (email), Expo Push API (push)**. No paid service activated | — |
+| 8 | DR-2026-11-20-O-8 | Malware scanning | Provider-independent; mock for tests; **ClamAV adapter** (open source) configured by environment; no ClamAV needed for development or tests; no third-party upload services; explicit outcomes PENDING / CLEAN / INFECTED / FAILED; quarantine until clean; failed or unavailable never treated as clean; mock refused in production. GuardDuty not now | DR-2026-11-19-O-9 is extended (scanner architecture approved; production activation still needs a running ClamAV) |
+| 9 | DR-2026-11-20-O-9 | OpenAPI (KI-40) | Required work: zero generation errors, warnings reviewed, no suppression, accurate schemas, schema validation tests | — |
+| 10 | DR-2026-11-20-O-10 | Matrimonial request expiry | **Unchanged:** formal requests expire after 3 calendar months; the 30-day cooldown after decline or expiry stays. Family-manager expiry and matrimonial request expiry are separate rules | — (confirmation) |
+
+**Not authorized (unchanged):** push, PR, merge, remote branch changes, CI/CD changes, AWS or production infrastructure, production database access, paid service purchase or activation, G5 Phase 5 or any other unauthorized phase.
+
+---
+
 ## OD-01 approved functional-domain catalogue
 
 **Source key:**

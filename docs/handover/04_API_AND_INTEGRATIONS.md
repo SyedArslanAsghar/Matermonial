@@ -568,3 +568,26 @@ Financial and retry-sensitive endpoints accept an optional `Idempotency-Key` hea
 | 503 | `temporarily_unavailable` | Lock contention retries exhausted; with `Retry-After` |
 
 "—" means the baseline doesn't fix the HTTP status; it is set in the OpenAPI contract for the phase. Errors never reveal a hidden or blocked relationship [DECIDED].
+
+### Implementation record: owner decisions DR-2026-11-20-O (2026-11-20; CC-R63)
+
+It adds no requirement. Request and response schemas for every operation are in the generated OpenAPI document (zero errors and zero warnings, KI-40).
+
+| Method | Endpoint | Purpose |
+|---|---|---|
+| POST | `/family-management/authorizations/` | Invite with permission selection (`permission_group`, `permissions`, `confirm_sensitive`); `202`, uniform |
+| GET | `/family-management/invitations/{id}/history/` | Owner's invitation history (never the background resolution) |
+| GET, POST | `/family-management/requests/` | List sent and received requests; ask to manage the profile of a phone number (`202`, uniform) |
+| POST | `/family-management/requests/{id}/accept/` | Owner accepts and selects permissions (authorization ACTIVE) |
+| POST | `/family-management/requests/{id}/decline/` | Owner declines |
+| POST | `/family-management/requests/{id}/cancel/` | Requester withdraws |
+| GET | `/family-management/requests/{id}/history/` | Requester, or the owner once received |
+| POST | `/profiles/step-up/` | TR-16 manager step-up (`X-Acting-Profile`; body `action`, `code`); `201` with a verification valid ≤ 5 min |
+| GET | `/auth/mfa/` · POST `enroll/`, `confirm/`, `remove/` | Account authenticator (enroll/remove need a recent password step-up) |
+| GET | `/notifications/` | Own in-app notifications (paginated; `?unread=true`) |
+| POST | `/notifications/{id}/read/`, `/notifications/read-all/` | Mark read |
+| POST | `/notifications/devices/`, `/notifications/devices/unregister/` | Register / unregister an Expo push token |
+
+Headers: `X-Step-Up-Verification: <uuid>` accompanies a manager's Sensitive change. New error codes: `already_requested` (409), `invitation_expired` (409), `step_up_required` (403, also for missing/expired/used verifications), `authenticator_required` (403), `step_up_failed` (403), `one_sensitive_action_per_request` (400), `identity_verification_owner_only` (403), `mfa_*` (409/400). `sensitive_use_unavailable` (interim, 2026-11-20) is superseded. The profile field `caste_or_subcast` is now `caste`, and `sub_caste` is added (DR-2026-11-20-O-5); no client consumed the old name.
+
+Provider integrations (doc 04 §17–§22): Twilio SMS, SMTP email, Expo Push and ClamAV adapters (ADR-037), configured through doc 16 §16.

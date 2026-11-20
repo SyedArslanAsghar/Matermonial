@@ -843,3 +843,12 @@ Editorial record (CC-R63). It adds no requirement. Details are in ADR-033 and `d
 - **Test database safety (KI-38):** test settings refuse to load without an explicit `DATABASE_URL`, and refuse any target other than a loopback host on an approved disposable port (55432 or 55418 by default; never 5432). The check runs before any connection.
 - **Local SMS:** `SMS_PROVIDER=console` is allowed only when `ENVIRONMENT=local`. Deployed settings refuse it like `mock`.
 
+### 22.13 Owner decisions record (2026-11-20, DR-2026-11-20-O)
+
+- **Manager restrictions (server-side):** a manager never manages other managers, changes permissions, sends or accepts invitations or requests for anyone else, or gains admin control. Family endpoints are account-scoped and owner operations filter by the caller's own profile; `manage_family_authorizations` and `manage_verification_submission` are Owner-only and stored grants of Owner-only permissions are ignored. Tested in `apps/family/tests/test_owner_decisions.py`.
+- **Requests (Flow B)** are enumeration-safe like invitations (ADR-034/035): uniform `202`, background delivery, the requester learns about the owner only when the owner answers.
+- **TR-16 step-up (ADR-036):** fresh, single-use, per-action verification with the manager's own authenticator, ≤ 5 minutes, consumed in the business transaction; failures audited and recorded as security events; owner notified after each Sensitive action.
+- **Account authenticator:** optional TOTP; seeds sealed under `ACCOUNT_MFA`; enrolling/removing needs a recent password step-up; throttled; never logged.
+- **Identity verification (OD-05c):** only the owner submits it (`verification.services.identity_access.ensure_owner_submits`, mandatory for Phase 5).
+- **Uploads:** 5 MB, 4096 px, JPEG/PNG/WebP by signature at upload and by decoder in the pipeline; SVG and animation refused; scan outcomes PENDING/CLEAN/INFECTED/FAILED; FAILED never clean, retried while quarantined, then rejected; READY requires CLEAN (database CHECK); nothing sent to third-party scanners.
+- **Providers:** deployed settings refuse mock/console for SMS, email, push and scanning, and refuse a selected real provider whose configuration is missing. Credentials, codes and message bodies are never logged.

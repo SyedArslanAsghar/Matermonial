@@ -21,7 +21,7 @@
 
 ## 2. Family-manager rules
 
-1. The owner initiates manager authorization.
+1. The owner initiates manager authorization. *Amended (DR-2026-11-20-O-1): an account may also request to manage a profile (identified by the owner's phone number); the owner accepts, choosing the permissions, or declines. The owner always decides.*
 2. The invited account must accept.
 3. An account cannot authorize itself as manager of another person's profile without the owner's invitation.
 4. Authorization is scoped to one profile.
@@ -34,6 +34,10 @@
 11. Manager actions record both the actual account and represented profile.
 12. The manager's personal account is not the billing identity for actions performed on behalf of the owner.
 13. A manager cannot transfer profile ownership.
+14. *(DR-2026-11-20-O-1)* The owner selects the permissions when inviting or accepting a request, and alone grants or revokes individual permissions later without a new authorization. A manager can never manage other managers, change permissions, send or accept invitations or requests for anyone else, or gain administrative control.
+15. *(DR-2026-11-20-O-2)* A pending invitation or request expires after 30 days if not accepted; expiry is recorded in history and notified to the sender and the recipient; an expired one can't be accepted. The owner can cancel pending ones and revoke active authorizations at any time. (Separate from formal matrimonial requests: 3 calendar months and the 30-day cooldown, unchanged, DR-2026-11-20-O-10.)
+16. *(DR-2026-11-20-O-3)* A manager's Sensitive action needs a fresh, single-use step-up with the manager's own authenticator, valid at most 5 minutes (TR-16).
+17. *(DR-2026-11-20-O-4)* Only the profile owner submits identity verification, personally; no manager permission overrides this.
 14. Deleting a manager account revokes that manager's authorizations but does not delete other users' profiles.
 
 ## 3. Interest rules

@@ -60,7 +60,7 @@ Rules:
 |---|---|
 | PENDING → ACTIVE | Manager accepts [DECIDED] |
 | PENDING → REJECTED | Manager |
-| PENDING → EXPIRED | System, at the invitation TTL [REC-BIZ, OD-05e] |
+| PENDING → EXPIRED | System, 30 days after the invitation if not accepted [DECIDED, DR-2026-11-20-O-2; supersedes the 14-day REC-BIZ proposal] |
 | PENDING → REVOKED | Owner cancels the invitation |
 | ACTIVE ↔ PAUSED | Owner [DECIDED] |
 | ACTIVE / PAUSED → REVOKED | Owner [DECIDED]; manager resigns, reason RESIGNED [REC-BIZ, OD-05f]; manager account deletion [DECIDED, FR-DAT-010] |
@@ -68,7 +68,7 @@ Rules:
 
 Rules:
 
-- Only the owner initiates an invitation.
+- Only the owner initiates an invitation. A separate request object (DR-2026-11-20-O-1) lets another account ask; the owner accepts (authorization created ACTIVE with the selected permissions) or declines. Requests: PENDING → ACCEPTED | DECLINED | CANCELLED (requester) | EXPIRED (30 days).
 - Manager must accept.
 - Owner controls pause, resume, and revocation.
 - Expiry is processed by a scheduled job and also checked at runtime.

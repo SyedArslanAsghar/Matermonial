@@ -2,7 +2,7 @@
 
 **Version:** 1.0 (G1 revision 2026-11-16)  
 **Date:** 11 November 2026  
-**Document status:** APPROVED_WITH_OPEN_ITEMS (project owner, 2026-11-17, DR-2026-11-17-A; record in doc 20 §5). **Open items:** OPEN ODs: OD-05; PROPOSED TRs: TR-16. Listed items keep their own status (doc 19); this document status doesn't approve them.  
+**Document status:** APPROVED_WITH_OPEN_ITEMS (project owner, 2026-11-17, DR-2026-11-17-A; record in doc 20 §5). **Open items:** OPEN ODs: OD-05 (a, b, d, f; c and e decided by DR-2026-11-20-O); TR-16 approved by DR-2026-11-20-O-3. Listed items keep their own status (doc 19); this document status doesn't approve them.  
 **Applied corrections:** DCR-06, DCR-10, DCR-32 (doc 20); G1 correction pass 2026-11-17 (DR-2026-11-17-C). The reconciled tiers and matrix are in **§9** [REC-BIZ, OD-05, OPEN]; until OD-05 is decided, §1–§8 remain the approved baseline and §9 is the recommended arrangement.
 
 ## 1. Purpose
@@ -223,7 +223,7 @@ The frontend may hide buttons for unavailable permissions, but the backend must 
 | `manage_privacy_settings`, `manage_blocked_profiles`, `manage_hidden_profiles`, `manage_visitor_history`, `manage_subscription` | S | – | – | – |
 | `share_documents` | **H** | – | – | – |
 | `manage_document_permissions` | **H** | – | – | – |
-| `manage_family_authorizations`, `manage_verification_submission` | **O** (REC-BIZ, OD-05c; doc 14 currently says S) | – | – | – |
+| `manage_family_authorizations`, `manage_verification_submission` | **O** (OD-05c **DECIDED**, DR-2026-11-20-O-4; implemented in `family.0004`) | – | – | – |
 | `manage_account_security`, `request_data_export`, `request_account_deletion`, `request_refund` (new) | O | – | – | – |
 
 **Remaining owner decisions in this area:**
@@ -232,3 +232,12 @@ The frontend may hide buttons for unavailable permissions, but the backend must 
 - **OD-05d:** owner approval per document share.
 
 *— End of verbatim extract —*
+
+## 10. Owner decisions of 2026-11-20 (DR-2026-11-20-O)
+
+Recorded without changing the approved §1–§8 text above, except where a decision says so:
+- `manage_family_authorizations` and `manage_verification_submission` are **Owner-only** (OD-05c). A manager never manages other managers and never submits identity verification for the owner.
+- **Permission selection:** the owner chooses permissions when inviting (Flow A) or accepting a request (Flow B) and later grants or revokes individual permissions; Sensitive selections need confirmation and an owner step-up; Owner-only ones are never delegated.
+- **Controls at use (TR-16, approved):** a fresh step-up with the manager's own authenticator before each Sensitive action (5 minutes, single use, bound to manager, profile and action). The 12-hour window in §9's adapted text is superseded.
+- Invitations and requests expire after 30 days if not accepted (OD-05e).
+

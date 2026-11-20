@@ -32,7 +32,7 @@ The ten bundles below follow the ten-question limit. Each sub-item can be approv
 | OD-02 | Participation and account lifecycle | OPEN | Phases 2–3, 6, 12, 15 |
 | OD-03 | Visibility | OPEN | Phases 3, 6 |
 | OD-04 | Identity rules | OPEN | Phases 3–5, 15 |
-| OD-05 | Manager arrangement | OPEN (owner-decision report 2026-11-20: `docs/implementation/od05_tr16_decision_report.md`) | Phase 4 |
+| OD-05 | Manager arrangement | **PARTLY RESOLVED** (DR-2026-11-20-O, 2026-11-20): OD-05c and OD-05e decided (below); OD-05a, b, d, f stay OPEN. Report: `docs/implementation/od05_tr16_decision_report.md` | Phase 4 |
 | OD-06 | Interest, request and connection interaction | OPEN | Phases 9–10 |
 | OD-07 | Request cancellation, refunds, credit disposition | OPEN | Phases 9, 12, 15 |
 | OD-08 | View exemptions and zero credit | OPEN | Phase 8 |
@@ -67,9 +67,9 @@ None of OD-02…OD-10 blocks migration 0001.
 | OD-04e | Identity re-verification after approval | v4 §11.2 |
 | OD-05a | Templates may pre-select Sensitive communication permissions, granted only after owner confirmation with step-up | A4 §7; v4 §15 |
 | OD-05b | Counterparty sees "Sent by an authorized family member"; the owner sees the identity | A4 §7 |
-| OD-05c | `manage_family_authorizations` and `manage_verification_submission` become Owner-only | A4 §7 |
+| OD-05c | `manage_family_authorizations` and `manage_verification_submission` become Owner-only. **DECIDED (DR-2026-11-20-O-4): yes; only the owner submits identity verification, personally; no permission overrides it** | A4 §7 |
 | OD-05d | Owner approval per document share | A4 §7 |
-| OD-05e | Invitation TTL 14 days | A4 §13 |
+| OD-05e | Invitation TTL ~~14 days~~ **DECIDED (DR-2026-11-20-O-2): 30 days for invitations and requests (supersedes the 14-day proposal)** | A4 §13 |
 | OD-05f | Managers may resign | A4 §13 |
 | OD-06a–g | Interest rules (auto-reciprocation, conversion by sender, either party may request after reciprocation, no cooldown on withdrawal, pending expiry, freeze/close behaviour, cooldown blocks both interests and requests; free interests with a daily cap set by the owner) | A4 §13; v4.1 C16 |
 | OD-06h | Only the pausing party resumes; pause edge cases | v4 §11.6; v4.1 C14 |
@@ -105,7 +105,7 @@ Doc 13 §4 lists **OD-001…OD-007** (commercial structure, credit packages, Jaz
 | TR | Topic | Status | Approval due | Main source |
 |---|---|---|---|---|
 | TR-01 | Authentication lifecycle (sessions, tokens, rotation, K_rot, cookies, lifetimes, lock order) | **APPROVED** (DR-2026-11-18-G4, 2026-11-18) | G4 | v4 §10; v4.2; v4.3 §1 |
-| TR-02 | Acting-profile authorization algorithm | **APPROVED** (DR-2026-11-20-C-5, 2026-11-20, after review of the G5 Phase 4 implementation against doc 04 §24.1) for steps 1–9, 11 and 13–17. **Step 10 (step-up at use) is not covered: it stays with TR-16 (PROPOSED).** Until TR-16 is decided, a manager's use of a Sensitive permission fails closed (`403 sensitive_use_unavailable`). *History:* PROPOSED; direction of ADR-026 adopted (DR-2026-11-18-G4); implemented in G5 Phase 4 (2026-11-19) | Phase 4 | A4 §9 |
+| TR-02 | Acting-profile authorization algorithm | **APPROVED** (DR-2026-11-20-C-5, 2026-11-20, after review of the G5 Phase 4 implementation against doc 04 §24.1) for steps 1–9, 11 and 13–17. Step 10 followed with TR-16's approval (DR-2026-11-20-O-3) and is implemented: per-action step-up with the manager's authenticator (ADR-036). The fail-closed interim (`sensitive_use_unavailable`, 2026-11-20) is superseded. *History:* PROPOSED; direction of ADR-026 adopted (DR-2026-11-18-G4); implemented in G5 Phase 4 (2026-11-19) | Phase 4 | A4 §9 |
 | TR-03 | Central eligibility service, including `get_account_standing` | PROPOSED | Phase 6 | v4.6 §5; F §C |
 | TR-04 | Calendar arithmetic in UTC | PROPOSED | Phase 9 | v4 §13 |
 | TR-05 | Subscription vocabulary | **APPROVED** (DR-2026-11-16-4) | — | v4 §16 |
@@ -119,7 +119,7 @@ Doc 13 §4 lists **OD-001…OD-007** (commercial structure, credit packages, Jaz
 | TR-13 | PostgreSQL tests and concurrency harness (CI on PostgreSQL 16 and 18) | **APPROVED** (DR-2026-11-17-G2D-2, 2026-11-17) | — | v4.5 §6; v4.6 §4 |
 | TR-14 | Status model | **APPROVED** (DR-2026-11-16-2) | — | v4 §6 |
 | TR-15 | Ledger projections, refund integrity, wallet closure, financial events | PROPOSED | Phase 7 / 9 | v4.4; v4.5; F1; F2; F3 |
-| TR-16 | Step-up windows | PROPOSED. Owner-decision report: `docs/implementation/od05_tr16_decision_report.md` (2026-11-20). Meanwhile Sensitive manager use fails closed (DR-2026-11-20-C-5) | Phase 4 | A4 §3 |
+| TR-16 | Step-up windows | **APPROVED** (DR-2026-11-20-O-3, 2026-11-20): fresh step-up with the manager's own authenticator before **each** Sensitive action, bound to manager, profile and action, valid at most 5 minutes, single use (ADR-036). Supersedes the proposal (12 h communication / 10 min other). *History:* PROPOSED; fail-closed interim (DR-2026-11-20-C-5) | Phase 4 | A4 §3 |
 | TR-17 | Security-event model | **APPROVED** (DR-2026-11-18-G4, 2026-11-18) | G4 | v4 §10.5 |
 | TR-18 | Lazy expiry | PROPOSED | Phase 9 | v4 §7 C |
 | TR-19 | Profile-detail revalidation, GET snapshot and deadline | PROPOSED | Phase 8 | v4 §8; v4.4 §5 |

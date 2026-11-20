@@ -58,6 +58,8 @@ The project proceeds through five gates. **Each gate needs the project owner's e
 
 **G5 Phases 2–4 final corrections (2026-11-20, DR-2026-11-20-C):** KI-34 (enumeration-safe invitations), KI-37 (employment-status options active), KI-38 (fail-safe test database) and KI-39 (first admin MFA code by SMS only) are resolved. TR-02 is approved (step 10 stays with TR-16; Sensitive manager use fails closed meanwhile). OD-05 and TR-16 stay open (owner-decision report `docs/implementation/od05_tr16_decision_report.md`). The full suite passes on Python 3.12 and 3.13 × PostgreSQL 16 and 18. Owner review and acceptance of Phases 2–4 pending. Phase 5 is not authorized.
 
+**Owner decisions DR-2026-11-20-O (2026-11-20):** implemented and TESTED on `feature/g5-phase2-auth`: two-way manager authorization (invitations and requests) with permission selection, owner-only permission management and manager restrictions; 30-day expiry with history; TR-16 step-up with the account authenticator; OD-05c owner-only identity verification guard; separate religion/denomination/caste/sub-caste/community vocabularies; photo limits; provider adapters (Twilio, SMTP, Expo), in-app notifications and push delivery; ClamAV scanner adapter with explicit outcomes; OpenAPI with zero errors and warnings (KI-40). No paid service or infrastructure activated. Owner review pending; Phase 5 not authorized.
+
 **Dependency check:**
 - Auth and User are final before 0001 (G4).
 - Audit and outbox exist at G4.
