@@ -2,9 +2,25 @@
 
 The database comes from DATABASE_URL via base.py; pytest-django creates and drops a separate
 "test_<name>" database. The previous in-memory SQLite override was removed (KI-4).
+
+KI-38: DATABASE_URL must be set explicitly (environment or backend/.env) and point to an approved
+disposable server (loopback, port 55432 or 55418 by default; never 5432). Otherwise loading these
+settings fails before any connection is attempted; base.py's development default is never used.
 """
 
-from .base import *  # noqa: F403
+import os
+from pathlib import Path
+
+import environ
+
+from common.test_database import require_disposable_test_database
+
+# A developer's backend/.env counts as explicit configuration (base.py reads it too); it never
+# overrides variables already set in the environment.
+environ.Env.read_env(Path(__file__).resolve().parent.parent.parent / ".env")
+require_disposable_test_database(os.environ)
+
+from .base import *  # noqa: E402, F403
 
 ENVIRONMENT = "test"
 DEBUG = False

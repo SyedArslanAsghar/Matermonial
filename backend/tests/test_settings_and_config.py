@@ -215,3 +215,108 @@ def test_local_settings_keep_documented_broker_behaviour():
     )
     assert result.returncode == 0, result.stderr
     assert result.stdout.split() == ["redis://127.0.0.1:6379/0", "True"]
+
+
+# --- KI-38: fail-safe test-database configuration --------------------------------------------
+
+DISPOSABLE = "postgresql://postgres:pw-not-shown@127.0.0.1:55432/matermonial"
+
+
+@pytest.mark.parametrize(
+    "url, fragment",
+    [
+        (None, "must be set explicitly"),
+        ("", "must be set explicitly"),
+        ("postgresql://u:pw-not-shown@127.0.0.1:5432/db", "must not use port 5432"),
+        ("postgresql://u:pw-not-shown@localhost:5432/db", "must not use port 5432"),
+        ("postgresql://u:pw-not-shown@127.0.0.1/db", "give the port explicitly"),
+        ("postgresql://u:pw-not-shown@db.example.test:55432/db", "loopback host only"),
+        ("postgresql://u:pw-not-shown@127.0.0.1:6543/db", "outside the approved"),
+        ("postgresql://u:pw-not-shown@%2Fvar%2Frun%2Fpostgresql/db", "Unix sockets"),
+        ("sqlite:///tmp/x.db", "must point to PostgreSQL"),
+        ("postgresql://u:pw-not-shown@127.0.0.1:notaport/db", "not a valid database URL"),
+    ],
+)
+def test_test_database_targets_are_refused(url, fragment):
+    from common.test_database import target_errors
+
+    errors = target_errors("DATABASE_URL", url, {})
+    assert errors and fragment in " ".join(errors)
+    assert "pw-not-shown" not in " ".join(errors)
+
+
+def test_approved_disposable_targets_are_accepted():
+    from common.test_database import target_errors
+
+    assert target_errors("DATABASE_URL", DISPOSABLE, {}) == []
+    assert target_errors("DATABASE_URL", DISPOSABLE.replace("55432", "55418"), {}) == []
+    # The port list is configurable, but 5432 can never be allowed.
+    custom = {"TEST_DATABASE_ALLOWED_PORTS": "5432,56000"}
+    assert target_errors("DATABASE_URL", DISPOSABLE.replace("55432", "56000"), custom) == []
+    assert target_errors("DATABASE_URL", DISPOSABLE.replace("55432", "5432"), custom)
+
+
+def _load_test_settings(env_overrides: dict) -> subprocess.CompletedProcess:
+    env = {
+        "PATH": os.environ.get("PATH", ""),
+        "DJANGO_SETTINGS_MODULE": "config.settings.test",
+        **env_overrides,
+    }
+    code = (
+        "import django; django.setup(); from django.conf import settings; "
+        "print(settings.DATABASES['default']['PORT'])"
+    )
+    return subprocess.run(
+        [sys.executable, "-c", code],
+        cwd=Path(__file__).resolve().parent.parent,
+        env={k: v for k, v in env.items() if v is not None},
+        capture_output=True,
+        text=True,
+        timeout=60,
+    )
+
+
+@pytest.mark.parametrize(
+    "overrides",
+    [
+        {},  # missing: base.py's development default (port 5432) is never used
+        {"DATABASE_URL": "postgresql://u:pw-not-shown@127.0.0.1:5432/db"},
+        {"DATABASE_URL": "postgresql://u:pw-not-shown@127.0.0.1/db"},
+        {
+            "DATABASE_URL": DISPOSABLE,
+            "MATERMONIAL_TEST_POSTGRES_URL": "postgresql://u@127.0.0.1:5432/x",
+        },
+    ],
+)
+def test_test_settings_refuse_to_load_without_a_disposable_database(overrides):
+    if not overrides and (Path(__file__).resolve().parent.parent / ".env").exists():
+        pytest.skip("backend/.env may supply DATABASE_URL explicitly")
+    result = _load_test_settings(overrides)
+    assert result.returncode != 0
+    assert "Refusing to load test settings (KI-38)" in result.stderr
+    assert "pw-not-shown" not in result.stderr + result.stdout
+
+
+def test_dotenv_counts_as_explicit_but_never_overrides_the_environment(tmp_path):
+    import environ as environ_module
+
+    from common.test_database import target_errors
+
+    dotenv = tmp_path / ".env"
+    dotenv.write_text("DATABASE_URL=postgresql://u:pw-not-shown@127.0.0.1:5432/db\n")
+    with pytest.MonkeyPatch.context() as mp:
+        mp.delenv("DATABASE_URL", raising=False)
+        environ_module.Env.read_env(dotenv)
+        # From the file: explicit, but its port is refused.
+        assert "must not use port 5432" in " ".join(
+            target_errors("DATABASE_URL", os.environ["DATABASE_URL"], os.environ)
+        )
+        mp.setenv("DATABASE_URL", DISPOSABLE)
+        environ_module.Env.read_env(dotenv)
+        assert os.environ["DATABASE_URL"] == DISPOSABLE  # the environment wins
+
+
+def test_test_settings_load_with_the_disposable_database():
+    result = _load_test_settings({"DATABASE_URL": DISPOSABLE})
+    assert result.returncode == 0, result.stderr
+    assert result.stdout.strip() == "55432"
