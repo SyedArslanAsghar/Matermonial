@@ -42,7 +42,11 @@ VOCABULARIES: dict[str, bool] = {
     "photo_type": False,
 }
 
-# Proposals for owner review, seeded INACTIVE (migration 0004 holds its own copy).
+# Proposals for owner review, seeded INACTIVE (migration 0004 holds its own copy). Owner-approved
+# lists are activated by later migrations: gender, marital status, religion (0005) and
+# employment status (0006, KI-37; NOT_EMPLOYED stays an inactive proposal).
+OWNER_ACTIVATED = ("gender", "marital_status", "religion", "employment_status")
+
 PROPOSED: dict[str, tuple[str, ...]] = {
     "gender": ("FEMALE", "MALE"),
     "marital_status": ("NEVER_MARRIED", "DIVORCED", "WIDOWED", "SEPARATED"),

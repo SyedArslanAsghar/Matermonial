@@ -521,3 +521,133 @@ class TestApprovedVocabulariesAndPrivacyChoices:
             "profession.employment_status",
         }
         assert FIELD_VOCABULARY["basic_info.denomination"] == "denomination"
+
+
+class TestEmploymentStatusVocabulary:
+    """KI-37: the approved employment-status options are active, so a valid profile can be
+    submitted with the production (migrated) vocabularies alone."""
+
+    APPROVED = [
+        "EMPLOYED",
+        "SELF_EMPLOYED",
+        "BUSINESS_OWNER",
+        "UNEMPLOYED",
+        "STUDENT",
+        "RETIRED",
+        "HOMEMAKER",
+        "OTHER",
+    ]
+
+    @staticmethod
+    def production_state():
+        """Exactly what the migrations leave: every option inactive except the owner-approved
+        activations of 0005 and 0006 (undoes the test-only neutral activations)."""
+        import importlib
+
+        from django.apps import apps as django_apps
+
+        VocabularyOption.objects.update(is_active=False)
+        for name in (
+            "0005_approved_vocabularies_and_privacy_choices",
+            "0006_activate_employment_status",
+        ):
+            module = importlib.import_module(f"apps.profiles.migrations.{name}")
+            (getattr(module, "activate_approved", None) or module.activate)(django_apps, None)
+
+    def test_migrated_options_are_the_approved_list_in_order(self):
+        from apps.profiles import reference
+
+        assert list(reference.allowed("employment_status")) == self.APPROVED
+        labels = dict(
+            VocabularyOption.objects.filter(vocabulary="employment_status").values_list(
+                "code", "label_en"
+            )
+        )
+        assert labels["SELF_EMPLOYED"] == "Self-employed" and labels["HOMEMAKER"] == "Homemaker"
+        # The earlier proposal is kept (codes are permanent) but not offered.
+        assert (
+            VocabularyOption.objects.get(
+                vocabulary="employment_status", code="NOT_EMPLOYED"
+            ).is_active
+            is False
+        )
+        assert not VocabularyOption.objects.filter(
+            vocabulary="employment_status", code__icontains="PREFER"
+        ).exists()
+
+    def test_valid_profile_submits_with_production_vocabularies_only(self, owner):
+        user, client = owner
+        self.production_state()
+        payload = {
+            "basic_info": {
+                "full_name": "Test Person",
+                "date_of_birth": "1995-04-12",
+                "gender": "FEMALE",
+                "marital_status": "NEVER_MARRIED",
+                "religion": "ISLAM",
+                "nationality": "PK",
+            },
+            "location": {"country": "PK", "city": "Lahore"},
+            "languages": [{"language": "ur", "is_native": True}],
+            "profession": {"employment_status": "HOMEMAKER"},
+        }
+        assert client.patch(ME, payload, format="json").status_code == 200
+        profile = MatrimonialProfile.objects.get(owner=user)
+        completion = client.get(f"{URL}{profile.id}/completion/").json()
+        assert completion["unconfigured_vocabularies"] == []
+        assert completion["missing_required"] == []
+        response = client.post(f"{URL}{profile.id}/submit-review/")
+        assert response.status_code == 200
+        assert MatrimonialProfile.objects.get(pk=profile.pk).profile_status == "PENDING_REVIEW"
+
+    def test_inactive_or_unknown_employment_status_is_rejected(self, owner):
+        _, client = owner
+        self.production_state()
+        for code in ("NOT_EMPLOYED", "PREFER_NOT_TO_SAY", "ASTRONAUT"):
+            response = client.patch(ME, {"profession": {"employment_status": code}}, format="json")
+            assert response.status_code == 400, code
+
+    def test_deactivating_the_list_blocks_submission_again(self, owner):
+        user, client = owner
+        self.production_state()
+        client.patch(
+            ME,
+            {
+                **COMPLETE,
+                "basic_info": {
+                    **COMPLETE["basic_info"],
+                    "gender": "MALE",
+                    "religion": "ISLAM",
+                },
+                "languages": [{"language": "ur", "is_native": True}],
+            },
+            format="json",
+        )
+        VocabularyOption.objects.filter(vocabulary="employment_status").update(is_active=False)
+        profile = MatrimonialProfile.objects.get(owner=user)
+        completion = client.get(f"{URL}{profile.id}/completion/").json()
+        assert completion["unconfigured_vocabularies"] == ["employment_status"]
+        response = client.post(f"{URL}{profile.id}/submit-review/")
+        assert response.status_code == 409
+        assert response.json()["error"]["code"] == "vocabulary_not_configured"
+
+    def test_migration_reverse_deactivates_and_reapply_restores(self):
+        import importlib
+
+        from django.apps import apps as django_apps
+
+        module = importlib.import_module("apps.profiles.migrations.0006_activate_employment_status")
+        module.deactivate(django_apps, None)
+        assert (
+            VocabularyOption.objects.filter(vocabulary="employment_status", is_active=True).count()
+            == 0
+        )
+        module.activate(django_apps, None)
+        assert (
+            list(
+                VocabularyOption.objects.filter(vocabulary="employment_status", is_active=True)
+                .order_by("sort_order")
+                .values_list("code", flat=True)
+            )
+            == self.APPROVED
+        )

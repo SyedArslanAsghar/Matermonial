@@ -1,6 +1,7 @@
 """Profile test fixtures. Production seeds every proposal INACTIVE; tests activate the neutral
 proposals so the sections can be exercised. Sensitive vocabularies stay empty unless a test
-configures stand-in codes."""
+configures stand-in codes. Owner-activated lists (``reference.OWNER_ACTIVATED``) keep exactly the
+state the migrations give them, so tests exercise the production values (KI-37)."""
 
 import pytest
 
@@ -20,5 +21,5 @@ def activate(vocabulary: str, *codes: str) -> None:
 @pytest.fixture(autouse=True)
 def neutral_vocabularies(db):
     for vocabulary, codes in reference.PROPOSED.items():
-        if not reference.VOCABULARIES[vocabulary]:
+        if not reference.VOCABULARIES[vocabulary] and vocabulary not in reference.OWNER_ACTIVATED:
             activate(vocabulary, *codes)
