@@ -824,3 +824,22 @@ Editorial record (CC-R63). It adds no requirement. Details are in ADR-033 and `d
   - admin password-change pages disabled.
 - **Admin MFA recovery review (DR-2026-11-19-R-3):** ADR-033 Amendment 1 (PROPOSED) proposes two-person recovery, notifications to the account holder and superusers, SMS delivery of the replacement enrollment code, optional hashed recovery codes, and CLI recovery only as flagged, reason-coded break-glass. Until the owner decides, the implemented single-administrator reset stays in force.
 - **Uploads (TR-10, DR-2026-11-19-R-4):** fail closed. Deployed environments refuse the mock scanner and refuse uploads until a real scanner is approved and integrated.
+
+### 22.11 G5 Phase 4 and ADR-033 Amendment 1 implementation record (2026-11-19, DR-2026-11-19-O)
+
+- **Admin MFA recovery** (approved): two-person request and approval, SMS-only replacement code (never shown to an administrator; sent directly after commit, not through the broker; fails safe on SMS failure), CLI emergency recovery with `--emergency --reason`, events and notifications to the account holder and superusers. First-enrollment codes can't be issued again for an account that enrolled before. No recovery codes.
+- **Acting profile (doc 04 §24.1, TR-02):** implemented per the adopted ADR-026 direction, steps 1–9, 11 and 13–17.
+  - Not implemented: step 10, manager step-up at use (TR-16, PROPOSED), and the H tier (OD-05).
+  - Missing, closed, stranger, pending, paused, revoked and expired cases all answer one identical `404 acting_profile_not_available`.
+  - Account-scoped endpoints answer `400 header_not_allowed`.
+- **Family permissions:** the doc 14 §1–§8 baseline. Templates grant only Normal permissions. Sensitive permissions need explicit confirmation and an owner step-up (5-minute window). Owner-only permissions are never delegated.
+- **Manager privacy:** the full DOB is shown to a manager only with `edit_basic_info`. Profile access history records IP addresses but never shows them to the owner.
+
+### 22.12 Final corrections record (2026-11-20, DR-2026-11-20-C)
+
+- **Invitation privacy (KI-34, ADR-034):** inviting a number never reveals whether it belongs to an account, or whether that account is verified, active, eligible or already linked. Every valid request gets the same `202` body and does the same database work. Eligibility is decided in a background task. The owner sees the account (an authorization) only after the invitee accepts; a decline is shown because the invitee chose to respond. Rate limits count every attempt. The number isn't stored (HMAC digest and masked hint only), and audit rows and logs contain no phone number.
+- **First admin MFA enrollment (KI-39, ADR-033 Amendment 2):** the code goes only by SMS to the account holder's verified phone. It is never shown to the issuing administrator or the CLI operator, and never written to logs, audit, events or responses. SMS failure revokes it, records the failure and notifies the account holder; issuing again (audited) is the recovery path.
+- **TR-02 approved (DR-2026-11-20-C-5)** for steps 1–9, 11 and 13–17. Step 10 stays with TR-16. Until TR-16 is decided, a manager can't *use* a Sensitive permission (`403 sensitive_use_unavailable`). It can still be granted with owner confirmation and step-up, and the owner can always perform the action.
+- **Test database safety (KI-38):** test settings refuse to load without an explicit `DATABASE_URL`, and refuse any target other than a loopback host on an approved disposable port (55432 or 55418 by default; never 5432). The check runs before any connection.
+- **Local SMS:** `SMS_PROVIDER=console` is allowed only when `ENVIRONMENT=local`. Deployed settings refuse it like `mock`.
+

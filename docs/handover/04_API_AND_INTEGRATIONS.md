@@ -108,6 +108,19 @@ Do not expose internal reviewer notes or duplicate-document fingerprints through
 
 The owner must be the only actor allowed to manage authorization by default.
 
+**Implementation record (G5 Phase 4; CC-R63; it adds no requirement):**
+- `POST /family-management/authorizations/{id}/renew/` sets, extends or clears the optional expiry (FR-FAM-007).
+- **Enumeration-safe invitations (KI-34, DR-2026-11-20-C-2, ADR-034):**
+  - `POST /family-management/authorizations/` answers **`202`** with `{"detail", "invitation"}` for every number that passes validation. The body is built only from the owner's input: masked `phone_hint`, template, requested permissions and expiry, `status: PENDING`. It never reveals whether the number belongs to an account or whether that account can be invited.
+  - The refusals depend only on the owner's own data:
+    - `400` for invalid input or the owner's own number
+    - `409 already_invited` for a pending invitation to the same number
+    - `409 already_managing` for a current manager's number
+    - `429` for the rate limit, which counts every attempt
+  - `GET /family-management/authorizations/` adds `invitations` (status `PENDING`, `ACCEPTED`, `DECLINED` or `CANCELLED`). `as_owner` lists only authorizations the invitee has accepted. Before acceptance, owner calls on the authorization ID answer `404`.
+  - New: `POST /family-management/invitations/{id}/cancel/` (owner only, optional `reason` code) cancels a pending invitation and revokes a linked pending authorization (doc 15 §4 PENDING → REVOKED).
+- **Sensitive permissions used by managers:** `403 sensitive_use_unavailable` until TR-16 is decided (DR-2026-11-20-C-5).
+
 ## 7. Search and matching endpoints
 
 | Method | Endpoint | Purpose |

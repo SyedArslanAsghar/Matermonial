@@ -8,7 +8,7 @@ A privacy-conscious matrimonial platform: a Django REST API backend, a React web
 
 Work proceeds through owner-authorized gates (doc 10 §0): G1 documentation → G2 repository governance → G3 backend foundation → **G4 first migration and backend kernel** → G5 features (G4 and G5 authorized, DR-2026-11-18-G4). Current status: [`docs/implementation/progress.md`](docs/implementation/progress.md).
 
-G5 Phases 2 and 3 are implemented and tested on `feature/g5-phase2-auth`, pending owner review. Phase 3 covers the own profile and its sections, partner preferences, and photos through the TR-10 pipeline, which needs `MALWARE_SCANNER=mock` locally. Phase 2 covers registration, phone OTP, login, logout, web sessions, mobile tokens, password reset, rate limits, AdminRole authorization and Django Admin MFA. The backend foundation (G3) and the G4 kernel are in place: the final `User` model and migrations, sessions and tokens, pseudonyms and envelope encryption, partitioned security-event and audit logs, the transactional outbox, idempotency records and the TR-24 maintenance protocol with a local compliance registry. Status and open items: [`progress.md`](docs/implementation/progress.md) and [`known_issues.md`](docs/implementation/known_issues.md).
+G5 Phases 2–4 are implemented and tested on `feature/g5-phase2-auth`, pending owner review. The final corrections (DR-2026-11-20-C) are included: enumeration-safe invitations, active employment-status options, a fail-safe test database and SMS-only admin enrollment codes. Phase 4 covers family management: manager invitations, permissions and templates, and acting for a profile with `X-Acting-Profile`. Phase 3 covers the own profile and its sections, partner preferences, and photos through the TR-10 pipeline, which needs `MALWARE_SCANNER=mock` locally. Phase 2 covers registration, phone OTP, login, logout, web sessions, mobile tokens, password reset, rate limits, AdminRole authorization and Django Admin MFA. The backend foundation (G3) and the G4 kernel are in place: the final `User` model and migrations, sessions and tokens, pseudonyms and envelope encryption, partitioned security-event and audit logs, the transactional outbox, idempotency records and the TR-24 maintenance protocol with a local compliance registry. Status and open items: [`progress.md`](docs/implementation/progress.md) and [`known_issues.md`](docs/implementation/known_issues.md).
 
 ## Repository structure
 
@@ -65,11 +65,17 @@ To add or update a dependency and regenerate the lockfiles, follow [`backend/req
 cd backend
 ruff check .            # lint
 ruff format --check .   # formatting check (use `ruff format .` to apply)
-pytest                  # tests
+
+# tests: a disposable PostgreSQL is required (KI-38), for example a throwaway container
+docker run -d --rm --name mat-pg16 -e POSTGRES_PASSWORD=test -e POSTGRES_DB=matermonial \
+  -p 127.0.0.1:55432:5432 postgres:16
+DATABASE_URL=postgresql://postgres:test@127.0.0.1:55432/matermonial \
+MATERMONIAL_TEST_POSTGRES_URL=postgresql://postgres:test@127.0.0.1:55432/matermonial \
+pytest
 ```
 
 - Ruff and pytest settings are in `backend/pyproject.toml`.
-- Tests run on PostgreSQL (TR-13; `CLAUDE.md` CC-R58). Set `DATABASE_URL` in `backend/.env` to a local database role that may create databases; pytest-django creates and drops its own `test_…` database.
+- Tests run on PostgreSQL (TR-13; `CLAUDE.md` CC-R58). **`DATABASE_URL` is required** (environment or `backend/.env`; the environment wins). It must point to a disposable server on a loopback host and an approved port: 55432 or 55418 by default (`TEST_DATABASE_ALLOWED_PORTS`); **port 5432 is always refused** (KI-38). Otherwise the test settings refuse to load before any connection is made, and no other database is substituted. pytest-django creates and drops its own `test_…` database on that server.
 - Tests that need the database carry `@pytest.mark.django_db`; pytest-django builds the test database from the migrations. Concurrency tests use `django_db(transaction=True)` with one connection per thread (doc 12 §8). Nothing is deferred: KI-14 was resolved in G4.
 - PostgreSQL foundation tests (`@pytest.mark.postgres`) cover readiness, advisory locks, `lock_timeout` and contention retry against a real server. They create no tables and run no migration. They only run when `MATERMONIAL_TEST_POSTGRES_URL` points to a **disposable** database, for example a throwaway container on a port other than 5432; otherwise they skip. They refuse port 5432 and local sockets, so they never touch a developer's own PostgreSQL server.
 - Testing standards: doc 08.
@@ -116,10 +122,12 @@ python manage.py admin_access sync-catalogue          # role definitions from ap
 python manage.py createsuperuser                      # break-glass account (at most two exist)
 # or a normal administrator:
 python manage.py admin_access assign-role --phone +923001234567 --role system_admin
-python manage.py admin_access issue-mfa-enrollment --phone +923001234567   # prints a single-use code
+python manage.py admin_access issue-mfa-enrollment --phone +923001234567   # sends the code by SMS
 ```
 
-Then open `/admin/mfa/enroll/`, enter the password and the enrollment code, add the shown key to an authenticator app, and confirm with a code. Sign in at `/admin/login/`. The admin uses its own session cookie (30 min idle, 12 h absolute). If an authenticator is lost, another administrator uses the account action "Reset admin MFA", or the operator runs `python manage.py admin_access reset-mfa --phone ...`. Other subcommands: `revoke-role`, `grant-superuser`, `revoke-superuser` (with `--reason CODE`).
+The enrollment code goes **only by SMS** to the account holder's verified phone; nobody else sees it (KI-39). The account needs a verified phone number. For local development, run the command (and `runserver`) with `SMS_PROVIDER=console` to read the code on the terminal. The console provider is allowed only in local settings.
+
+Then open `/admin/mfa/enroll/`, enter the password and the enrollment code from the SMS, add the shown key to an authenticator app, and confirm with a code. Sign in at `/admin/login/`. The admin uses its own session cookie (30 min idle, 12 h absolute). If an authenticator is lost, recovery takes two administrators (ADR-033 Amendment 1). One uses the account action "Request MFA recovery" with a reason code, and a **different** administrator approves it under "Admin action approvals". The replacement enrollment code then goes **only by SMS** to the account holder's verified phone; no administrator sees it. As a break-glass emergency only, the operator can run `python manage.py admin_access emergency-mfa-recovery --phone ... --emergency --reason CODE`, which is audited and notifies the account holder and all superusers. `issue-mfa-enrollment` works only for a first enrollment. Other subcommands: `revoke-role`, `grant-superuser`, `revoke-superuser` (with `--reason CODE`).
 
 ### Later setup steps
 

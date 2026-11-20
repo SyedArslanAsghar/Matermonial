@@ -1,8 +1,8 @@
 # Pending Features
 
-**Last updated:** 2026-11-19 (G5 Phase 2)
+**Last updated:** 2026-11-20 (final corrections DR-2026-11-20-C)
 
-Phases 2 and 3 are implemented and tested; everything after them is pending. The authoritative per-requirement list, with domain, module, approval status, implementation status and owner-decision dependencies, is `docs/handover/18_REQUIREMENTS_TRACEABILITY_MATRIX.md`.
+Phases 2–4 are implemented and tested; everything after them is pending (Phase 5 not authorized). The authoritative per-requirement list, with domain, module, approval status, implementation status and owner-decision dependencies, is `docs/handover/18_REQUIREMENTS_TRACEABILITY_MATRIX.md`.
 
 ## Sequence (doc 10 §0)
 
@@ -11,10 +11,10 @@ Phases 2 and 3 are implemented and tested; everything after them is pending. The
 | G2 | Repository governance | **ACCEPTED** with carried-forward items (DR-2026-11-17-G2A); baseline commit `38f491dea79f`; "CI runs on the baseline" OPEN until before G4 |
 | G3 | Backend foundation, no migrations | **ACCEPTED** by the owner on 2026-11-18 with an accepted exception (DR-2026-11-18-G3A); KI-14's 3 User-model database tests are OPEN and carried forward to G4 |
 | G4 | First migration (kernel models) | **ACCEPTED** (DR-2026-11-18-G4A) |
-| G5 Phase 2 | Auth flows + Django Admin MFA | **TESTED** (2026-11-19, `feature/g5-phase2-auth`; owner review pending) |
-| G5 Phase 3 | Profiles, preferences, uploads | **TESTED** (2026-11-19; owner review pending; KI-29…KI-32) |
-| G5 Phase 4 | Family management and ActorContext | NOT_STARTED |
-| G5 Phase 5 | Identity verification | NOT_STARTED |
+| G5 Phase 2 | Auth flows + Django Admin MFA | **TESTED** (2026-11-19, `feature/g5-phase2-auth`; first-enrollment SMS correction 2026-11-20; owner review pending) |
+| G5 Phase 3 | Profiles, preferences, uploads | **TESTED** (2026-11-19; KI-37 resolved 2026-11-20; owner review pending; KI-29, KI-31, KI-32) |
+| G5 Phase 4 | Family management and ActorContext | **TESTED** (2026-11-19; authorized DR-2026-11-19-O-10; KI-34 and KI-36 resolved 2026-11-20; owner review pending; open: KI-35, OD-05 and TR-16) |
+| G5 Phase 5 | Identity verification | NOT_STARTED (**not authorized**; decide OD-05c first) |
 | G5 Phase 6 | Privacy, central eligibility, restrictions | NOT_STARTED |
 | G5 Phase 7 | Credit ledger and projections | NOT_STARTED |
 | G5 Phase 8 | Search, matching, view billing | NOT_STARTED |

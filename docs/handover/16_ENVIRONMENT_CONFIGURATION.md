@@ -272,3 +272,20 @@ Implementation record (CC-R63). The names are in `backend/.env.example`; the cod
 | `MALWARE_SCANNER` | Upload scanner (TR-10): `mock` flags only the EICAR test string; `disabled` refuses uploads | `mock` (local, test) | `mock` refused; `disabled` until a real scanner is approved |
 | `PHOTO_MAX_UPLOAD_BYTES`, `PHOTO_MAX_PIXELS`, `PHOTO_MAX_EDGE`, `PHOTO_MIN_EDGE`, `PHOTO_MAX_PER_PROFILE` | Photo pipeline limits (AS-24) | 10 MB, 40 MP, 2048, 200, 6 | Same |
 | `PROFILE_REQUIRED_FIELDS`, `PROFILE_OPTIONAL_FIELDS` (settings, not environment) | Completion and the review gate (AS-23) | see `config/settings/base.py` | Same |
+
+## 14. Configuration added with DR-2026-11-19-O (2026-11-19)
+
+| Variable | Purpose | Default |
+|---|---|---|
+| `ADMIN_MFA_RECOVERY_TTL_SECONDS` | Lifetime of a pending admin MFA recovery request | 86400 |
+| `RATE_FAMILY_INVITE_ACCOUNT` | Manager invitations per owner account | `10/86400` |
+
+## 15. Configuration added with DR-2026-11-20-C (2026-11-20)
+
+| Variable | Purpose | Default |
+|---|---|---|
+| `DATABASE_URL` (tests) | **Required** for `config.settings.test` (environment or `backend/.env`). Must be a loopback host on an approved disposable port; port 5432, a missing port and Unix sockets are refused (KI-38) | none: tests refuse to start |
+| `MATERMONIAL_TEST_POSTGRES_URL` | When set, checked by the same rule | unset |
+| `TEST_DATABASE_ALLOWED_PORTS` | Approved disposable test ports (comma-separated); 5432 is always refused | `55432,55418` |
+| `SMS_PROVIDER=console` | Local development only (`ENVIRONMENT=local`): SMS bodies on standard output, a simulated handset for OTPs and admin enrollment codes. Refused in every other environment | local default stays `mock` |
+

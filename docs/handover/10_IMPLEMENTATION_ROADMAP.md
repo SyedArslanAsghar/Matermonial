@@ -54,6 +54,10 @@ The project proceeds through five gates. **Each gate needs the project owner's e
 
 **G5 Phase 3 status (2026-11-19):** **IMPLEMENTED and TESTED** on `feature/g5-phase2-auth` (owner-only endpoints): profile and sections, completion, submit-for-review, partner preferences, and photos through the TR-10 pipeline. 404/404 tests pass on Python 3.12 and 3.13 × PostgreSQL 16 and 18. Open: the sensitive value lists (owner), confirmation of the required set (AS-23), and the items in `known_issues.md` KI-29…KI-32. Owner review and acceptance pending.
 
+**G5 Phase 4 status (2026-11-19):** authorized (DR-2026-11-19-O-10). **IMPLEMENTED and TESTED** on `feature/g5-phase2-auth`: authorization lifecycle, permission catalogue and templates, Sensitive grants with confirmation and step-up, acting-profile resolution in the profile endpoints, action and access history, expiry. Open parts are listed in `known_issues.md` (OD-05, TR-16, TR-02 formal approval). Owner review and acceptance pending.
+
+**G5 Phases 2–4 final corrections (2026-11-20, DR-2026-11-20-C):** KI-34 (enumeration-safe invitations), KI-37 (employment-status options active), KI-38 (fail-safe test database) and KI-39 (first admin MFA code by SMS only) are resolved. TR-02 is approved (step 10 stays with TR-16; Sensitive manager use fails closed meanwhile). OD-05 and TR-16 stay open (owner-decision report `docs/implementation/od05_tr16_decision_report.md`). The full suite passes on Python 3.12 and 3.13 × PostgreSQL 16 and 18. Owner review and acceptance of Phases 2–4 pending. Phase 5 is not authorized.
+
 **Dependency check:**
 - Auth and User are final before 0001 (G4).
 - Audit and outbox exist at G4.

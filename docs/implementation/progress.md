@@ -1,6 +1,6 @@
 # Progress
 
-**Last updated:** 2026-11-19 (G5 Phases 2 and 3 implemented and tested)
+**Last updated:** 2026-11-20 (G5 Phases 2–4 implemented and tested; final corrections DR-2026-11-20-C)
 
 ## Governance status
 
@@ -11,12 +11,12 @@
 | G2 Repository governance | **ACCEPTED** by the project owner with carried-forward items (DR-2026-11-17-G2A). Baseline commit `38f491dea79fb9bb10fd2010b1c2cb8a68d545f9`. Exit criterion "CI runs on the baseline" (carried forward under DR-2026-11-17-G2X): **satisfied by owner acceptance** (DR-2026-11-18-G2C, 2026-11-18) on the integrated run `44294474904` on commit `c5fc346` (success, 6/6 jobs). The baseline commit `38f491d` itself did not run independently. |
 | G3 Backend foundation | **ACCEPTED** by the project owner on 2026-11-18, with an accepted exception and a carried-forward item (DR-2026-11-18-G3A). Exit criterion "tests green on PostgreSQL" is **not fully met**: the PostgreSQL foundation tests pass, but the 3 KI-14 User-model database tests are **OPEN** and must pass as part of G4. The G3 changes were committed and pushed by the owner as `c5fc346` (DR-2026-11-18-GH). |
 | G4 First migration | **ACCEPTED by the project owner** (DR-2026-11-18-G4A, 2026-11-18). |
-| G5 Features | **IN PROGRESS** (authorized DR-2026-11-18-G4). Phases 2 (auth + Django Admin MFA) and 3 (profiles, preferences, photos) **IMPLEMENTED and TESTED** on `feature/g5-phase2-auth` (not pushed; owner review pending). Phase 4 next. |
+| G5 Features | **IN PROGRESS** (authorized DR-2026-11-18-G4). Phases 2 (auth + Django Admin MFA), 3 (profiles, preferences, photos) and 4 (family management, authorized DR-2026-11-19-O-10) are **IMPLEMENTED and TESTED** on `feature/g5-phase2-auth`, with the final corrections of DR-2026-11-20-C. The branch is local only (not pushed); owner review and acceptance are pending. **Phase 5 is not authorized.** |
 | Current delivery scope | **CI/CD implementation and validation** (DR-2026-11-18-CI, 2026-11-18). AWS deployment and production infrastructure are **deferred** and out of current scope. CD execution stays disabled until a target and an authorization exist. This doesn't authorize a remote, a push, a commit, G4 or a deployment. |
 
 ## Implementation status
 
-*Current (2026-11-19):* G5 Phase 2 is TESTED (FR-ACC-001, FR-ACC-005 TESTED; FR-ACC-002 and FR-ADM-002 IN_PROGRESS); see the G5 Phase 2 section below and doc 18. *Historical (G3):* No implementation work has been authorized or started. Doc 18 lists 126 requirements: 124 NOT_STARTED and 2 BLOCKED (FR-ACC-009 by OD-02a/b, FR-PRO-005 by OD-04a). Nothing is PLANNED or beyond.
+*Current (2026-11-20):* G5 Phases 2, 3 and 4 are TESTED, with per-requirement status in doc 18 and the sections below. TR-02 is approved (DR-2026-11-20-C-5); OD-05 and TR-16 are open (KI-35). Nothing is REVIEWED or ACCEPTED (CC-R70). *Historical (G3):* No implementation work has been authorized or started. Doc 18 lists 126 requirements: 124 NOT_STARTED and 2 BLOCKED (FR-ACC-009 by OD-02a/b, FR-PRO-005 by OD-04a). Nothing is PLANNED or beyond.
 
 The `backend/` scaffold predates the baseline. G3 rebuilt it into the backend foundation, which has been **executed and verified**: system checks, `check --deploy`, WSGI/ASGI loading, and the test suite on Python 3.12 and 3.13. The PostgreSQL foundation tests pass on PostgreSQL 16 and 18. It has no migrations, so the 3 KI-14 User-model database tests stay deferred to G4. GitHub Actions ran for the first time on the owner-pushed commit `c5fc346` (run `44294474904`, success, 6/6 jobs; DR-2026-11-18-GH). The owner accepted this run as satisfying the G2 prerequisite "CI runs on the baseline" (DR-2026-11-18-G2C). The baseline commit `38f491d` itself did not run independently.
 
@@ -438,4 +438,52 @@ A profile can't yet complete basic info, because the sensitive value lists await
 - a real scanner (KI-33).
 
 **Validation:** **412 passed, 0 skipped, 0 failed** on Python 3.12.16 and 3.13.18 × PostgreSQL 16.16 and 18.7. Lockfiles consistent; Ruff clean. On a fresh database `profiles.0004` seeds 46 options, **0 active**; it reverses to 0003 and re-applies cleanly; `makemigrations --check` reports no changes.
+
+## Owner decisions DR-2026-11-19-O and G5 Phase 4 — Family management (2026-11-19)
+
+| Commit | Content |
+|---|---|
+| `98734f5` | Decision record DR-2026-11-19-O (vocabularies, required fields, ADR-033 Amendment 1 approved, Phase 4 authorized) |
+| `baabb75` | Approved vocabularies, denomination, "prefer not to say" (`profiles.0005`) |
+| `1378d82` | Two-person admin MFA recovery with SMS-only codes (ADR-033 Amendment 1; `admin_access.0002`) |
+| `f0048f4` | Family management and acting-profile resolution (`family.0001`, `0002`); 463 tests passed on Python 3.13 × PostgreSQL 16 at the time |
+
+Phase 4 scope: manager permission catalogue and templates; authorization lifecycle (invite, accept or reject, pause, resume, renew, revoke, expiry by job and at runtime); Sensitive grants with confirmation and owner step-up; Owner-only never delegated; `ActorContext` resolution in the profile, preference and photo endpoints; manager action log and profile access history. Requirements: doc 18 FR-FAM-001…009.
+
+## G5 Phases 2–4 final corrections (2026-11-20, DR-2026-11-20-C)
+
+| Item | Result | Evidence |
+|---|---|---|
+| KI-37 employment status | **Resolved.** The 8 approved options are active (`profiles.0006`, data only); `NOT_EMPLOYED` stays inactive. A valid profile submits with the production vocabularies alone. An inactive or unknown value is rejected, and a deactivated list blocks submission again (`409 vocabulary_not_configured`) | `TestEmploymentStatusVocabulary` (5 tests). The test fixture no longer activates owner-approved lists, so tests use the migrated state |
+| KI-34 invitation enumeration | **Resolved.** `ManagerInvitation` (`family.0003`): uniform `202` body, identical query count, background resolution, authorization visible to the owner only after acceptance, owner cancel endpoint, no phone number stored or logged (ADR-034) | `TestInvitationPrivacy` (15 tests: eligible, unregistered, unverified, inactive, deactivated and already-managing-elsewhere cases; query-count equality; owner-data-only refusals; hidden pending authorizations; audit and log scan; cancel before and after resolution; idempotent resolution) plus the concurrent-invitation test |
+| KI-39 first MFA enrollment | **Resolved.** The code goes by SMS only (after commit, not through the broker). The admin action and CLI show only the outcome, and the code-display template was removed. Failure revokes the code, is audited and notifies the holder. A verified phone is required (ADR-033 Amendment 2) | `TestFirstEnrollmentDelivery` (6 tests: delivery, failure and reissue, unverified phone, admin page, CLI output, console provider local-only) |
+| KI-38 test database | **Resolved.** `config.settings.test` refuses to load without an explicit `DATABASE_URL`, and refuses any target other than loopback on an approved port (never 5432, no implicit port, no socket). The check runs before any connection | 17 tests in `tests/test_settings_and_config.py` (unit checks and subprocess loads of the test settings) |
+| TR-02 review | **Approved** for steps 1–9, 11 and 13–17 (DR-2026-11-20-C-5). One gap was found and closed: a granted Sensitive permission could be used without step-up. It now fails closed (`403 sensitive_use_unavailable`) until TR-16 is decided | `test_granted_sensitive_permissions_cannot_be_used_until_tr16` |
+| KI-35 OD-05 / TR-16 | **Open.** Owner-decision report written | `docs/implementation/od05_tr16_decision_report.md` |
+
+**Incident note (2026-11-20):** before the KI-38 safeguard was in place, one test command ran without `DATABASE_URL`. Django's development default made one connection attempt to `127.0.0.1:5432`, which was **refused** at password authentication. No query ran and nothing was read or changed. It was the same failure mode as the 2026-11-19 record. The safeguard was implemented immediately afterwards, and every later command used the disposable servers on 55432 and 55418 only.
+
+### Final validation (2026-11-20)
+
+Disposable containers `postgres:16` (16.16, port 55432) and `postgres:18` (18.7, port 55418). Python 3.13.7 (project `.venv`) and Python 3.12.14 (a throwaway uv environment with a hash-checked `local.txt` install).
+
+| Check | Python 3.12.14 | Python 3.13.7 |
+|---|---|---|
+| Hash-checked `local.txt` install, `pip check` | pass | pass |
+| Hash-checked `production.txt` install, `pip check` | pass | — |
+| Lockfiles match inputs (CI rule, recompiled with 3.12) | base, local, production consistent | n/a (by design) |
+| Ruff lint, Ruff format (ruff 0.17.5) | pass | (same source) |
+| Full suite on PostgreSQL 16.16 | **502 passed, 0 skipped, 0 failed** | **502 passed, 0 skipped, 0 failed** |
+| Full suite on PostgreSQL 18.7 | **502 passed, 0 skipped, 0 failed** | **502 passed, 0 skipped, 0 failed** |
+
+**Migrations** (fresh database `migcheck` on 16.16 and 18.7):
+1. Migrated from empty.
+2. Reversed `family` → 0002 and `profiles` → 0005; employment options were inactive after the reverse.
+3. Seeded one PENDING and one REJECTED authorization.
+4. Re-applied: the backfill created PENDING and DECLINED invitations with a masked hint, and the 8 employment options were active in order.
+5. `makemigrations --check` reported no changes.
+
+**Other checks:** `manage.py check` reports no issues. The OpenAPI generation warnings and errors are unchanged from `f0048f4` (158 errors, all pre-existing: APIViews without serializers, KI-40). The new cancel endpoint is annotated.
+
+Implementation status: **TESTED.** REVIEWED and ACCEPTED are set by the reviewer and the owner (CC-R70).
 

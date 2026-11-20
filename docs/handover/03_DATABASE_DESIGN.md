@@ -2287,3 +2287,21 @@ Editorial record of the Module 02/03 schema (app `profiles`; migrations `profile
 | `ProfilePhoto` (§3.9, §22.3, TR-10) | Adds `uploaded_by`, `mime_type`, `size`, `checksum` (SHA-256), `width`, `height`, `processing_status` (QUARANTINED / READY / REJECTED, with `rejection_reason`). CHECKs: a READY row has every stored-file fact and others have no storage key; the storage key is never a URL; a primary photo is READY and live. Partial unique: one live primary per profile. Soft delete keeps the row |
 | FKs | All PROTECT. Implicit-lock class P (the acting User FOR SHARE, then the profile FOR UPDATE, precede every write) |
 | `VocabularyOption` (`profiles.0004`, DR-2026-11-19-R-1) | Admin-managed controlled vocabularies: `vocabulary` (known names only, CHECK), `code` (stable identifier, the value stored on profiles), `label_en`, `label_ur`, `sort_order`, `is_active`. Unique `(vocabulary, code)`. A trigger rejects changing `vocabulary` or `code` and rejects DELETE (deactivate instead). Proposals seeded inactive |
+
+### 22.20 Owner decisions and G5 Phase 4 implementation record (2026-11-19, DR-2026-11-19-O)
+
+| Item | Implementation |
+|---|---|
+| Vocabularies (`profiles.0005`) | Owner-approved options active: gender 2, marital status 4, religion 12 (DR-2026-11-19-O-1..3). New `denomination` vocabulary: each option's `parent` is a religion option (trigger; parent immutable); none seeded. Community and caste: none seeded |
+| `ProfileBasicInfo` | `denomination` (must belong to the religion; needs a disclosed religion, CHECK) and `<field>_prefer_not_to_say` flags for religion, denomination, community, caste (CHECK: no value when set). "Prefer not to say" is never a code (DR-2026-11-19-O-6) |
+| `AdminActionApproval` (`admin_access.0002`, §16.7) | Requested by / approved by / rejected by, `action_type` (ADMIN_MFA_RECOVERY), `resource_type`, `resource_id`, status PENDING/APPROVED/REJECTED/EXPIRED, reason code, `outcome`, timestamps, `expires_at`. CHECKs: the requester never approves or rejects; decision fields consistent; one PENDING per action and resource |
+| `account_security_event` (`accounts.0003`) | Event types `ADMIN_MFA_RECOVERY_REQUESTED`, `ADMIN_MFA_RECOVERY_DECIDED`, `ADMIN_MFA_EMERGENCY_RECOVERY` (CHECK widened on the partitioned table) |
+| Module 05 (`family.0001`, `0002`) | §6.1–§6.7 as listed. Additions: `ManagerPermission.sensitivity` NORMAL/SENSITIVE/OWNER_ONLY (the approved doc 14 §3 levels; §22.5's tier column waits for OD-05); template link table `family_permission_group_permission`; authorization `invited_by`, `invitation_expires_at` (unset: OD-05e), `rejected_at`, `expired_at`. Partial unique: one PENDING/ACTIVE/PAUSED authorization per (profile, manager); CHECKs on self-invitation, expiry and status timestamps. History, action log and access history append-only (trigger). Catalogue: 39 permissions (`manage_family_authorizations` inactive, OD-05c); templates Standard / Communication / Advanced. `SensitiveActionVerification` (§6.8) not created: H tier and step-up at use are OD-05 / TR-16 |
+
+### 22.21 Final corrections record (2026-11-20, DR-2026-11-20-C)
+
+| Item | Implementation |
+|---|---|
+| `profiles.0006` (data only, KI-37) | Activates the owner-approved employment-status options `EMPLOYED`, `SELF_EMPLOYED`, `BUSINESS_OWNER`, `UNEMPLOYED`, `STUDENT`, `RETIRED`, `HOMEMAKER`, `OTHER` (labels and order editable in the admin). The 0004 proposal `NOT_EMPLOYED` stays inactive. Reverse deactivates (options are never deleted) |
+| `ManagerInvitation` (`family.0003`, `family_invitation`; KI-34, ADR-034) | The owner's record of each invitation: `profile`, `invited_by`, `phone_digest` (HMAC; the number isn't stored), `phone_hint` (masked), `invitee` (internal only, nullable), `permission_group`, `requested_permissions` (Normal codes), `requested_expires_at`, `authorization` (one-to-one, nullable, set by the resolution task), `status` PENDING / ACCEPTED / DECLINED / CANCELLED, `invited_at`, `responded_at`, `cancelled_at`, `reason`. Partial unique: one PENDING invitation per (profile, `phone_digest`). CHECKs: not self; ACCEPTED/DECLINED have an authorization and `responded_at`; CANCELLED has `cancelled_at`. All FKs PROTECT; implicit-lock classes recorded in `common/db/fk_inventory.py`. The migration backfills rows for existing authorizations |
+

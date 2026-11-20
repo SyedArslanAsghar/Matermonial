@@ -47,15 +47,15 @@ One row per requirement, from the SRS (doc 01) to its domain, module, status and
 | FR-DAT-008 | — | Deletion processing | D21 | M14 | APPROVED | NOT_STARTED | — | T-DEL, T-REG, T-SEC-013…020 |
 | FR-DAT-009 | — | Retention exceptions | D21 | M14 | APPROVED | IN_PROGRESS (G4: audit hold tables and release function; hold cases G5 Phase 15) | — | T-DEL, T-REG, T-SEC-013…020 |
 | FR-DAT-010 | — | Manager deletion | D21 | M14 | APPROVED | NOT_STARTED | — | T-DEL, T-REG, T-SEC-013…020 |
-| FR-FAM-001 | — | Authorization invitation | D08 | M05 | APPROVED | NOT_STARTED | — | T-ACT |
-| FR-FAM-002 | — | Acceptance | D08 | M05 | APPROVED | NOT_STARTED | — | T-ACT |
-| FR-FAM-003 | — | Permission assignment | D08 | M05 | APPROVED | NOT_STARTED | — | T-ACT |
-| FR-FAM-004 | — | Starter permission groups | D08 | M05 | APPROVED | NOT_STARTED | OD-05a (dependent behaviour BLOCKED) | T-ACT |
-| FR-FAM-005 | — | Sensitive permissions | D08 | M05 | APPROVED | NOT_STARTED | OD-05a/c/d (dependent behaviour BLOCKED) | T-ACT |
-| FR-FAM-006 | — | Authorization lifecycle | D08 | M05 | APPROVED | NOT_STARTED | OD-05e/f (dependent behaviour BLOCKED) | T-ACT |
-| FR-FAM-007 | — | Expiry | D08 | M05 | APPROVED | NOT_STARTED | — | T-ACT |
-| FR-FAM-008 | — | Owner control | D08 | M05 | APPROVED | NOT_STARTED | — | T-ACT |
-| FR-FAM-009 | — | Activity tracking | D08 | M05 | APPROVED | NOT_STARTED | — | T-ACT |
+| FR-FAM-001 | — | Authorization invitation | D08 | M05 | APPROVED | TESTED (G5 Phase 4: owner invites a registered, active, phone-verified account; rate limited. 2026-11-20, KI-34: enumeration-safe, with a uniform `202` and invitation record, resolution in a background task, and the authorization visible to the owner only after acceptance; ADR-034) | — | T-ACT |
+| FR-FAM-002 | — | Acceptance | D08 | M05 | APPROVED | TESTED (G5 Phase 4: only the invitee accepts or rejects; pending grants nothing) | — | T-ACT |
+| FR-FAM-003 | — | Permission assignment | D08 | M05 | APPROVED | TESTED (G5 Phase 4: template plus individual permissions; Sensitive with confirmation and owner step-up; Owner-only never) | — | T-ACT |
+| FR-FAM-004 | — | Starter permission groups | D08 | M05 | APPROVED | IN_PROGRESS (G5 Phase 4: configurable Standard/Communication/Advanced templates TESTED; pre-selection semantics OD-05a) | OD-05a (dependent behaviour BLOCKED) | T-ACT |
+| FR-FAM-005 | — | Sensitive permissions | D08 | M05 | APPROVED | IN_PROGRESS (G5 Phase 4: Sensitive owner-only by default, explicit grant with step-up, owner notified, audited, TESTED. Manager *use* of a Sensitive permission fails closed until TR-16 is decided (DR-2026-11-20-C-5, TESTED). H tier, per-share approval and manager step-up at use: OD-05a/c/d, TR-16) | OD-05a/c/d (dependent behaviour BLOCKED) | T-ACT |
+| FR-FAM-006 | — | Authorization lifecycle | D08 | M05 | APPROVED | IN_PROGRESS (G5 Phase 4: PENDING, ACTIVE, PAUSED, EXPIRED, REVOKED, REJECTED TESTED; owner cancels a pending invitation (PENDING → REVOKED) TESTED; invitation TTL OD-05e and resignation OD-05f not implemented) | OD-05e/f (dependent behaviour BLOCKED) | T-ACT |
+| FR-FAM-007 | — | Expiry | D08 | M05 | APPROVED | TESTED (G5 Phase 4: optional expiry, none by default, job plus runtime check, renewal) | — | T-ACT |
+| FR-FAM-008 | — | Owner control | D08 | M05 | APPROVED | TESTED (G5 Phase 4: pause, resume, revoke, renew by the owner only; immediate loss of access) | — | T-ACT |
+| FR-FAM-009 | — | Activity tracking | D08 | M05 | APPROVED | TESTED (G5 Phase 4: ManagerActionLog and ProfileAccessHistory, append-only; device/browser shown, IP not shown; approximate location empty until a source exists) | — | T-ACT |
 | FR-MAT-001 | — | Search | D09 | M06 | APPROVED | NOT_STARTED | — | T-MAT |
 | FR-MAT-002 | FR-013 | Worldwide search | D09 | M06 | APPROVED | NOT_STARTED | — | T-MAT |
 | FR-MAT-003 | FR-021 | Rule-based matching | D09 | M06 | APPROVED | NOT_STARTED | OD-10 (dependent behaviour BLOCKED) | T-MAT |
@@ -99,7 +99,7 @@ One row per requirement, from the SRS (doc 01) to its domain, module, status and
 | FR-PRI-008 | — | Visitor history removal | D16 | M10 | APPROVED | NOT_STARTED | — | T-MAT-017…022 |
 | FR-PRI-009 | — | Private media | D05 | M02, M10, M13 | APPROVED | NOT_STARTED | — | — |
 | FR-PRO-001 | FR-008 | Profile creation | D04 | M02 | APPROVED | TESTED (G5 Phase 3b: one profile per account; creation needs an active, phone-verified account; final gate wording OD-02a) | OD-02a (FR-008 wording) (dependent behaviour BLOCKED) | T-ACT |
-| FR-PRO-002 | FR-008 | Profile sections | D04 | M02 | APPROVED | IN_PROGRESS (G5 Phase 3: all sections TESTED; value lists are admin-managed vocabularies with proposals inactive; gender, marital status and religion need approved, active options before any submission, DR-2026-11-19-R-1/R-2) | — | T-ACT |
+| FR-PRO-002 | FR-008 | Profile sections | D04 | M02 | APPROVED | IN_PROGRESS (G5 Phase 3: all sections TESTED; gender, marital status and religion options approved and active; denomination separate and optional; prefer-not-to-say flags, DR-2026-11-19-O; employment-status options approved and active (DR-2026-11-20-C-1, KI-37 resolved), so a valid profile submits; community, caste and denomination lists still owner-supplied, KI-29) | — | T-ACT |
 | FR-PRO-003 | — | Date of birth privacy | D04 | M02 | APPROVED | TESTED (G5 Phase 3b: DOB only in the owner's own view; age computed; under-age DOB rejected and not stored) | — | T-ACT |
 | FR-PRO-004 | FR-014 | Education and profession | D04 | M02 | APPROVED | TESTED (G5 Phase 3b: editable in every non-closed state) | — | T-ACT |
 | FR-PRO-005 | FR-012 | Verified information | D04 | M02 | APPROVED | BLOCKED | OD-04a (whole requirement) | T-ACT |
