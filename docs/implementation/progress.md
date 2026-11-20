@@ -1,6 +1,6 @@
 # Progress
 
-**Last updated:** 2026-11-20 (owner decisions DR-2026-11-20-O implemented and tested)
+**Last updated:** 2026-11-20 (DR-2026-11-20-P: religion optional, admin parent choices)
 
 ## Governance status
 
@@ -519,4 +519,14 @@ Migrations: `accounts.0004`, `family.0004`, `profiles.0007`, `profiles.0008`, `n
 Upgrade tested from the previous commit's schema and data (seeded with the old code in a temporary worktree): caste value preserved through the rename, deadlines and scan outcomes backfilled, permissions reclassified; all five migrations reverse (old caste value restored, sub-caste options removed) and re-apply; `makemigrations --check` clean; on PostgreSQL 16.16 and 18.7.
 
 Implementation status: **TESTED.** REVIEWED and ACCEPTED are set by the reviewer and the owner (CC-R70).
+
+## DR-2026-11-20-P: religion optional, admin parent choices (2026-11-20)
+
+| Item | Result | Evidence |
+|---|---|---|
+| P-1 religion | Removed from `PROFILE_REQUIRED_FIELDS`. `create_profile` also creates `ProfileBasicInfo` with `religion_prefer_not_to_say = true` (no religion or denomination value). The existing normalisation clears religion and denomination when the flag is chosen and clears the flag when a religion is chosen; denominations stay scoped to the religion. No schema change, no data migration; earlier profiles keep their values | `test_religion_optional.py` (9); superseded assertions in `test_profiles.py` and `test_identity_vocabularies.py` updated |
+| P-2 admin defect | The parent dropdown offered religion values for every list. Now: denomination → religion (required), sub-caste → caste (optional), other lists → none; the add page narrows with `?vocabulary=`; a form check rejects mismatches before the unchanged database trigger; parent stays read-only after creation | `test_vocabulary_admin.py` (12, including a signed-in admin page) |
+| P-3 vocabularies | Values unchanged; recommendations documented for review only | `docs/implementation/vocabulary_review_recommendations.md` |
+
+Implementation status: **TESTED.** Owner review pending.
 

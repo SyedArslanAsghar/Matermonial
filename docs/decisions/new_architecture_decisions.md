@@ -576,6 +576,24 @@ No speculative infrastructure tasks are added.
 
 ---
 
+## Decision record DR-2026-11-20-P: religion optional with a private default; admin parent choices
+
+- **Decision ID:** DR-2026-11-20-P
+- **Date:** 2026-11-20
+- **Decided by:** Project owner (instruction after the read-only vocabulary review)
+- **Decision status:** APPROVED
+- **Branch:** `feature/g5-phase2-auth` (local only)
+
+| # | ID | Item | Decision | Supersedes |
+|---|---|---|---|---|
+| 1 | DR-2026-11-20-P-1 | Religion | **Optional** for profile submission. New profiles start with **"Prefer not to say" selected** (the privacy flag; no religion or denomination value). Choosing a religion clears the flag and limits denominations to that religion; choosing "prefer not to say" clears religion and denomination. Empty never means a religion; no religion is preselected. Existing profiles keep their values and choices (no data migration). Denomination, caste, sub-caste and community stay optional | Religion's place in the required set of DR-2026-11-19-O-7 (and the owner's earlier clarification in DR-2026-11-20-O-5 to keep it) |
+| 2 | DR-2026-11-20-P-2 | Admin parent choices | Correct the defect found in the review: denomination parent = religion options only (required); sub-caste parent = caste options only (optional); no parent for other lists. Database constraints and triggers unchanged | — (defect fix) |
+| 3 | DR-2026-11-20-P-3 | Vocabulary preservation | Keep the religion list (`profiles.0005`) and the `0007` structure and values unchanged: no Ahmadiyya without a separate decision; no change to Islamic denominations without a documented proposal; MEMON, MALIK and SHEIKH stay as seeded; Jutt and Syed Bukhari stay. Recommendations are documented for review only (`docs/implementation/vocabulary_review_recommendations.md`) and are **not** approved changes | — |
+
+**Not authorized (unchanged):** push, PR, merge, CI/CD, AWS or production, port 5432, Phase 5.
+
+---
+
 ## OD-01 approved functional-domain catalogue
 
 **Source key:**

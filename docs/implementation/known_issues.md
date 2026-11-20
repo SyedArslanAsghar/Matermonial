@@ -1,6 +1,6 @@
 # Known Issues
 
-**Last updated:** 2026-11-20 (owner decisions DR-2026-11-20-O)
+**Last updated:** 2026-11-20 (DR-2026-11-20-P)
 
 Issues in the existing repository scaffold, found during the specification assessment. None has been fixed; fixes belong to the gate shown.
 
@@ -58,3 +58,5 @@ Until then they carry `@pytest.mark.deferred_g4_ki14` and are reported as skippe
 | KI-40 | **Resolved (DR-2026-11-20-O-9):** OpenAPI generation went from **158 errors / 66 warnings** (33 / 52 unique; every error "unable to guess serializer" on plain APIViews; every warning "could not resolve authenticator" for the two custom auth classes) to **0 errors / 0 warnings**, validated against the OpenAPI specification (`spectacular --validate --fail-on-warn`). Fixes: explicit request/response serializers on all 60 operations, the empty profile response schema replaced by declared fields, security-scheme extensions for the custom auth classes, enum name overrides, typed serializer methods. Evidence: `tests/test_openapi_schema.py` (8 tests, including drift guards between views and schemas). | — |
 | KI-41 | Notification limits (ADR-037): Expo push receipts aren't polled (SENT = accepted by Expo); notification preferences (FR-NOT-002, OD-02e) and Urdu templates (FR-NOT-006) aren't built; in-app notification retention isn't defined; SMS and email aren't used for notices. | Phase 12 |
 | KI-42 | Account authenticator: seed re-encryption on `ACCOUNT_MFA` key rotation isn't built (same as KI-26); there is no recovery path for a lost account authenticator other than removing it while signed in with password step-up and a valid code (a lost device means a manager can't do Sensitive actions until support processes exist, Phase 16). | Before production key rotation; Phase 16 |
+| KI-43 | **Resolved (DR-2026-11-20-P-2):** the vocabulary admin's parent dropdown offered religion values for every list, so sub-castes couldn't be given a caste parent in the admin. Now restricted per list and validated by the form; database rules unchanged. Evidence: `test_vocabulary_admin.py`. | — |
+| KI-44 | Vocabulary recommendations awaiting owner decisions (MALIK, SHEIKH, MEMON, sub-caste labels and multi-caste clans, Islamic and Christian denominations including Ahmadiyya, communities, Urdu labels): `docs/implementation/vocabulary_review_recommendations.md`. Nothing applied. | Owner |

@@ -60,4 +60,11 @@ Evidence in `progress.md` (404/404 tests on Python 3.12 and 3.13 × PostgreSQL 1
 | SMS/email/push adapters, in-app notifications, push delivery | FR-NOT-001/004; O-7 | TESTED (FR rows IN_PROGRESS) |
 | OpenAPI zero errors and warnings | KI-40; O-9 | TESTED |
 
+## DR-2026-11-20-P (TESTED, 2026-11-20)
+
+| Feature | Requirement / decision | Status |
+|---|---|---|
+| Religion optional; "prefer not to say" default for new profiles | FR-PRO-002; P-1 | TESTED |
+| Vocabulary admin parent choices per list | P-2 | TESTED |
+
 Documentation work completed under G1 is recorded in `docs/handover/20_DOCUMENTATION_CORRECTION_REGISTER.md`.

@@ -852,3 +852,10 @@ Editorial record (CC-R63). It adds no requirement. Details are in ADR-033 and `d
 - **Identity verification (OD-05c):** only the owner submits it (`verification.services.identity_access.ensure_owner_submits`, mandatory for Phase 5).
 - **Uploads:** 5 MB, 4096 px, JPEG/PNG/WebP by signature at upload and by decoder in the pipeline; SVG and animation refused; scan outcomes PENDING/CLEAN/INFECTED/FAILED; FAILED never clean, retried while quarantined, then rejected; READY requires CLEAN (database CHECK); nothing sent to third-party scanners.
 - **Providers:** deployed settings refuse mock/console for SMS, email, push and scanning, and refuse a selected real provider whose configuration is missing. Credentials, codes and message bodies are never logged.
+
+### 22.14 Religion default and vocabulary admin (2026-11-20, DR-2026-11-20-P)
+
+- New profiles store religion as the privacy choice "prefer not to say" (flag true, no religion or denomination value). Religion is optional for submission; empty never means a religion and none is preselected. Existing profiles are unchanged.
+- No new disclosure: the only endpoints returning profile fields are the owner's own profile and the acting-profile view for authorized managers (who see the flag, not a value). Search, recommendations, previews, public views and exports don't exist yet (Phases 6, 8, 15); when built they must respect these flags. Tested in `apps/profiles/tests/test_religion_optional.py`.
+- Vocabulary admin parent choices are restricted per list (denomination → religion, sub-caste → caste, none otherwise) in the form, on top of the unchanged database CHECK and trigger.
+

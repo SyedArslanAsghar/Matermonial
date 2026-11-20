@@ -60,6 +60,8 @@ The project proceeds through five gates. **Each gate needs the project owner's e
 
 **Owner decisions DR-2026-11-20-O (2026-11-20):** implemented and TESTED on `feature/g5-phase2-auth`: two-way manager authorization (invitations and requests) with permission selection, owner-only permission management and manager restrictions; 30-day expiry with history; TR-16 step-up with the account authenticator; OD-05c owner-only identity verification guard; separate religion/denomination/caste/sub-caste/community vocabularies; photo limits; provider adapters (Twilio, SMTP, Expo), in-app notifications and push delivery; ClamAV scanner adapter with explicit outcomes; OpenAPI with zero errors and warnings (KI-40). No paid service or infrastructure activated. Owner review pending; Phase 5 not authorized.
 
+**DR-2026-11-20-P (2026-11-20):** religion optional with "prefer not to say" as the default for new profiles; vocabulary admin parent choices corrected. TESTED; owner review pending.
+
 **Dependency check:**
 - Auth and User are final before 0001 (G4).
 - Audit and outbox exist at G4.

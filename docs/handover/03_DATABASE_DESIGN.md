@@ -2315,3 +2315,8 @@ Editorial record of the Module 02/03 schema (app `profiles`; migrations `profile
 | `profiles.0008` | `ProfilePhoto.scan_status` PENDING/CLEAN/INFECTED/FAILED and `scan_attempts` (backfilled); CHECK `photo_ready_was_scanned_clean` |
 | `notifications.0001` | `InAppNotification` (unique per outbox event), `PushDevice` (unique token), `NotificationDelivery` (one per notification, channel, device; status PENDING/SENT/FAILED) |
 | FKs | All PROTECT; implicit-lock classes in `common/db/fk_inventory.py` |
+
+### 22.23 Religion default (2026-11-20, DR-2026-11-20-P-1)
+
+No schema change and no data migration. Profile creation now also creates the `ProfileBasicInfo` row with `religion_prefer_not_to_say = true`; the column default stays `false`, so existing rows and profiles created earlier keep their stored values.
+
