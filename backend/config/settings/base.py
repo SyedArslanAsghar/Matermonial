@@ -9,7 +9,7 @@ from pathlib import Path
 
 import environ
 
-from common.crypto.keys import dev_keyring
+from common.crypto.keys import PURPOSES, dev_keyring
 from common.logs import build_logging_config
 
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
@@ -45,6 +45,7 @@ INSTALLED_APPS = [
     "apps.admin_access",
     "apps.audit",
     "apps.family",
+    "apps.notifications",
     "apps.platform_ops",
     "apps.profiles",
     "apps.verification",
@@ -159,6 +160,12 @@ SPECTACULAR_SETTINGS = {
     "DESCRIPTION": "Versioned API for the Matermonial platform.",
     "VERSION": "1.0.0",
     "SERVE_INCLUDE_SCHEMA": False,
+    # Distinct names for the different "status" choice sets (KI-40).
+    "ENUM_NAME_OVERRIDES": {
+        "AuthorizationStatusEnum": "apps.family.api.serializers.STATUS_AUTH",
+        "InvitationStatusEnum": "apps.family.api.serializers.STATUS_INV",
+        "SessionStatusEnum": "apps.accounts.models.sessions.AuthSession.Status",
+    },
 }
 
 # --- Security headers and cookies ---
@@ -172,18 +179,60 @@ CSRF_COOKIE_SAMESITE = "Lax"
 CSRF_COOKIE_HTTPONLY = False
 
 # --- Providers (CC-R55, CC-R56; doc 16 §5) ---
-EMAIL_BACKEND = env("EMAIL_BACKEND", default="django.core.mail.backends.console.EmailBackend")
+# --- Notification providers (DR-2026-11-20-O-7; common/providers). Activating a supported
+# provider later needs only these variables; deployed settings refuse mock/console and refuse a
+# real provider whose configuration is missing (common.config). Never commit credentials.
+PROVIDER_TIMEOUT_SECONDS = env.float("PROVIDER_TIMEOUT_SECONDS", default=10.0)
+# Email: mock | console | smtp | disabled (maps to Django's EMAIL_BACKEND).
+EMAIL_BACKENDS = {
+    "mock": "django.core.mail.backends.locmem.EmailBackend",
+    "console": "django.core.mail.backends.console.EmailBackend",
+    "smtp": "django.core.mail.backends.smtp.EmailBackend",
+    "disabled": "common.providers.email.DisabledEmailBackend",
+}
+# An explicit EMAIL_BACKEND (older configuration) implies its provider; otherwise the default
+# is "disabled": nothing silently pretends to send. local/test settings choose console/mock.
+_explicit_backend = env("EMAIL_BACKEND", default="")
+EMAIL_PROVIDER = env(
+    "EMAIL_PROVIDER",
+    default={v: k for k, v in EMAIL_BACKENDS.items()}.get(_explicit_backend, "disabled"),
+)
+EMAIL_BACKEND = _explicit_backend or EMAIL_BACKENDS.get(EMAIL_PROVIDER, "")
+EMAIL_HOST = env("EMAIL_HOST", default="")
+EMAIL_PORT = env.int("EMAIL_PORT", default=587)
+EMAIL_HOST_USER = env("EMAIL_HOST_USER", default="")
+EMAIL_HOST_PASSWORD = env("EMAIL_HOST_PASSWORD", default="")
+EMAIL_USE_TLS = env.bool("EMAIL_USE_TLS", default=True)
+EMAIL_USE_SSL = env.bool("EMAIL_USE_SSL", default=False)
+EMAIL_TIMEOUT = env.int("EMAIL_TIMEOUT", default=10)
+EMAIL_SENDER = env("EMAIL_SENDER", default="")
+DEFAULT_FROM_EMAIL = EMAIL_SENDER or "no-reply@localhost"
+# SMS: mock | console (local only) | twilio | disabled.
 SMS_PROVIDER = env("SMS_PROVIDER", default="disabled")
+SMS_SENDER_ID = env("SMS_SENDER_ID", default="")
+TWILIO_ACCOUNT_SID = env("TWILIO_ACCOUNT_SID", default="")
+TWILIO_AUTH_TOKEN = env("TWILIO_AUTH_TOKEN", default="")
+# Push: mock | console (local only) | expo | disabled.
 PUSH_PROVIDER = env("PUSH_PROVIDER", default="disabled")
-# Upload malware scanner (TR-10): "mock" locally and in tests, "disabled" (uploads refused)
-# until a real scanner is approved.
+EXPO_PUSH_URL = env("EXPO_PUSH_URL", default="https://exp.host/--/api/v2/push/send")
+EXPO_ACCESS_TOKEN = env("EXPO_ACCESS_TOKEN", default="")
+# Bounded delivery retries for push (CC-R54).
+NOTIFICATION_PUSH_MAX_ATTEMPTS = env.int("NOTIFICATION_PUSH_MAX_ATTEMPTS", default=5)
+# Upload malware scanner (TR-10; DR-2026-11-20-O-8): mock (local/test only) | clamav | disabled
+# (uploads refused). Unavailable scanning is never treated as clean.
 MALWARE_SCANNER = env("MALWARE_SCANNER", default="disabled")
+CLAMAV_HOST = env("CLAMAV_HOST", default="")
+CLAMAV_PORT = env.int("CLAMAV_PORT", default=3310)
+CLAMAV_TIMEOUT_SECONDS = env.float("CLAMAV_TIMEOUT_SECONDS", default=10.0)
+# Scan attempts before a quarantined upload is rejected as SCAN_FAILED.
+PHOTO_SCAN_MAX_ATTEMPTS = env.int("PHOTO_SCAN_MAX_ATTEMPTS", default=3)
+PHOTO_SCAN_RETRY_SECONDS = env.int("PHOTO_SCAN_RETRY_SECONDS", default=60)
 
 # --- Encryption, pseudonymisation and registry keys (TR-23, TR-11, TR-24; doc 16 §10) ---
 # Each ring is "<version>:<base64 32-byte key>,..." plus its active version. The defaults are
 # DEV-ONLY keys derived from a public label (common.crypto.keys): fine for local development and
 # tests, never for real data. Staging and production refuse them (common.config).
-for _purpose in ("KEK", "QUEUE", "DEDUPE", "SUBJECT_HASH", "REGISTRY", "OTP", "ROT", "ADMIN_MFA"):
+for _purpose in PURPOSES:
     globals()[f"{_purpose}_KEYS"] = env(f"{_purpose}_KEYS", default=dev_keyring(_purpose))
     globals()[f"{_purpose}_ACTIVE_VERSION"] = env.int(f"{_purpose}_ACTIVE_VERSION", default=1)
 # Compliance registry (TR-24): "local" writes hash-chained JSON files under
@@ -214,6 +263,8 @@ ADMIN_SESSION_ABSOLUTE_SECONDS = env.int("ADMIN_SESSION_ABSOLUTE_SECONDS", defau
 ADMIN_MFA_ENROLLMENT_TTL_SECONDS = env.int("ADMIN_MFA_ENROLLMENT_TTL_SECONDS", default=86400)
 ADMIN_MFA_RECOVERY_TTL_SECONDS = env.int("ADMIN_MFA_RECOVERY_TTL_SECONDS", default=86400)
 ADMIN_MFA_THROTTLE_FACTOR = env.int("ADMIN_MFA_THROTTLE_FACTOR", default=1)  # 1, 2, 4, 8 … s
+# Account authenticator (TR-16): same exponential throttling after failed codes.
+ACCOUNT_MFA_THROTTLE_FACTOR = env.int("ACCOUNT_MFA_THROTTLE_FACTOR", default=1)
 OTP_TOTP_ISSUER = env("OTP_TOTP_ISSUER", default="Matermonial")
 # Authentication rate limits, "<count>/<seconds>" (doc 06 §22.1 §8.4; common/api/throttles.py).
 AUTH_RATE_LIMITS = {
@@ -229,7 +280,18 @@ AUTH_RATE_LIMITS = {
     "admin_enroll_ip": env("RATE_ADMIN_ENROLL_IP", default="10/3600"),
     # Manager invitations per owner account (limits phone-number probing; KI-34).
     "family_invite_account": env("RATE_FAMILY_INVITE_ACCOUNT", default="10/86400"),
+    # Requests to manage a profile, per requesting account (Flow B; same probing limit).
+    "family_request_account": env("RATE_FAMILY_REQUEST_ACCOUNT", default="10/86400"),
+    # Manager step-up attempts (TR-16) and account authenticator confirmation, per account.
+    "step_up_account": env("RATE_STEP_UP_ACCOUNT", default="10/900"),
+    "account_mfa_account": env("RATE_ACCOUNT_MFA_ACCOUNT", default="10/900"),
 }
+# Family management (owner decisions DR-2026-11-20-O-2, -3).
+# Pending invitations and requests expire when not accepted within this many days (fixed rule;
+# the setting exists for tests and is documented as the owner's 30-day decision).
+FAMILY_INVITATION_TTL_DAYS = env.int("FAMILY_INVITATION_TTL_DAYS", default=30)
+# TR-16: validity of a manager's step-up verification for one Sensitive action (maximum 300 s).
+FAMILY_STEP_UP_TTL_SECONDS = min(env.int("FAMILY_STEP_UP_TTL_SECONDS", default=300), 300)
 # Cache: rate limits and flood control. Local/test: in-process; deployed: Redis (validated).
 CACHES = {"default": env.cache("CACHE_URL", default="locmemcache://")}
 # One-time codes (doc 03 §2.5, doc 06 §3; configurable defaults).
@@ -276,8 +338,11 @@ PROFILE_OPTIONAL_FIELDS = [
 ]
 
 # Photo pipeline (TR-10; DR-2026-11-19-P3-1). Defaults are documented assumptions.
-PHOTO_MAX_UPLOAD_BYTES = env.int("PHOTO_MAX_UPLOAD_BYTES", default=10 * 1024 * 1024)
-PHOTO_MAX_PIXELS = env.int("PHOTO_MAX_PIXELS", default=40_000_000)  # decompression-bomb guard
+# Owner-approved MVP limits (DR-2026-11-20-O-6): 5 MB originals, at most 4096 × 4096 px,
+# JPEG/PNG/WebP only (no SVG, no animation), 6 active photos, one primary.
+PHOTO_MAX_UPLOAD_BYTES = env.int("PHOTO_MAX_UPLOAD_BYTES", default=5 * 1024 * 1024)
+PHOTO_MAX_DIMENSION = env.int("PHOTO_MAX_DIMENSION", default=4096)  # width and height, pixels
+PHOTO_MAX_PIXELS = env.int("PHOTO_MAX_PIXELS", default=4096 * 4096)  # decompression-bomb guard
 PHOTO_MAX_EDGE = env.int("PHOTO_MAX_EDGE", default=2048)  # stored long edge, pixels
 PHOTO_MIN_EDGE = env.int("PHOTO_MIN_EDGE", default=200)
 PHOTO_MAX_PER_PROFILE = env.int("PHOTO_MAX_PER_PROFILE", default=6)

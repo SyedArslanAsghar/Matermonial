@@ -163,6 +163,9 @@ def _load_settings_in_subprocess(module: str, extra_env: dict) -> subprocess.Com
         "DJANGO_SECRET_KEY": "k" * 64,
         "DJANGO_ALLOWED_HOSTS": "api.example.test",
         "EMAIL_BACKEND": "django.core.mail.backends.smtp.EmailBackend",
+        # A selected real provider must be configured (DR-2026-11-20-O-7).
+        "EMAIL_HOST": "smtp.example.test",
+        "EMAIL_SENDER": "no-reply@example.test",
         "DATABASE_URL": f"postgresql://app:{SECRET_LOOKING_PASSWORD}@db.example.test:5432/app",
         "COMPLIANCE_REGISTRY_BACKEND": "external",
         "CACHE_URL": "redis://cache.example.test:6379/1",

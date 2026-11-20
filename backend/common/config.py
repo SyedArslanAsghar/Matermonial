@@ -70,9 +70,10 @@ def deployed_settings_errors(settings: Mapping, environ: Mapping) -> list[str]:
             "CELERY_BROKER_URL or REDIS_URL must be set explicitly "
             "(no default message broker in deployment)."
         )
-    for name in ("SMS_PROVIDER", "PUSH_PROVIDER", "MALWARE_SCANNER"):
+    for name in ("SMS_PROVIDER", "PUSH_PROVIDER", "MALWARE_SCANNER", "EMAIL_PROVIDER"):
         if settings.get(name) in NON_PRODUCTION_PROVIDERS:
             errors.append(f"{name} must not be a mock provider in a deployed environment.")
+    errors.extend(provider_configuration_errors(settings))
     if settings.get("EMAIL_BACKEND") in NON_PRODUCTION_EMAIL_BACKENDS:
         errors.append("EMAIL_BACKEND must not be a console/local/test backend when deployed.")
     if settings.get("STORAGE_BACKEND") not in SUPPORTED_STORAGE_BACKENDS:
@@ -92,6 +93,31 @@ def deployed_settings_errors(settings: Mapping, environ: Mapping) -> list[str]:
             "COMPLIANCE_REGISTRY_BACKEND must be the approved external registry when deployed "
             "(TR-24; the storage resource needs owner approval before production)."
         )
+    return errors
+
+
+# Variables each real provider needs (DR-2026-11-20-O-7, -8). Names only, never values.
+PROVIDER_REQUIREMENTS = {
+    ("SMS_PROVIDER", "twilio"): ("TWILIO_ACCOUNT_SID", "TWILIO_AUTH_TOKEN", "SMS_SENDER_ID"),
+    ("EMAIL_PROVIDER", "smtp"): ("EMAIL_HOST", "EMAIL_SENDER"),
+    ("PUSH_PROVIDER", "expo"): ("EXPO_PUSH_URL",),
+    ("MALWARE_SCANNER", "clamav"): ("CLAMAV_HOST",),
+}
+
+
+def provider_configuration_errors(settings: Mapping) -> list[str]:
+    """A selected real provider must be fully configured: no silent fallback to mock,
+    console or a half-configured adapter."""
+    errors = []
+    for (name, choice), required in PROVIDER_REQUIREMENTS.items():
+        if settings.get(name) == choice:
+            for variable in required:
+                if not settings.get(variable):
+                    errors.append(f"{variable} must be set when {name}={choice}.")
+    if settings.get("PUSH_PROVIDER") == "expo" and not str(
+        settings.get("EXPO_PUSH_URL", "")
+    ).startswith("https://"):
+        errors.append("EXPO_PUSH_URL must use https.")
     return errors
 
 

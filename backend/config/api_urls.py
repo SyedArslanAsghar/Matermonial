@@ -10,4 +10,5 @@ urlpatterns = [
     path("auth/", include("apps.accounts.api.urls")),
     path("profiles/", include("apps.profiles.api.urls")),
     path("family-management/", include("apps.family.api.urls")),
+    path("notifications/", include("apps.notifications.api.urls")),
 ]

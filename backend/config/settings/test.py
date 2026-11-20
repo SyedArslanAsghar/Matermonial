@@ -29,6 +29,7 @@ PASSWORD_HASHERS = ["django.contrib.auth.hashers.MD5PasswordHasher"]
 
 API_DOCS_ENABLED = True
 LOCK_TRACKER_ENABLED = True
+EMAIL_PROVIDER = "mock"
 EMAIL_BACKEND = "django.core.mail.backends.locmem.EmailBackend"
 SMS_PROVIDER = "mock"
 PUSH_PROVIDER = "mock"
