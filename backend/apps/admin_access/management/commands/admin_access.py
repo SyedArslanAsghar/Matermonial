@@ -9,9 +9,9 @@ privileged, so these run as the CLI operator (audit ``channel=cli``, actor SYSTE
     manage.py admin_access issue-mfa-enrollment --phone +92...      (first enrollment only)
     manage.py admin_access emergency-mfa-recovery --phone +92... --emergency --reason CODE
 
-First-enrollment codes are printed once to this terminal and never logged. Emergency recovery
-(ADR-033 Amendment 1, A1-4) never prints the replacement code: it goes only by SMS to the
-account holder; the account holder and every superuser are notified.
+No enrollment code is ever printed. First-enrollment codes (KI-39) and emergency-recovery codes
+(ADR-033 Amendment 1, A1-4) go only by SMS to the account holder's verified phone. For emergency
+recovery, the account holder and every superuser are also notified.
 """
 
 from datetime import timedelta
@@ -81,9 +81,12 @@ class Command(BaseCommand):
                 )
                 operation(roles.CLI, user, reason_code=opts["reason"])
             elif action == "issue-mfa-enrollment":
-                self.stdout.write(
-                    f"Enrollment code (single use): {mfa.issue_enrollment(roles.CLI, user)}"
-                )
+                if not mfa.issue_enrollment(roles.CLI, user):
+                    raise CommandError(
+                        "SMS delivery failed: the enrollment code was revoked and not revealed. "
+                        "Retry when SMS works."
+                    )
+                self.stdout.write("The enrollment code was sent by SMS to the account holder.")
             elif action == "emergency-mfa-recovery":
                 if not opts["emergency"]:
                     raise CommandError("Emergency recovery needs --emergency (break-glass only).")

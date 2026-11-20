@@ -41,7 +41,7 @@ from common.events.services import emit
 from ..catalogue import APPROVE_ADMIN_MFA_RECOVERY, RESET_ADMIN_MFA
 from ..models import AdminActionApproval, AdminMfaEnrollment, AdminTotpDevice
 from ..selectors import has_admin_access
-from .mfa import new_enrollment_code
+from .mfa import new_enrollment_code, send_enrollment_code
 from .roles import (
     CLI,
     Actor,
@@ -340,33 +340,15 @@ def emergency_recovery(target: User, reason_code: str) -> bool:
 def deliver_code(enrollment_id, code: str, approval_id: str | None) -> str:
     """Send the replacement code by SMS. On any failure, revoke it and record the outcome; the
     code is never logged, stored in plaintext or shown to anyone else."""
-    from common.providers import get_sms_provider
-
-    enrollment = (
-        AdminMfaEnrollment.objects.select_related("user")
-        .filter(pk=enrollment_id, used_at__isnull=True, revoked_at__isnull=True)
-        .first()
-    )
+    enrollment, delivered = send_enrollment_code(enrollment_id, code)
     if enrollment is None:
         return "skipped"
-    try:
-        get_sms_provider().send_sms(
-            to=enrollment.user.phone_number,
-            message=f"Matermonial admin authenticator enrollment code: {code}. "
-            "Never share it. If you didn't expect this, contact security.",
-        )
-        delivered = True
-    except Exception:  # noqa: BLE001 - every failure must fail safe, never reveal the code
-        delivered = False
     with transaction.atomic():
         if approval_id:
             AdminActionApproval.objects.filter(pk=approval_id).update(
                 outcome="DELIVERED" if delivered else "DELIVERY_FAILED"
             )
-        if not delivered:
-            AdminMfaEnrollment.objects.filter(pk=enrollment.pk, used_at__isnull=True).update(
-                revoked_at=timezone.now()
-            )
+        if not delivered:  # the code is already revoked
             _event("ADMIN_MFA_RECOVERY_DECIDED", enrollment.user, CLI, "DELIVERY_FAILED")
             audit(
                 CLI,

@@ -8,7 +8,7 @@ from datetime import timedelta
 import pytest
 from django.conf import settings
 from django.db import connection
-from django.test import Client
+from django.test import Client, TestCase
 from django.utils import timezone
 from django_otp.oath import TOTP
 from rest_framework.test import APIClient
@@ -27,14 +27,26 @@ from apps.admin_access.services.roles import (
 )
 from apps.admin_access.services.superusers import grant_superuser
 from common.crypto.aead import DecryptionError
+from common.providers import MockSMSProvider
 
 PASSWORD = "Correct-Horse-Battery-9"
 LOGIN, INDEX, ENROLL = "/admin/login/", "/admin/", "/admin/mfa/enroll/"
 pytestmark = pytest.mark.django_db
 
 
-def make_user(n: int) -> User:
-    return User.objects.create_user(phone_number=f"+92300400{n:04d}", password=PASSWORD)
+def make_user(n: int, verified: bool = True) -> User:
+    user = User.objects.create_user(phone_number=f"+92300400{n:04d}", password=PASSWORD)
+    User.objects.filter(pk=user.pk).update(is_phone_verified=verified)
+    return User.objects.get(pk=user.pk)
+
+
+def issue_code(user: User, actor=CLI) -> str:
+    """Issue a first-enrollment code and read it from the account holder's (mock) SMS: the
+    only place it ever appears (KI-39)."""
+    with TestCase.captureOnCommitCallbacks(execute=True):
+        assert mfa.issue_enrollment(actor, user) is True
+    messages = [m for m in MockSMSProvider.sent if m["to"] == user.phone_number]
+    return messages[-1]["message"].split("code: ")[1].split(".")[0]
 
 
 def code_for(device: AdminTotpDevice, steps_ahead: int = 0) -> str:
@@ -45,11 +57,12 @@ def code_for(device: AdminTotpDevice, steps_ahead: int = 0) -> str:
 
 
 def enroll(user: User) -> AdminTotpDevice:
-    code = mfa.issue_enrollment(CLI, user)
+    code = issue_code(user)
     pending = mfa.begin_enrollment(user, code)
     assert mfa.confirm_enrollment(
         user, pending.device.pk, pending.enrollment_id, code_for(pending.device)
     )
+    MockSMSProvider.sent.clear()  # setup only: tests count the messages they cause
     return AdminTotpDevice.objects.get(user=user)
 
 
@@ -104,7 +117,7 @@ class TestEnrollment:
         assert events("ADMIN_MFA_ENROLLED").count() == 1
 
     def test_enrollment_code_is_hashed_single_use_and_expires(self, admin):
-        code = mfa.issue_enrollment(CLI, admin)
+        code = issue_code(admin)
         row = AdminMfaEnrollment.objects.get(user=admin)
         assert code.replace("-", "") not in row.code_hash and re.fullmatch(
             r"[0-9a-f]{64}", row.code_hash
@@ -117,7 +130,7 @@ class TestEnrollment:
             mfa.begin_enrollment(admin, code)
         other = make_user(3)
         assign_role(CLI, other, "system_admin")
-        code = mfa.issue_enrollment(CLI, other)
+        code = issue_code(other)
         AdminMfaEnrollment.objects.filter(user=other).update(
             created_at=timezone.now() - timedelta(days=2),
             expires_at=timezone.now() - timedelta(days=1),
@@ -126,7 +139,7 @@ class TestEnrollment:
             mfa.begin_enrollment(other, code)
 
     def test_wrong_confirmation_code_leaves_the_device_unconfirmed(self, admin):
-        code = mfa.issue_enrollment(CLI, admin)
+        code = issue_code(admin)
         pending = mfa.begin_enrollment(admin, code)
         assert not mfa.confirm_enrollment(admin, pending.device.pk, pending.enrollment_id, "000000")
         assert not AdminTotpDevice.objects.get(user=admin).confirmed
@@ -141,7 +154,7 @@ class TestEnrollment:
             mfa.issue_enrollment(Actor(user=make_user(5)), admin)  # no reset permission
 
     def test_enrollment_through_the_admin_pages(self, admin):
-        code = mfa.issue_enrollment(CLI, admin)
+        code = issue_code(admin)
         client = Client()
         page = client.post(
             ENROLL,
@@ -162,13 +175,120 @@ class TestEnrollment:
         assert AdminTotpDevice.objects.get(user=admin).confirmed
 
     def test_enrollment_page_rejects_a_wrong_password(self, admin):
-        code = mfa.issue_enrollment(CLI, admin)
+        code = issue_code(admin)
         page = Client().post(
             ENROLL,
             {"phone_number": admin.phone_number, "password": "wrong", "enrollment_code": code},
         )
         assert "secret" not in page.context
         assert not AdminTotpDevice.objects.filter(user=admin).exists()
+
+
+class TestFirstEnrollmentDelivery:
+    """KI-39: the first enrollment code goes only by SMS to the account holder."""
+
+    def test_code_goes_only_to_the_account_holders_phone(self, admin):
+        issuer = make_user(6)
+        assign_role(CLI, issuer, "system_admin")
+        issuer = User.objects.get(pk=issuer.pk)
+        with TestCase.captureOnCommitCallbacks(execute=True):
+            result = mfa.issue_enrollment(Actor(user=issuer), admin)
+        assert result is True  # a status, never the code
+        [sms] = MockSMSProvider.sent
+        assert sms["to"] == admin.phone_number
+        code = sms["message"].split("code: ")[1].split(".")[0]
+        assert mfa.begin_enrollment(admin, code).device is not None
+        from apps.audit.models import AuditLog
+
+        delivery = AuditLog.objects.get(action="admin.mfa_enrollment_delivery")
+        assert delivery.result == "SUCCESS"
+        from common.events.models import OutboxEvent
+
+        notice = OutboxEvent.objects.get(event_type="security.admin_mfa_enrollment")
+        for blob in (
+            str(list(AuditLog.objects.values_list("safe_metadata", flat=True))),
+            str(notice.__dict__),
+        ):
+            assert code not in blob and code.replace("-", "") not in blob
+
+    def test_failed_delivery_revokes_the_code_and_reveals_nothing(self, admin, settings, caplog):
+        import logging
+
+        caplog.set_level(logging.DEBUG)
+        settings.SMS_PROVIDER = "disabled"
+        with TestCase.captureOnCommitCallbacks(execute=True):
+            mfa.issue_enrollment(CLI, admin)
+        assert MockSMSProvider.sent == []
+        assert not AdminMfaEnrollment.objects.filter(
+            user=admin, used_at__isnull=True, revoked_at__isnull=True
+        ).exists()
+        from apps.audit.models import AuditLog
+
+        assert AuditLog.objects.get(action="admin.mfa_enrollment_delivery").result == "FAILURE"
+        assert "enrollment code:" not in caplog.text
+        # Recovery path: issuing again (audited) once SMS works.
+        settings.SMS_PROVIDER = "mock"
+        code = issue_code(admin)
+        assert mfa.begin_enrollment(admin, code) is not None
+        assert AuditLog.objects.filter(action="admin.mfa_enrollment_issue").count() == 2
+
+    def test_unverified_phone_is_refused_before_any_code_exists(self):
+        sync_catalogue(CLI)
+        user = make_user(7, verified=False)
+        assign_role(CLI, user, "system_admin")
+        with pytest.raises(InvalidTarget):
+            mfa.issue_enrollment(CLI, user)
+        assert not AdminMfaEnrollment.objects.filter(user=user).exists()
+        assert MockSMSProvider.sent == []
+
+    def test_admin_action_shows_only_the_outcome(self, enrolled):
+        issuer, device = enrolled
+        target = make_user(8)
+        assign_role(CLI, target, "system_admin")
+        client = Client()
+        assert admin_login(client, issuer, device).status_code == 302
+        with TestCase.captureOnCommitCallbacks(execute=True):
+            response = client.post(
+                "/admin/accounts/user/",
+                {"action": "issue_mfa_enrollment", "_selected_action": [str(target.pk)]},
+                follow=True,
+            )
+        assert response.status_code == 200
+        [sms] = [m for m in MockSMSProvider.sent if m["to"] == target.phone_number]
+        code = sms["message"].split("code: ")[1].split(".")[0]
+        page = response.content.decode()
+        assert code not in page and code.replace("-", "") not in page
+        assert "sent by SMS" in page
+
+    def test_cli_never_prints_the_code(self, admin):
+        from io import StringIO
+
+        from django.core.management import call_command
+
+        out = StringIO()
+        with TestCase.captureOnCommitCallbacks(execute=True):
+            call_command(
+                "admin_access", "issue-mfa-enrollment", phone=admin.phone_number, stdout=out
+            )
+        [sms] = MockSMSProvider.sent
+        code = sms["message"].split("code: ")[1].split(".")[0]
+        assert code not in out.getvalue() and "sent by SMS" in out.getvalue()
+
+    def test_console_sms_is_local_only(self, settings):
+        from django.core.exceptions import ImproperlyConfigured
+
+        from common.providers import ConsoleSMSProvider, get_sms_provider
+
+        settings.SMS_PROVIDER = "console"
+        settings.ENVIRONMENT = "local"
+        assert isinstance(get_sms_provider(), ConsoleSMSProvider)
+        for environment in ("test", "staging", "production"):
+            settings.ENVIRONMENT = environment
+            with pytest.raises(ImproperlyConfigured):
+                get_sms_provider()
+        from common.config import NON_PRODUCTION_PROVIDERS
+
+        assert "console" in NON_PRODUCTION_PROVIDERS
 
 
 def mfa_pending_key():
@@ -379,6 +499,7 @@ def test_concurrent_logins_with_one_code_succeed_once():
 
     sync_catalogue(CLI)
     user = User.objects.create_user(phone_number="+923004009999", password=PASSWORD)
+    User.objects.filter(pk=user.pk).update(is_phone_verified=True)
     assign_role(CLI, user, "system_admin")
     device = enroll(User.objects.get(pk=user.pk))
     code = code_for(device, 1)

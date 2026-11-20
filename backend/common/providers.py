@@ -3,6 +3,10 @@
 
 - ``mock``: records messages in memory for local development and tests. It never logs the
   message body (an SMS can carry an OTP; CC-R47).
+- ``console`` (SMS only, ``ENVIRONMENT=local`` only): writes each SMS to this process's standard
+  output, standing in for the handset so a developer can read OTPs and admin enrollment codes
+  (which are delivered only by SMS, KI-39). It never goes through ``logging``. Any other
+  environment refuses it at selection, and deployed settings refuse it at startup.
 - ``disabled``: refuses to send. This is the default outside local and test, so a feature
   flag or missing provider never silently pretends to deliver.
 
@@ -54,6 +58,19 @@ class MockSMSProvider:
         return DispatchResult(provider=self.name, reference=reference)
 
 
+class ConsoleSMSProvider:
+    name = "console"
+
+    def send_sms(self, *, to: str, message: str) -> DispatchResult:
+        import sys
+
+        reference = uuid.uuid4().hex
+        # Deliberately stdout, not logging: this is the simulated handset (local only).
+        sys.stdout.write(f"[local console SMS to {to}] {message}\n")
+        sys.stdout.flush()
+        return DispatchResult(provider=self.name, reference=reference)
+
+
 class MockPushProvider:
     name = "mock"
     sent: list[dict] = []
@@ -90,6 +107,12 @@ def _select(setting_name: str, channel: str, mock_cls):
 
 
 def get_sms_provider() -> SMSProvider:
+    if getattr(settings, "SMS_PROVIDER", None) == "console":
+        if getattr(settings, "ENVIRONMENT", None) != "local":
+            raise ImproperlyConfigured(
+                "SMS_PROVIDER 'console' is allowed only in local development."
+            )
+        return ConsoleSMSProvider()
     return _select("SMS_PROVIDER", "SMS", MockSMSProvider)
 
 

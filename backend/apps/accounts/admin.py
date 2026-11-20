@@ -69,33 +69,32 @@ class UserAdmin(BaseUserAdmin):
             actions.pop("request_mfa_recovery", None)
         return actions
 
-    def _mfa_action(self, request, queryset, operation, title):
+    @admin.action(description="Send a first MFA enrollment code by SMS")
+    def issue_mfa_enrollment(self, request, queryset):
+        """KI-39: the code goes only to each account holder's verified phone; the issuing
+        administrator sees the outcome, never the code."""
+        from apps.admin_access.services.mfa import issue_enrollment
         from apps.admin_access.services.roles import Actor, AdminAccessError
 
         actor = Actor(user=request.user, request_id=getattr(request, "request_id", None))
-        results, errors = [], []
         for user in queryset:
             try:
-                code = operation(actor, user)
+                delivered = issue_enrollment(actor, user)
             except AdminAccessError as exc:
-                errors.append(f"{user}: {exc or exc.code}")
+                self.message_user(request, f"{user}: {exc or exc.code}", messages.ERROR)
                 continue
-            results.append((user, code))
-        for error in errors:
-            self.message_user(request, error, messages.ERROR)
-        if not results:
-            return None
-        # Codes are rendered once in this response, never stored in messages or logs.
-        context = {**self.admin_site.each_context(request), "title": title, "results": results}
-        response = TemplateResponse(request, "admin_access/enrollment_codes.html", context)
-        response["Cache-Control"] = "no-store"
-        return response
-
-    @admin.action(description="Issue a first MFA enrollment code")
-    def issue_mfa_enrollment(self, request, queryset):
-        from apps.admin_access.services.mfa import issue_enrollment
-
-        return self._mfa_action(request, queryset, issue_enrollment, "MFA enrollment codes")
+            if delivered:
+                self.message_user(
+                    request, f"{user}: enrollment code sent by SMS to the account holder."
+                )
+            else:
+                self.message_user(
+                    request,
+                    f"{user}: SMS delivery failed; the code was revoked and not revealed. "
+                    "Try again when SMS works.",
+                    messages.ERROR,
+                )
+        return None
 
     @admin.action(description="Request MFA recovery (a second administrator must approve)")
     def request_mfa_recovery(self, request, queryset):

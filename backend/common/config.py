@@ -14,7 +14,7 @@ from common.crypto.keys import PURPOSES, KeyConfigurationError, KeyRing, parse_k
 
 INSECURE_DEFAULT_SECRET_KEY = "unsafe-local-only-key-change-me"
 MIN_SECRET_KEY_LENGTH = 50
-NON_PRODUCTION_PROVIDERS = {"mock"}
+NON_PRODUCTION_PROVIDERS = {"mock", "console"}
 NON_PRODUCTION_EMAIL_BACKENDS = {
     "django.core.mail.backends.console.EmailBackend",
     "django.core.mail.backends.locmem.EmailBackend",

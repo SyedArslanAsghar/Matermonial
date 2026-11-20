@@ -5,9 +5,12 @@ Design (documented in docs/decisions/ADR-033-admin-mfa.md):
   (``OTPMiddleware`` + ``is_verified()``), for superusers too. There is no "skip".
 - **Seed at rest:** AES-256-GCM with the ADMIN_MFA key ring; the associated data binds the
   ciphertext to the account, so a seed copied to another row doesn't decrypt.
-- **Enrollment** needs the password and a single-use enrollment code (24 h by default) issued out
-  of band by an administrator holding ``admin_access.reset_admin_mfa`` or by the CLI operator.
-  The code is stored only as an HMAC. The seed is shown once, to the enrolling account only, and
+- **Enrollment** needs the password and a single-use enrollment code (24 h by default). An
+  administrator holding ``admin_access.reset_admin_mfa`` or the CLI operator *issues* it, but the
+  code goes **only by SMS** to the account holder's verified phone (KI-39, following the approved
+  A1-2 direction); no administrator or operator ever sees it. It is stored only as an HMAC. If
+  delivery fails, the code is revoked, the failure is audited and the account holder notified,
+  and issuing again is the (audited) recovery path. The seed is shown once, to the enrolling account only, and
   the device is confirmed by a valid TOTP code.
 - **Verification:** the device row is locked, the token must be exactly ``digits`` digits, a
   time step is accepted at most once (replay), django-otp's exponential throttling applies, and
@@ -184,11 +187,76 @@ def has_enrolled_before(user: User) -> bool:
     return AdminMfaEnrollment.objects.filter(user=user, used_at__isnull=False).exists()
 
 
-def issue_enrollment(actor: Actor, target: User) -> str:
-    """**First** enrollment only: a single-use code for an administrator who has never enrolled
-    (returned once, never stored). Anyone who has enrolled before recovers only through the
-    two-person recovery or the emergency procedure (ADR-033 Amendment 1), whose replacement code
-    goes by SMS and is never shown to an administrator."""
+def send_enrollment_code(enrollment_id, code: str) -> tuple[AdminMfaEnrollment | None, bool]:
+    """SMS an enrollment code to its account holder's verified phone (first enrollment and
+    recovery). Any failure revokes the code. The code is never logged, stored in plaintext,
+    returned to a caller or shown to anyone else. Returns (enrollment, delivered)."""
+    from common.providers import get_sms_provider
+
+    enrollment = (
+        AdminMfaEnrollment.objects.select_related("user")
+        .filter(pk=enrollment_id, used_at__isnull=True, revoked_at__isnull=True)
+        .first()
+    )
+    if enrollment is None:
+        return None, False
+    try:
+        if not enrollment.user.is_phone_verified:
+            raise ValueError("unverified phone")
+        get_sms_provider().send_sms(
+            to=enrollment.user.phone_number,
+            message=f"Matermonial admin authenticator enrollment code: {code}. "
+            "Never share it. If you didn't expect this, contact security.",
+        )
+        delivered = True
+    except Exception:  # noqa: BLE001 - every failure must fail safe, never reveal the code
+        delivered = False
+    if not delivered:
+        AdminMfaEnrollment.objects.filter(pk=enrollment.pk, used_at__isnull=True).update(
+            revoked_at=timezone.now()
+        )
+    return enrollment, delivered
+
+
+def _notify_enrollment(user_id, stage: str, reference) -> None:
+    from apps.accounts.services.pseudonyms import pseudonym_for
+    from common.events.services import emit
+
+    emit(
+        "security.admin_mfa_enrollment",
+        event_class="NOTIFICATION",
+        category="SECURITY",
+        aggregate_type="AdminMfaEnrollment",
+        recipient_pseudonym=pseudonym_for("ACCOUNT", user_id),
+        payload={"stage": stage, "reference": str(reference)},
+        dedupe_identity=f"admin-mfa-enrollment:{reference}:{stage}",
+    )
+
+
+def _deliver_first_enrollment(enrollment_id, code: str, actor: Actor) -> None:
+    enrollment, delivered = send_enrollment_code(enrollment_id, code)
+    if enrollment is None:
+        return
+    with transaction.atomic():
+        audit(
+            actor,
+            "admin.mfa_enrollment_delivery",
+            "SUCCESS" if delivered else "FAILURE",
+            target_id=enrollment.user_id,
+            resource=RESOURCE,
+        )
+        _notify_enrollment(
+            enrollment.user_id, "SENT" if delivered else "DELIVERY_FAILED", enrollment.pk
+        )
+
+
+def issue_enrollment(actor: Actor, target: User) -> bool:
+    """**First** enrollment only, for an administrator who has never enrolled. The single-use
+    code is sent only by SMS to the account holder's verified phone after commit (KI-39): it is
+    never returned, shown, logged or audited. Returns whether the SMS provider accepted it; on
+    failure the code is already revoked and issuing again is the recovery path. Anyone who has
+    enrolled before recovers only through the two-person recovery or the emergency procedure
+    (ADR-033 Amendment 1)."""
     try:
         require_permission(actor, RESET_ADMIN_MFA)
         if actor.user is not None and actor.user.pk == target.pk:
@@ -213,6 +281,10 @@ def issue_enrollment(actor: Actor, target: User) -> str:
         user = _lock_target(target.pk)
         if not has_admin_access(user):
             raise InvalidTarget("Only accounts with administrative access can enroll MFA.")
+        if not user.is_phone_verified:
+            raise InvalidTarget(
+                "The enrollment code goes by SMS: the account needs a verified phone number."
+            )
         if AdminTotpDevice.objects.filter(user=user, confirmed=True).exists():
             raise AlreadyEnrolled("This account already has an authenticator.")
         if has_enrolled_before(user):
@@ -226,9 +298,15 @@ def issue_enrollment(actor: Actor, target: User) -> str:
         for row in open_codes:
             row.revoked_at = now
             row.save(update_fields=["revoked_at"])
-        _, code = new_enrollment_code(user, issued_by=actor.user, now=now)
+        enrollment, code = new_enrollment_code(user, issued_by=actor.user, now=now)
         audit(actor, "admin.mfa_enrollment_issue", "SUCCESS", target_id=user.pk, resource=RESOURCE)
-    return code
+        # Sent directly after commit, not through Celery, so the code never sits in a message
+        # broker (same rule as recovery, A1-2).
+        enrollment_id = enrollment.pk
+        transaction.on_commit(lambda: _deliver_first_enrollment(enrollment_id, code, actor))
+    return AdminMfaEnrollment.objects.filter(
+        pk=enrollment_id, used_at__isnull=True, revoked_at__isnull=True
+    ).exists()
 
 
 def _open_enrollment(user: User, code: str) -> AdminMfaEnrollment | None:
