@@ -594,6 +594,22 @@ No speculative infrastructure tasks are added.
 
 ---
 
+## Acceptance record DR-2026-11-20-PA: owner acceptance of DR-2026-11-20-P items
+
+- **Record ID:** DR-2026-11-20-PA
+- **Date:** 2026-11-20
+- **Accepted by:** Project owner (explicit, item by item). Implementation status ACCEPTED is set by the owner only (CC-R70); this record documents the owner's acceptance.
+
+| # | ID | Item | Evidence | Status |
+|---|---|---|---|---|
+| 1 | DR-2026-11-20-PA-1 | **DR-2026-11-20-P-1** religion optional; new profiles default to "Prefer not to say"; all five fields (religion, denomination, caste, sub-caste, community) optional; existing profiles unchanged | Commit `c7fe7e5`; `test_religion_optional.py`; 621/621 tests on Python 3.12 and 3.13 × PostgreSQL 16 and 18 | **ACCEPTED** |
+| 2 | DR-2026-11-20-PA-2 | **DR-2026-11-20-P-2** vocabulary admin parent choices: denomination → religion, sub-caste → caste; database validation still enforced | Commit `c7fe7e5`; `test_vocabulary_admin.py` | **ACCEPTED** |
+| 3 | DR-2026-11-20-PA-3 | **DR-2026-11-20-P-3** keep the existing vocabulary values without modification | No vocabulary change in `c7fe7e5` | **ACCEPTED** |
+
+**Not accepted by this record:** the vocabulary recommendations (KI-44, `docs/implementation/vocabulary_review_recommendations.md`) stay open for separate owner review. No other phase, task or requirement is accepted by this record. Nothing has been pushed.
+
+---
+
 ## OD-01 approved functional-domain catalogue
 
 **Source key:**

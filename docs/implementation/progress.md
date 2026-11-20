@@ -1,6 +1,6 @@
 # Progress
 
-**Last updated:** 2026-11-20 (DR-2026-11-20-P: religion optional, admin parent choices)
+**Last updated:** 2026-11-20 (DR-2026-11-20-P items accepted by the owner: DR-2026-11-20-PA)
 
 ## Governance status
 
@@ -528,5 +528,5 @@ Implementation status: **TESTED.** REVIEWED and ACCEPTED are set by the reviewer
 | P-2 admin defect | The parent dropdown offered religion values for every list. Now: denomination → religion (required), sub-caste → caste (optional), other lists → none; the add page narrows with `?vocabulary=`; a form check rejects mismatches before the unchanged database trigger; parent stays read-only after creation | `test_vocabulary_admin.py` (12, including a signed-in admin page) |
 | P-3 vocabularies | Values unchanged; recommendations documented for review only | `docs/implementation/vocabulary_review_recommendations.md` |
 
-Implementation status: **TESTED.** Owner review pending.
+Implementation status: **ACCEPTED by the project owner**, item by item, on 2026-11-20 (DR-2026-11-20-PA-1, -2, -3), commit `c7fe7e5`. The vocabulary recommendations (KI-44) stay open. Acceptance covers these three items only.
 
