@@ -8,6 +8,7 @@ from django.core.exceptions import ValidationError as DjangoValidationError
 from django.middleware.csrf import get_token
 from django.utils.decorators import method_decorator
 from django.views.decorators.csrf import ensure_csrf_cookie
+from drf_spectacular.utils import OpenApiResponse, PolymorphicProxySerializer, extend_schema
 from rest_framework import status
 from rest_framework.authentication import SessionAuthentication
 from rest_framework.exceptions import ValidationError
@@ -23,6 +24,7 @@ from apps.accounts.services.refresh import refresh as refresh_tokens
 from apps.verification.services.otp import send_code, verify_code
 from common.api.auth_errors import AmbiguousCredentials, InvalidCode, InvalidPassword
 from common.api.pagination import StandardPagination
+from common.api.schema import PAGE_PARAMETERS, DetailSerializer
 from common.api.throttles import (
     LoginIpThrottle,
     LoginPhoneIpThrottle,
@@ -32,6 +34,7 @@ from common.api.throttles import (
     RegisterIpThrottle,
 )
 
+from . import schema_serializers as docs
 from .serializers import (
     AccountSerializer,
     LoginSerializer,
@@ -64,6 +67,7 @@ class CsrfView(APIView):
     permission_classes = [AllowAny]
     authentication_classes = []
 
+    @extend_schema(tags=["auth"], responses=docs.CsrfResponse)
     def get(self, request):
         return Response({"csrf_token": get_token(request)})
 
@@ -73,6 +77,7 @@ class RegisterView(APIView):
     authentication_classes = []
     throttle_classes = [RegisterIpThrottle]
 
+    @extend_schema(tags=["auth"], request=RegisterSerializer, responses={202: DetailSerializer})
     def post(self, request):
         data = RegisterSerializer(data=request.data)
         data.is_valid(raise_exception=True)
@@ -90,6 +95,7 @@ class OtpSendView(APIView):
     authentication_classes = []
     throttle_classes = [OtpIpThrottle]
 
+    @extend_schema(tags=["auth"], request=PhoneSerializer, responses={202: DetailSerializer})
     def post(self, request):
         data = PhoneSerializer(data=request.data)
         data.is_valid(raise_exception=True)
@@ -104,6 +110,7 @@ class OtpVerifyView(APIView):
     authentication_classes = []
     throttle_classes = [OtpIpThrottle]
 
+    @extend_schema(tags=["auth"], request=OtpVerifySerializer, responses=docs.PhoneVerifiedResponse)
     def post(self, request):
         data = OtpVerifySerializer(data=request.data)
         data.is_valid(raise_exception=True)
@@ -126,6 +133,16 @@ class LoginView(APIView):
     authentication_classes = []
     throttle_classes = [LoginPhoneIpThrottle, LoginIpThrottle]
 
+    @extend_schema(
+        tags=["auth"],
+        request=LoginSerializer,
+        responses=PolymorphicProxySerializer(
+            component_name="LoginResponse",
+            serializers=[docs.WebLoginResponse, docs.MobileLoginResponse],
+            resource_type_field_name=None,
+        ),
+        description="client=web sets the session cookie; client=mobile returns tokens.",
+    )
     def post(self, request):
         if request.META.get("HTTP_AUTHORIZATION"):
             raise AmbiguousCredentials()
@@ -170,6 +187,9 @@ class LoginView(APIView):
 class LogoutView(APIView):
     permission_classes = [IsAuthenticated]
 
+    @extend_schema(
+        tags=["auth"], request=None, responses={204: OpenApiResponse(description="Logged out")}
+    )
     def post(self, request):
         auth_service.logout(request._request, request.auth, request_id(request))
         return Response(status=status.HTTP_204_NO_CONTENT)
@@ -178,6 +198,7 @@ class LogoutView(APIView):
 class MeView(APIView):
     permission_classes = [IsAuthenticated]
 
+    @extend_schema(tags=["auth"], responses=AccountSerializer)
     def get(self, request):
         return Response(AccountSerializer(request.user).data)
 
@@ -197,6 +218,7 @@ class RefreshView(APIView):
     authentication_classes = []
     throttle_classes = [RefreshSessionThrottle]
 
+    @extend_schema(tags=["auth"], request=docs.RefreshRequest, responses=docs.RefreshResponse)
     def post(self, request):
         token = request.data.get("refresh_token")
         if not isinstance(token, str):
@@ -215,6 +237,7 @@ class RefreshView(APIView):
 class SessionListView(APIView):
     permission_classes = [IsAuthenticated]
 
+    @extend_schema(tags=["auth"], parameters=PAGE_PARAMETERS, responses=docs.SessionPage)
     def get(self, request):
         sessions = AuthSession.objects.filter(user=request.user).order_by("-created_at", "-id")
         paginator = StandardPagination()
@@ -226,6 +249,7 @@ class SessionListView(APIView):
 class SessionDetailView(APIView):
     permission_classes = [IsAuthenticated]
 
+    @extend_schema(tags=["auth"], responses={204: OpenApiResponse(description="Session revoked")})
     def delete(self, request, session_id):
         if not auth_service.revoke_one(request.user, session_id, request_id(request)):
             from rest_framework.exceptions import NotFound
@@ -242,6 +266,7 @@ class SessionDetailView(APIView):
 class RevokeOthersView(APIView):
     permission_classes = [IsAuthenticated]
 
+    @extend_schema(tags=["auth"], request=None, responses=docs.RevokedResponse)
     def post(self, request):
         count = auth_service.revoke_others(request.user, request.auth, request_id(request))
         return Response({"revoked": count})
@@ -252,6 +277,9 @@ class ReauthenticateView(APIView):
 
     permission_classes = [IsAuthenticated]
 
+    @extend_schema(
+        tags=["auth"], request=docs.ReauthenticateRequest, responses=docs.ReauthenticatedResponse
+    )
     def post(self, request):
         password = request.data.get("password")
         if not isinstance(password, str) or not password:
@@ -270,6 +298,7 @@ class PasswordForgotView(APIView):
     authentication_classes = []
     throttle_classes = [PasswordIpThrottle]
 
+    @extend_schema(tags=["auth"], request=PhoneSerializer, responses={202: DetailSerializer})
     def post(self, request):
         data = PhoneSerializer(data=request.data)
         data.is_valid(raise_exception=True)
@@ -282,6 +311,9 @@ class PasswordResetView(APIView):
     authentication_classes = []
     throttle_classes = [PasswordIpThrottle]
 
+    @extend_schema(
+        tags=["auth"], request=PasswordResetSerializer, responses=docs.PasswordResetResponse
+    )
     def post(self, request):
         data = PasswordResetSerializer(data=request.data)
         data.is_valid(raise_exception=True)
@@ -300,6 +332,9 @@ class PasswordResetView(APIView):
 class PasswordChangeView(APIView):
     permission_classes = [IsAuthenticated]
 
+    @extend_schema(
+        tags=["auth"], request=PasswordChangeSerializer, responses=docs.PasswordChangedResponse
+    )
     def post(self, request):
         data = PasswordChangeSerializer(data=request.data)
         data.is_valid(raise_exception=True)

@@ -1,6 +1,7 @@
 """Auth API serializers. Explicit field allowlists only (CC-R44)."""
 
 from django.core.exceptions import ValidationError as DjangoValidationError
+from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
 
 from apps.accounts.managers import normalize_phone_number
@@ -92,9 +93,11 @@ class SessionSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = fields
 
+    @extend_schema_field(serializers.CharField(allow_null=True))
     def get_ip(self, obj):
         return mask_ip(obj.last_ip or obj.login_ip)
 
+    @extend_schema_field(serializers.BooleanField())
     def get_current(self, obj):
         current = self.context.get("current_session")
         return current is not None and current.pk == obj.pk
