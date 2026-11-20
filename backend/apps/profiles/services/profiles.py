@@ -169,6 +169,9 @@ def create_profile(user: User, request_id=None) -> MatrimonialProfile:
                 profile = MatrimonialProfile.objects.create(
                     owner=user, profile_code=_new_code(), created_by=user, updated_by=user
                 )
+                # DR-2026-11-20-P-1: a new profile starts with religion set to the privacy
+                # choice "prefer not to say" (a flag; no religion or denomination value).
+                ProfileBasicInfo.objects.create(profile=profile, religion_prefer_not_to_say=True)
                 pseudonym = create_subject("PROFILE", profile.id).pseudonym
                 record_audit(
                     action="profile.created",

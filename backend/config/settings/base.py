@@ -321,7 +321,8 @@ PROFILE_REQUIRED_FIELDS = [
     "basic_info.date_of_birth",
     "basic_info.gender",
     "basic_info.marital_status",
-    "basic_info.religion",
+    # Religion is optional (owner decision DR-2026-11-20-P-1; supersedes its place in
+    # DR-2026-11-19-O-7). New profiles start with "prefer not to say" selected.
     "basic_info.nationality",
     "location.country",
     "location.city",

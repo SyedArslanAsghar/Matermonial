@@ -153,7 +153,7 @@ class TestEditing:
         value = years_ago(18, -1) if dob == "under" else timezone.now().date() + timedelta(days=1)
         response = client.patch(ME, {"basic_info": {"date_of_birth": str(value)}}, format="json")
         assert response.status_code == 400
-        assert not ProfileBasicInfo.objects.filter(profile__owner=user).exists()
+        assert ProfileBasicInfo.objects.get(profile__owner=user).date_of_birth is None
 
     def test_exactly_eighteen_is_accepted(self, owner):
         _, client = owner
@@ -311,7 +311,8 @@ class TestVocabularies:
         ).update(is_active=False)
         profile = MatrimonialProfile.objects.get(owner=user)
         completion = client.get(f"{URL}{profile.id}/completion/").json()
-        assert completion["unconfigured_vocabularies"] == ["gender", "marital_status", "religion"]
+        # Religion is optional (DR-2026-11-20-P-1): only required lists block submission.
+        assert completion["unconfigured_vocabularies"] == ["gender", "marital_status"]
         response = client.post(f"{URL}{profile.id}/submit-review/")
         assert response.status_code == 409
         assert response.json()["error"]["code"] == "vocabulary_not_configured"
@@ -475,10 +476,8 @@ class TestApprovedVocabulariesAndPrivacyChoices:
         bad = {"basic_info": {"religion": "R1", "religion_prefer_not_to_say": True}}
         assert client.patch(ME, bad, format="json").status_code == 400
         with pytest.raises(IntegrityError), transaction.atomic():
-            ProfileBasicInfo.objects.create(
-                profile=MatrimonialProfile.objects.first(),
-                caste="K1",
-                caste_prefer_not_to_say=True,
+            ProfileBasicInfo.objects.filter(profile=MatrimonialProfile.objects.first()).update(
+                caste="K1", caste_prefer_not_to_say=True
             )
 
     def test_denomination_is_optional_separate_and_scoped_to_its_religion(
@@ -517,13 +516,15 @@ class TestApprovedVocabulariesAndPrivacyChoices:
         with pytest.raises(IntegrityError), transaction.atomic():
             VocabularyOption.objects.create(vocabulary="denomination", code="Y", label_en="Y")
 
-    def test_community_caste_and_denomination_are_never_required(self, settings):
+    def test_identity_fields_are_never_required(self, settings):
         from apps.profiles.reference import FIELD_VOCABULARY
 
         required = set(settings.PROFILE_REQUIRED_FIELDS)
         assert not required & {
+            "basic_info.religion",
             "basic_info.community",
             "basic_info.caste",
+            "basic_info.sub_caste",
             "basic_info.denomination",
         }
         assert required == {
@@ -531,7 +532,6 @@ class TestApprovedVocabulariesAndPrivacyChoices:
             "basic_info.date_of_birth",
             "basic_info.gender",
             "basic_info.marital_status",
-            "basic_info.religion",
             "basic_info.nationality",
             "location.country",
             "location.city",

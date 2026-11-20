@@ -1,8 +1,10 @@
 """Profile completion from defined fields, computed by the backend (FR-008; doc 03 §22.1 row 16).
 
 The required set gates DRAFT → PENDING_REVIEW (doc 15 §2). It is configurable
-(``PROFILE_REQUIRED_FIELDS`` / ``PROFILE_OPTIONAL_FIELDS``); the defaults are the assumption
-recorded in DR-2026-11-19-P3-3, pending owner confirmation. Photos join the set when the upload
+(``PROFILE_REQUIRED_FIELDS`` / ``PROFILE_OPTIONAL_FIELDS``); the defaults are the owner-approved
+baseline (DR-2026-11-19-O-7), with religion made optional by DR-2026-11-20-P-1. Religion,
+denomination, caste, sub-caste and community never count toward completion, so the percentage
+never pressures anyone to disclose them. Photos join the set when the upload
 pipeline exists (TR-10). Items are ``"<section>.<field>"`` or a list section name ("languages",
 "education"), which counts as filled when it has at least one row.
 """

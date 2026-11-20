@@ -104,10 +104,10 @@ def test_prefer_not_to_say_is_a_flag_for_each_field(client):
         ProfileBasicInfo.objects.filter().update(sub_caste="X1", sub_caste_prefer_not_to_say=True)
 
 
-def test_religion_rule_is_unchanged_a_value_or_prefer_not_to_say(client, settings):
-    # The owner kept DR-2026-11-19-O-7: religion is answered by a value or "prefer not to say".
-    assert "basic_info.religion" in settings.PROFILE_REQUIRED_FIELDS
+def test_none_of_the_five_identity_fields_is_required(client, settings):
+    # DR-2026-11-20-P-1: religion is optional too (superseding its place in DR-2026-11-19-O-7).
     assert not {
+        "basic_info.religion",
         "basic_info.denomination",
         "basic_info.caste",
         "basic_info.sub_caste",

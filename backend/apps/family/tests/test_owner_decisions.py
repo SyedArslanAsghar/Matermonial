@@ -48,10 +48,8 @@ REQ = f"{FAM}requests/"
 @pytest.fixture
 def owner():
     user = make_user(1, with_profile=True)
-    ProfileBasicInfo.objects.create(
-        profile=MatrimonialProfile.objects.get(owner=user),
-        full_name="Owner Person",
-        date_of_birth="1995-01-01",
+    ProfileBasicInfo.objects.filter(profile=MatrimonialProfile.objects.get(owner=user)).update(
+        full_name="Owner Person", date_of_birth="1995-01-01"
     )
     return user
 
