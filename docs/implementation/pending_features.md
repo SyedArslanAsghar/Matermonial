@@ -1,6 +1,6 @@
 # Pending Features
 
-**Last updated:** 2026-11-20 (owner decisions DR-2026-11-20-O)
+**Last updated:** 2026-11-23 (DR-2026-11-23-K: KI-44 closed for the MVP; vocabulary expansion deferred until after the MVP)
 
 Phases 2–4 are implemented and tested; everything after them is pending (Phase 5 not authorized). The authoritative per-requirement list, with domain, module, approval status, implementation status and owner-decision dependencies, is `docs/handover/18_REQUIREMENTS_TRACEABILITY_MATRIX.md`.
 
@@ -31,3 +31,12 @@ Phases 2–4 are implemented and tested; everything after them is pending (Phase
 | G5 Phase 19 | Release | NOT_STARTED |
 
 Requirements fully blocked by an OPEN owner decision: FR-ACC-009 (OD-02a/b) and FR-PRO-005 (OD-04a). Partially dependent requirements are listed in doc 18.
+
+## Client obligations carried from backend decisions
+
+| Obligation | Source | Applies to | Status |
+|---|---|---|---|
+| Show the sub-caste privacy notice beside the sub-caste field when profile editing is built. Use the wording served by `GET /api/v1/profiles/vocabularies/` (`notices`, vocabulary `sub_caste`) without changing its meaning: it stays neutral, and disclosure stays optional (no required sub-caste, no blocking prompt) | DR-2026-11-23-K-2; AS-30 | Web client (G5 Phase 17) | NOT_STARTED: no web client exists; the notice is **not** displayed anywhere yet |
+| The same notice, same rules | DR-2026-11-23-K-2; AS-30 | Mobile client (G5 Phase 18) | NOT_STARTED: no mobile client exists; the notice is **not** displayed anywhere yet |
+
+The backend part is TESTED: the notice is served by the API (`test_carries_the_sub_caste_privacy_notice`).

@@ -11,13 +11,22 @@ has a parent. The dropdown offers only valid choices for the list being added (p
 ``?vocabulary=<list>`` on the add page to narrow it to one list; without it, religion and caste
 options are offered, labelled with their list), and the form rejects a mismatched parent before
 the database trigger would. Database constraints are unchanged.
+
+Owner vocabulary policy (DR-2026-11-23-K-4): adding or changing an option of an identity-sensitive
+list (``reference.VOCABULARIES``: gender, marital status, religion, denomination, community,
+caste, sub-caste) needs the owner decision that authorizes it, entered as ``decision_reference``
+(e.g. ``DR-2026-11-23-K-1``). The reference is recorded in the audit entry, so every such change
+can be traced to an owner decision. It is a traceability safeguard, not an approval workflow.
 """
+
+import re
 
 from django import forms
 from django.contrib import admin
 
 from apps.audit.services import record_audit
 
+from . import reference
 from .models import VocabularyOption
 
 TRACKED = ("label_en", "label_ur", "sort_order", "is_active")
@@ -31,13 +40,24 @@ class ParentChoiceField(forms.ModelChoiceField):
         return f"{obj.vocabulary}: {obj.label_en} ({obj.code})"
 
 
+DECISION_REFERENCE = re.compile(r"^DR-\d{4}-\d{2}-\d{2}-[A-Z0-9]+(?:-[A-Z0-9]+)*$")
+
+
 class VocabularyOptionForm(forms.ModelForm):
+    decision_reference = forms.CharField(
+        required=False,
+        max_length=64,
+        help_text="Owner decision authorizing this change (e.g. DR-2026-11-23-K-1). Required for "
+        "identity-sensitive lists.",
+    )
+
     class Meta:
         model = VocabularyOption
         fields = ("vocabulary", "code", "parent", "label_en", "label_ur", "sort_order", "is_active")
 
     def clean(self):
         cleaned = super().clean()
+        self._check_decision_reference(cleaned)
         if not self.instance._state.adding:  # vocabulary, code, parent are read-only after creation
             return cleaned
         vocabulary, parent = cleaned.get("vocabulary"), cleaned.get("parent")
@@ -52,6 +72,20 @@ class VocabularyOptionForm(forms.ModelForm):
         elif parent is not None and parent.vocabulary != parent_list:
             self.add_error("parent", f"The parent must be a {parent_list} option.")
         return cleaned
+
+    def _check_decision_reference(self, cleaned) -> None:
+        vocabulary = (
+            cleaned.get("vocabulary") if self.instance._state.adding else self.instance.vocabulary
+        )
+        value = (cleaned.get("decision_reference") or "").strip()
+        cleaned["decision_reference"] = value
+        if value and not DECISION_REFERENCE.fullmatch(value):
+            self.add_error("decision_reference", "Use a decision ID such as DR-2026-11-23-K-1.")
+        elif not value and reference.VOCABULARIES.get(vocabulary, False):
+            self.add_error(
+                "decision_reference",
+                "Identity-sensitive lists change only by owner decision: enter its ID.",
+            )
 
 
 def parent_queryset(vocabulary: str | None):
@@ -80,7 +114,16 @@ class VocabularyOptionAdmin(admin.ModelAdmin):
     list_editable = ()
     search_fields = ("code", "label_en")
     ordering = ("vocabulary", "sort_order", "code")
-    fields = ("vocabulary", "code", "parent", "label_en", "label_ur", "sort_order", "is_active")
+    fields = (
+        "vocabulary",
+        "code",
+        "parent",
+        "label_en",
+        "label_ur",
+        "sort_order",
+        "is_active",
+        "decision_reference",
+    )
     form = VocabularyOptionForm
 
     def get_readonly_fields(self, request, obj=None):
@@ -106,6 +149,14 @@ class VocabularyOptionAdmin(admin.ModelAdmin):
 
     def save_model(self, request, obj, form, change):
         changed = sorted(f for f in TRACKED if f in form.changed_data) if change else ["created"]
+        metadata = {
+            "vocabulary": obj.vocabulary,
+            "code": obj.code,
+            "is_active": obj.is_active,
+            "changed": ".".join(changed),
+        }
+        if form.cleaned_data.get("decision_reference"):
+            metadata["decision_reference"] = form.cleaned_data["decision_reference"]
         super().save_model(request, obj, form, change)
         record_audit(
             action="profiles.vocabulary_option_changed"
@@ -117,10 +168,5 @@ class VocabularyOptionAdmin(admin.ModelAdmin):
             category="ADMINISTRATIVE",
             actor_user_id=request.user.pk,
             request_id=getattr(request, "request_id", None),
-            metadata={
-                "vocabulary": obj.vocabulary,
-                "code": obj.code,
-                "is_active": obj.is_active,
-                "changed": ".".join(changed),
-            },
+            metadata=metadata,
         )

@@ -62,6 +62,8 @@ The project proceeds through five gates. **Each gate needs the project owner's e
 
 **DR-2026-11-20-P (2026-11-20):** religion optional with "prefer not to say" as the default for new profiles; vocabulary admin parent choices corrected; vocabulary values preserved. **ACCEPTED by the owner, item by item** (DR-2026-11-20-PA-1, -2, -3; commit `c7fe7e5`). Vocabulary recommendations (KI-44) remain open; the rest of Phases 2–4 awaits owner review.
 
+**DR-2026-11-23-K (2026-11-23):** the seeded identity vocabularies are accepted for the MVP unchanged, and their expansion is deferred until after the MVP (KI-44 no longer blocks). A withheld caste now clears or refuses a sub-caste that names a caste; read-only `GET /api/v1/profiles/vocabularies/`; admin changes to identity lists need an owner decision ID. **ACCEPTED by the owner** (DR-2026-11-23-KA).
+
 **Dependency check:**
 - Auth and User are final before 0001 (G4).
 - Audit and outbox exist at G4.

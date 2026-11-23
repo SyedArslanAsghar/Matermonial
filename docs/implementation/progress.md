@@ -1,6 +1,6 @@
 # Progress
 
-**Last updated:** 2026-11-20 (DR-2026-11-20-P items accepted by the owner: DR-2026-11-20-PA)
+**Last updated:** 2026-11-23 (DR-2026-11-23-K: KI-44 ACCEPTED by the owner, DR-2026-11-23-KA)
 
 ## Governance status
 
@@ -529,4 +529,17 @@ Implementation status: **TESTED.** REVIEWED and ACCEPTED are set by the reviewer
 | P-3 vocabularies | Values unchanged; recommendations documented for review only | `docs/implementation/vocabulary_review_recommendations.md` |
 
 Implementation status: **ACCEPTED by the project owner**, item by item, on 2026-11-20 (DR-2026-11-20-PA-1, -2, -3), commit `c7fe7e5`. The vocabulary recommendations (KI-44) stay open. Acceptance covers these three items only.
+
+## DR-2026-11-23-K: KI-44 vocabulary decisions (2026-11-23)
+
+| Item | Result | Evidence |
+|---|---|---|
+| K-1 vocabulary kept | Seeded identity values unchanged (religion 12, denomination 22, caste 16, sub-caste 19, community 12); expansion deferred until after the MVP | `test_seeded_identity_vocabularies_are_unchanged` compares every code, label, parent, status and order with migrations 0005 and 0007 |
+| K-2 caste privacy | `_protect_withheld_caste` in `services/profiles.py`: while caste is "prefer not to say", a sub-caste that names a caste is cleared when stored and refused when sent; unparented "Other" kept; owners and managers alike; earlier rows corrected on their next basic-info update. Notice text in `reference.NOTICES`, served by the API; not yet displayed by any client (no web or mobile client exists; recorded in `pending_features.md`) | `test_ki44_vocabulary.py::TestWithheldCaste` (12); `test_concurrent_updates_never_leave_a_named_sub_caste_beside_a_withheld_caste` (2 orders): the interleaving is forced, the second update is shown waiting on the profile-row lock, and the invariant holds; with the lock removed (scratch mutation check, not committed) both cases fail |
+| K-3 vocabulary API | `GET /api/v1/profiles/vocabularies/`: active options with code, labels and parent, plus notices; authenticated, account-scoped, not paginated | `TestVocabularyEndpoint` (7); OpenAPI `--validate --fail-on-warn`: 0 errors, 0 warnings |
+| K-4 admin safeguard | Identity-list adds and changes need an owner decision ID, recorded in the audit (`decision_reference`) | `TestAdminDecisionReference` (5); existing admin tests updated |
+
+No migration (`makemigrations --check`: no changes). Ruff lint and format clean. Local development data on port 5432 not inspected (KI-45). Full suite, run as CI runs it (`-m postgres`, then `-m "not postgres"`), on disposable databases: **648/648 passed** (9 + 639, including 27 KI-44 tests) on Python 3.12 and 3.13 × PostgreSQL 16 and 18 (re-run after the concurrency test was added).
+
+Implementation status: **ACCEPTED by the project owner** on 2026-11-23 (DR-2026-11-23-KA), after TESTED. Acceptance covers K-1 to K-4 only; KI-45 and the client display of the notice stay open.
 

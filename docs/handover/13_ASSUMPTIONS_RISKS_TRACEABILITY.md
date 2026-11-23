@@ -241,6 +241,7 @@ Recorded during specification reconciliation (baseline v4–v4.6-F3). Each must 
 | AS-27 | Initial denomination, caste, sub-caste and community values (migration `profiles.0007`) are a starting list chosen by professional judgment at the owner's request: common Pakistani and South Asian identities plus major denominations of each religion. They aren't tied to a religion (except denominations), a country or a population, and administrators can add, relabel, reorder or deactivate them. Ahmadiyya and other contested classifications aren't pre-seeded under any religion; administrators may add options after an owner decision | DR-2026-11-20-O-5 |
 | AS-28 | Notification channel policy: in-app and push for family and security notices; SMS only for one-time codes; email reserved for later features. Push `SENT` means accepted by Expo (receipts not polled yet) | DR-2026-11-20-O-7 |
 | AS-29 | Users' authenticator (TOTP) is optional except for managers performing Sensitive actions; WebAuthn may replace or complement it later | DR-2026-11-20-O-3 |
+| AS-30 | The sub-caste privacy notice is English only until Urdu translations are approved (deferred, DR-2026-11-23-K-1); clients show it beside the sub-caste field | DR-2026-11-23-K-2 |
 
 ### 5.2 Specification risks (R-1…R-19)
 

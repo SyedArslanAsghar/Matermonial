@@ -859,3 +859,10 @@ Editorial record (CC-R63). It adds no requirement. Details are in ADR-033 and `d
 - No new disclosure: the only endpoints returning profile fields are the owner's own profile and the acting-profile view for authorized managers (who see the flag, not a value). Search, recommendations, previews, public views and exports don't exist yet (Phases 6, 8, 15); when built they must respect these flags. Tested in `apps/profiles/tests/test_religion_optional.py`.
 - Vocabulary admin parent choices are restricted per list (denomination → religion, sub-caste → caste, none otherwise) in the form, on top of the unchanged database CHECK and trigger.
 
+### 22.15 Caste privacy and vocabulary changes (2026-11-23, DR-2026-11-23-K)
+
+- **Withheld caste (K-2):** while caste is "prefer not to say", a sub-caste whose option names a caste (for example a Syed sub-caste) can't stay beside it. The profile service clears it when it is only stored and refuses it when an update sends it. A sub-caste without a parent ("Other") reveals no caste and is kept. The same rule applies to owners and managers; the represented profile is locked during the update, so no update order or concurrent request bypasses it. It mirrors the existing religion rule (withholding religion clears the denomination). Tested in `apps/profiles/tests/test_ki44_vocabulary.py`, including a concurrent-update test that forces the interleaving and checks that the second update waits on the row lock (it fails when the lock is removed).
+- **Notice (K-2):** the neutral sub-caste notice is served by `GET /api/v1/profiles/vocabularies/`; disclosure stays optional. No web or mobile client exists yet, so it isn't displayed anywhere; showing it is a client obligation (`docs/implementation/pending_features.md`).
+- **Vocabulary endpoint (K-3):** returns reference data only (codes, labels, parents, notices), never profile data; authenticated.
+- **Admin changes (K-4):** adding or changing an option of an identity-sensitive list needs an owner decision ID, recorded in the audit entry (`decision_reference`). Options are still never deleted, and codes and parents still can't change.
+

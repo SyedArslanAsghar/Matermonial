@@ -1,6 +1,6 @@
 # Completed Features
 
-**Last updated:** 2026-11-20
+**Last updated:** 2026-11-23 (DR-2026-11-23-K ACCEPTED, DR-2026-11-23-KA)
 
 Implementation status per requirement is in `docs/handover/18_REQUIREMENTS_TRACEABILITY_MATRIX.md`. Nothing here is REVIEWED or ACCEPTED: those statuses are set by the reviewer and the project owner (CC-R70).
 
@@ -67,5 +67,14 @@ Evidence in `progress.md` (404/404 tests on Python 3.12 and 3.13 × PostgreSQL 1
 | Religion optional; "prefer not to say" default for new profiles; all five identity fields optional; existing profiles unchanged | FR-PRO-002; P-1 | **ACCEPTED** (DR-2026-11-20-PA-1, `c7fe7e5`) |
 | Vocabulary admin parent choices per list; database validation kept | P-2 | **ACCEPTED** (DR-2026-11-20-PA-2, `c7fe7e5`) |
 | Existing vocabulary values preserved without modification | P-3 | **ACCEPTED** (DR-2026-11-20-PA-3) |
+
+## DR-2026-11-23-K (ACCEPTED, 2026-11-23)
+
+| Feature | Requirement / decision | Status |
+|---|---|---|
+| Identity vocabularies accepted unchanged for the MVP | FR-PRO-002; K-1 | **ACCEPTED** (DR-2026-11-23-KA) |
+| Withheld caste clears or refuses a sub-caste that names a caste; sub-caste notice served by the API | FR-PRO-002; K-2 | **ACCEPTED** (DR-2026-11-23-KA) |
+| `GET /api/v1/profiles/vocabularies/` | FR-PRO-002; K-3 | **ACCEPTED** (DR-2026-11-23-KA) |
+| Admin identity-list changes need an owner decision ID, audited | K-4 | **ACCEPTED** (DR-2026-11-23-KA) |
 
 Documentation work completed under G1 is recorded in `docs/handover/20_DOCUMENTATION_CORRECTION_REGISTER.md`.

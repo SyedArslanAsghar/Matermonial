@@ -8,6 +8,7 @@ from rest_framework.views import APIView
 
 from apps.family.context import reject_header, resolve
 
+from .. import reference
 from ..services import profiles as service
 from ..services.completion import (
     completion_percentage,
@@ -103,3 +104,40 @@ class SubmitForReviewView(APIView):
         ctx = resolve(request, path_profile_id=profile_id, any_of=service.EDIT_PERMISSIONS)
         profile = service.submit_for_review(ctx, _rid(request))
         return Response(represent(profile, ctx))
+
+
+class VocabularyParentSerializer(serializers.Serializer):
+    vocabulary = serializers.CharField()
+    code = serializers.CharField()
+
+
+class VocabularyOptionSerializer(serializers.Serializer):
+    code = serializers.CharField()
+    label_en = serializers.CharField()
+    label_ur = serializers.CharField(help_text="Empty until an Urdu label is approved.")
+    parent = VocabularyParentSerializer(allow_null=True)
+
+
+class VocabularyNoticeSerializer(serializers.Serializer):
+    vocabulary = serializers.CharField()
+    text_en = serializers.CharField()
+
+
+class VocabularyListSerializer(serializers.Serializer):
+    vocabularies = serializers.DictField(
+        child=VocabularyOptionSerializer(many=True),
+        help_text="Every list by name, with its active options in display order.",
+    )
+    notices = VocabularyNoticeSerializer(many=True)
+
+
+class VocabularyListView(APIView):
+    """``/profiles/vocabularies/``: the active options of every controlled vocabulary (KI44-2,
+    DR-2026-11-23-K-3). Account-scoped reference data, so the acting-profile header is refused.
+    Small and complete, so not paginated."""
+
+    @extend_schema(tags=TAG, responses=VocabularyListSerializer)
+    def get(self, request):
+        reject_header(request)
+        notices = [{"vocabulary": k, "text_en": v} for k, v in reference.NOTICES.items()]
+        return Response({"vocabularies": reference.active_options(), "notices": notices})

@@ -591,3 +591,15 @@ It adds no requirement. Request and response schemas for every operation are in 
 Headers: `X-Step-Up-Verification: <uuid>` accompanies a manager's Sensitive change. New error codes: `already_requested` (409), `invitation_expired` (409), `step_up_required` (403, also for missing/expired/used verifications), `authenticator_required` (403), `step_up_failed` (403), `one_sensitive_action_per_request` (400), `identity_verification_owner_only` (403), `mfa_*` (409/400). `sensitive_use_unavailable` (interim, 2026-11-20) is superseded. The profile field `caste_or_subcast` is now `caste`, and `sub_caste` is added (DR-2026-11-20-O-5); no client consumed the old name.
 
 Provider integrations (doc 04 §17–§22): Twilio SMS, SMTP email, Expo Push and ClamAV adapters (ADR-037), configured through doc 16 §16.
+
+### Implementation record: KI-44 decisions DR-2026-11-23-K (2026-11-23; CC-R63)
+
+It adds no requirement.
+
+| Method | Endpoint | Purpose |
+|---|---|---|
+| GET | `/profiles/vocabularies/` | Active options of every controlled vocabulary, for building forms (DR-2026-11-23-K-3). Authenticated; account-scoped, so `X-Acting-Profile` is refused (`header_not_allowed`, 400). Not paginated (small, complete reference data) |
+
+Response: `{"vocabularies": {"<list>": [{"code", "label_en", "label_ur", "parent": {"vocabulary", "code"} or null}]}, "notices": [{"vocabulary", "text_en"}]}`. Every list in `reference.VOCABULARIES` is present, in that order, with its active options in display order (an unconfigured list is empty). `label_ur` is empty until Urdu labels are approved. Only active options are listed: exactly the values the profile services accept as new choices.
+
+`PATCH /profiles/me/` (DR-2026-11-23-K-2): while `caste_prefer_not_to_say` is true, a `sub_caste` whose option names a caste is refused with a `sub_caste` field error (400); one that is only stored is cleared.

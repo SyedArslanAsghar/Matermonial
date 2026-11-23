@@ -610,6 +610,44 @@ No speculative infrastructure tasks are added.
 
 ---
 
+## Decision record DR-2026-11-23-K: KI-44 vocabulary decisions for the MVP
+
+- **Decision ID:** DR-2026-11-23-K
+- **Date:** 2026-11-23
+- **Decided by:** Project owner (instruction after the KI-44 vocabulary review)
+- **Decision status:** APPROVED
+- **Branch:** `feature/g5-phase2-auth`
+
+| # | ID | Item | Decision | Supersedes |
+|---|---|---|---|---|
+| 1 | DR-2026-11-23-K-1 | Vocabulary for the MVP | The seeded identity vocabularies are accepted for the MVP **unchanged**: religion 12, denomination 22, caste 16, sub-caste 19, community 12, with their codes, English labels, parents, active status and order (keeps DR-2026-11-20-PA-3). Deferred until after the MVP, driven by user feedback: new caste, sub-caste or community values, label-consistency changes, denomination hierarchies, Urdu translations. No Ahmadiyya-related change. KI-44 is no longer an MVP blocker | KI-44 recommendations (deferred, not rejected) |
+| 2 | DR-2026-11-23-K-2 | Caste privacy (KI44-1) | While caste is "prefer not to say", a sub-caste whose option names a caste can't be stored: it is cleared when only stored (also on the next basic-info update of an earlier row) and refused when the update sends it. A sub-caste option without a parent ("Other") is kept. Enforced server-side for owners and managers alike. A neutral notice explains that a sub-caste may show the caste and suggest family or religious background; disclosure stays optional | — (privacy gap fix) |
+| 3 | DR-2026-11-23-K-3 | Vocabulary API (KI44-2) | `GET /api/v1/profiles/vocabularies/`: read-only, authenticated, account-scoped; every list with its active options (code, English label, Urdu label, parent) and the field notices; not paginated | — |
+| 4 | DR-2026-11-23-K-4 | Admin safeguard | Adding or changing an option of an identity-sensitive list in the admin needs the ID of the owner decision that authorizes it; the audit entry records it. No approval workflow | — |
+
+**Explicitly deferred (not implemented):** additional caste, sub-caste or community values; denomination hierarchies; Urdu translations; search, matching, partner-preference and profile-visibility changes; Ahmadiyya classification; free-text identity fields.
+
+**Not authorized:** push, PR, merge, production data or infrastructure, port 5432.
+
+---
+
+## Acceptance record DR-2026-11-23-KA: owner acceptance of KI-44 (DR-2026-11-23-K)
+
+- **Record ID:** DR-2026-11-23-KA
+- **Date:** 2026-11-23
+- **Accepted by:** Project owner (explicit). Implementation status ACCEPTED is set by the owner only (CC-R70); this record documents the owner's acceptance.
+
+| # | Item | Evidence | Status |
+|---|---|---|---|
+| 1 | **DR-2026-11-23-K-1** seeded identity vocabularies kept unchanged for the MVP; expansion deferred | Seed snapshot test (81 rows vs. migrations 0005 and 0007) | **ACCEPTED** |
+| 2 | **DR-2026-11-23-K-2** withheld caste clears or refuses a sub-caste that names a caste; owners and managers; concurrency-safe; notice served by the API | `test_ki44_vocabulary.py` (privacy, manager and concurrent-update tests) | **ACCEPTED** |
+| 3 | **DR-2026-11-23-K-3** `GET /api/v1/profiles/vocabularies/` | Endpoint tests; OpenAPI 0 errors, 0 warnings | **ACCEPTED** |
+| 4 | **DR-2026-11-23-K-4** admin decision reference for identity lists, audited | Admin tests | **ACCEPTED** |
+
+Evidence: 648/648 tests on Python 3.12 and 3.13 × PostgreSQL 16 and 18 on the reviewed working tree; committed in `feat(profiles): complete KI-44 vocabulary privacy and API safeguards`. Authorized with this acceptance: that commit and its push to `feature/g5-phase2-auth`. **Not accepted or authorized by this record:** KI-45 (stays open), displaying the notice in clients (pending, no client exists), a PR, a merge, `main`, deployment, Phase 5.
+
+---
+
 ## OD-01 approved functional-domain catalogue
 
 **Source key:**

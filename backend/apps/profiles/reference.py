@@ -10,7 +10,12 @@ the owner's Phase 2/3 review on 2026-11-19).
   a new value.
 - Only *which* vocabularies exist is code (``VOCABULARIES``), because each backs a model field.
 - Proposed options are seeded **inactive** for owner review (``PROPOSED``); nothing is offered
-  until an administrator activates it. No religion, community or caste value is proposed.
+  until an administrator activates it. The identity lists (religion, denomination, caste,
+  sub-caste, community) aren't proposals: their owner-approved values are seeded active by
+  migrations 0005 and 0007 and are kept unchanged for the MVP (DR-2026-11-20-PA-3,
+  DR-2026-11-23-K-1).
+- Clients read the active options from ``GET /api/v1/profiles/vocabularies/``
+  (``active_options``).
 """
 
 import re
@@ -72,7 +77,9 @@ PROPOSED: dict[str, tuple[str, ...]] = {
     "photo_type": ("PORTRAIT", "FULL_LENGTH", "OTHER"),
 }
 
-# Required profile fields that are vocabulary-backed: submission needs each configured.
+# Vocabulary-backed profile fields. Only those listed in ``settings.PROFILE_REQUIRED_FIELDS``
+# need a configured list before submission (``services.completion``); the five identity fields
+# are optional (DR-2026-11-20-P-1).
 FIELD_VOCABULARY = {
     "basic_info.gender": "gender",
     "basic_info.marital_status": "marital_status",
@@ -151,3 +158,43 @@ def unconfigured(vocabularies) -> list[str]:
         ).values_list("vocabulary", flat=True)
     )
     return sorted(set(vocabularies) - active)
+
+
+def active_options() -> dict[str, list[dict]]:
+    """Every vocabulary (in ``VOCABULARIES`` order) with its active options in display order,
+    exactly the values the profile services accept as new choices. A list with no active option
+    is returned empty."""
+    from .models import VocabularyOption
+
+    grouped: dict[str, list[dict]] = {name: [] for name in VOCABULARIES}
+    rows = (
+        VocabularyOption.objects.filter(is_active=True, vocabulary__in=list(VOCABULARIES))
+        .order_by("vocabulary", "sort_order", "code")
+        .values("vocabulary", "code", "label_en", "label_ur", "parent__vocabulary", "parent__code")
+    )
+    for row in rows:
+        parent = (
+            {"vocabulary": row["parent__vocabulary"], "code": row["parent__code"]}
+            if row["parent__code"] is not None
+            else None
+        )
+        grouped[row["vocabulary"]].append(
+            {
+                "code": row["code"],
+                "label_en": row["label_en"],
+                "label_ur": row["label_ur"],
+                "parent": parent,
+            }
+        )
+    return grouped
+
+
+# Neutral notices that clients show beside a field (KI44-1, DR-2026-11-23-K-2). English only
+# until Urdu translations are approved (deferred, DR-2026-11-23-K-1).
+NOTICES: dict[str, str] = {
+    "sub_caste": (
+        "Sharing a sub-caste is optional. A sub-caste can show your caste and may suggest your "
+        "family or religious background. If you chose not to share your caste, you can't pick "
+        "a sub-caste that names one."
+    ),
+}

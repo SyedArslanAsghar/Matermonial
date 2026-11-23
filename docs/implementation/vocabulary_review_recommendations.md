@@ -1,6 +1,6 @@
 # Vocabulary Review Recommendations (for owner review — NOT approved)
 
-**Prepared:** 2026-11-20, under DR-2026-11-20-P-3. **Status:** proposals only. Nothing below has been applied. The seeded values of `profiles.0005` (religion) and `profiles.0007` (denomination, caste, sub-caste, community) are unchanged, and each item needs a separate owner decision. Every change listed is possible in the admin without a code change: relabel, reorder, deactivate, or add values. Codes can't be renamed or deleted.
+**Prepared:** 2026-11-20, under DR-2026-11-20-P-3. **Status (2026-11-23, DR-2026-11-23-K-1):** deferred until after the MVP; the owner accepted the current values for the MVP and will revisit these proposals using user feedback. Proposals only. Nothing below has been applied. The seeded values of `profiles.0005` (religion) and `profiles.0007` (denomination, caste, sub-caste, community) are unchanged, and each item needs a separate owner decision. Every change listed is possible in the admin without a code change: relabel, reorder, deactivate, or add values. Codes can't be renamed or deleted.
 
 | # | Value(s) | Concern | Options |
 |---|---|---|---|

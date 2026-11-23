@@ -236,6 +236,33 @@ def _check_denomination(values: dict, current, errors: dict) -> None:
         errors["denomination"] = ["This denomination or tradition doesn't belong to the religion."]
 
 
+def _protect_withheld_caste(values: dict, current, errors: dict) -> None:
+    """KI44-1 (owner decision DR-2026-11-23-K-2): a sub-caste whose option names a caste would
+    reveal a caste the user chose not to share. While caste is "prefer not to say", such a
+    sub-caste is cleared when it is only stored, and rejected when this update sends it. A
+    sub-caste option without a parent (e.g. "Other") names no caste and is kept.
+
+    Runs after ``_normalise_privacy_choices``, which already resolved the flag for this update;
+    the represented profile is locked, so ``current`` can't change underneath."""
+    withheld = values.get(
+        "caste_prefer_not_to_say", getattr(current, "caste_prefer_not_to_say", False)
+    )
+    if not withheld:
+        return
+    if values.get("sub_caste") is not None:
+        if reference.parent_code("sub_caste", values["sub_caste"]) is not None:
+            errors["sub_caste"] = [
+                "This sub-caste would reveal the caste you chose not to share. Share the caste, "
+                "or leave the sub-caste empty."
+            ]
+        return
+    if "sub_caste" in values:
+        return  # cleared by this update
+    stored = getattr(current, "sub_caste", None)
+    if stored is not None and reference.parent_code("sub_caste", stored) is not None:
+        values["sub_caste"] = None
+
+
 def _check_sub_caste(values: dict, current, errors: dict) -> None:
     """A sub-caste is never required. If its option names a caste and a caste is given, they
     must match (DR-2026-11-20-O-5)."""
@@ -252,6 +279,7 @@ def _check_section(section: str, values: dict, current, today: date) -> dict:
     errors: dict = {}
     if section == "basic_info":
         _normalise_privacy_choices(values, errors)
+        _protect_withheld_caste(values, current, errors)
         _check_denomination(values, current, errors)
         _check_sub_caste(values, current, errors)
     _check_codes(section, values, errors, current=current)

@@ -409,6 +409,7 @@ def test_vocabulary_admin_changes_are_audited():
 
     class Form:
         changed_data = ["is_active"]
+        cleaned_data: dict = {}  # diet isn't identity-sensitive: no decision reference (K-4)
 
     model_admin.save_model(request, option, Form(), change=True)
     entry = AuditLog.objects.get(action="profiles.vocabulary_option_changed")

@@ -37,6 +37,7 @@ def form_for(vocabulary, parent=None, code="NEW_CODE", **query):
         "label_ur": "",
         "sort_order": 0,
         "is_active": "on",
+        "decision_reference": "DR-2026-11-23-K-4",  # identity-sensitive lists need one (K-4)
     }
     if parent is not None:
         data["parent"] = str(parent.pk)
@@ -129,7 +130,14 @@ class TestEditing:
         assert "parent" not in form_class.base_fields
         form = form_class(
             instance=existing,
-            data={"label_en": "Syed Bukhari", "label_ur": "", "sort_order": 5, "is_active": "on"},
+            data={
+                "label_en": "Syed Bukhari",
+                "label_ur": "",
+                "sort_order": 5,
+                "is_active": "on",
+                # Identity-sensitive list: an owner decision reference is required (K-4).
+                "decision_reference": "DR-2026-11-23-K-4",
+            },
         )
         assert form.is_valid(), form.errors
         saved = form.save()
