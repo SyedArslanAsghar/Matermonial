@@ -7,10 +7,8 @@
 #   with Python 3.12, the minimum supported version, so the consistency check runs on 3.12.
 # - Tests run on PostgreSQL 16 and 18 (TR-13), in throwaway CI service containers. Their
 #   credentials are not secrets. The service is published on port 55432, never 5432.
-# - Known issue KI-14 (carried forward to G4, DR-2026-11-18-G3A): exactly 3 User-model database
-#   tests need the initial accounts migration. They carry the `deferred_g4_ki14` marker and are
-#   reported as skipped with a DEFERRED reason, never as passed. Every other test runs, and any
-#   failure, error or collection error fails the job. There is no continue-on-error.
+# - Every test runs, in two groups: the PostgreSQL-marked foundation tests, then all other
+#   tests. Any failure, error or collection error fails the job. There is no continue-on-error.
 
 name: CI
 
@@ -135,23 +133,8 @@ jobs:
           fi
           echo "MATERMONIAL_TEST_POSTGRES_URL is set (value not printed)."
 
-      - name: Verify that exactly the 3 KI-14 tests are deferred to G4
-        shell: bash
-        run: |
-          expected="apps/accounts/tests/test_user_model.py::test_create_user_stores_e164_phone_and_hashed_password
-          apps/accounts/tests/test_user_model.py::test_create_user_without_password_gets_unusable_password
-          apps/accounts/tests/test_user_model.py::test_invalid_phone_format_is_rejected"
-          collected=$(pytest --collect-only -q -m deferred_g4_ki14) || { echo "$collected"; exit 1; }
-          actual=$(grep '::' <<< "$collected" | sort)
-          if ! diff <(sed 's/^ *//' <<< "$expected" | sort) <(echo "$actual"); then
-            echo "::error::The deferred_g4_ki14 set is not exactly the 3 known KI-14 tests."
-            exit 1
-          fi
-          echo "::notice::3 tests DEFERRED to G4 (KI-14): they need the initial accounts migration. They are not run and not passed."
-          echo "$actual"
-
       - name: PostgreSQL foundation tests
         run: pytest -m postgres
 
-      - name: All other pre-G4 tests (the 3 KI-14 tests are reported as skipped, DEFERRED)
+      - name: All other tests (application and unit tests)
         run: pytest -m "not postgres"
